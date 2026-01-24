@@ -1,0 +1,40 @@
+# Ignore node modules
+mobile-app/node_modules/
+
+# Ignore mobile app build files
+mobile-app/android/app/build/
+mobile-app/android/.gradle/
+mobile-app/ios/build/
+mobile-app/ios/Pods/
+mobile-app/*.apk
+mobile-app/*.ipa
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore environment files
+.env
+.env.local
+.env.production
+
+# Ignore uploads directory
+website/backend/uploads/
+
+# Ignore temporary files
+tmp/
+temp/
+*.tmp

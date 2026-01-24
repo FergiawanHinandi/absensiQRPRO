@@ -1,0 +1,386 @@
+/* absensiQRPRO - Main Stylesheet */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Navbar */
+.navbar {
+    background-color: #2c3e50;
+    color: white;
+    padding: 1rem 0;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.navbar .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo h1 {
+    font-size: 1.5rem;
+    color: #3498db;
+}
+
+.nav-menu {
+    display: flex;
+    list-style: none;
+    gap: 2rem;
+}
+
+.nav-menu a {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.nav-menu a:hover,
+.nav-menu a.active {
+    background-color: #3498db;
+}
+
+/* Dashboard */
+.dashboard {
+    margin: 2rem 0;
+}
+
+.dashboard h2 {
+    color: #2c3e50;
+    margin-bottom: 2rem;
+    font-size: 2rem;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.stat-icon {
+    font-size: 3rem;
+}
+
+.stat-info h3 {
+    font-size: 2rem;
+    color: #3498db;
+    margin-bottom: 0.25rem;
+}
+
+.stat-info p {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+/* Tables */
+.table-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow-x: auto;
+    margin-bottom: 2rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background-color: #3498db;
+    color: white;
+}
+
+th, td {
+    padding: 1rem;
+    text-align: left;
+}
+
+tbody tr {
+    border-bottom: 1px solid #ecf0f1;
+}
+
+tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.no-data {
+    text-align: center !important;
+    color: #7f8c8d;
+    padding: 2rem !important;
+}
+
+/* Recent Attendance Section */
+.recent-attendance {
+    margin: 2rem 0;
+}
+
+.recent-attendance h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+/* QR Section */
+.qr-section {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    margin: 2rem 0;
+}
+
+.qr-section h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.info-box {
+    background-color: #e8f4f8;
+    padding: 1.5rem;
+    border-radius: 4px;
+    border-left: 4px solid #3498db;
+}
+
+.info-box ul {
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+.info-box li {
+    margin: 0.5rem 0;
+}
+
+.note {
+    margin-top: 1rem;
+    font-style: italic;
+    color: #7f8c8d;
+}
+
+code {
+    background-color: #2c3e50;
+    color: #3498db;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+}
+
+.btn-success {
+    background-color: #27ae60;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #229954;
+}
+
+/* Page Header */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 2rem 0;
+}
+
+.page-header h2 {
+    color: #2c3e50;
+    font-size: 2rem;
+}
+
+/* Filter Section */
+.filter-section {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.search-input, .filter-select {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.search-input {
+    flex: 1;
+}
+
+/* Date Picker */
+.date-picker {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.date-input {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+/* Stats Summary */
+.stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.summary-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.summary-card h4 {
+    color: #7f8c8d;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.summary-card p {
+    font-size: 2rem;
+    color: #3498db;
+    font-weight: bold;
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-present {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-late {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-absent {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-excused {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+/* QR Code Display */
+.qr-code-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+
+/* Footer */
+footer {
+    background-color: #2c3e50;
+    color: white;
+    text-align: center;
+    padding: 2rem 0;
+    margin-top: 3rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .navbar .container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .nav-menu {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .filter-section {
+        flex-direction: column;
+    }
+
+    table {
+        font-size: 0.85rem;
+    }
+
+    th, td {
+        padding: 0.5rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .navbar, footer, .btn, .filter-section {
+        display: none;
+    }
+
+    .container {
+        max-width: 100%;
+    }
+}

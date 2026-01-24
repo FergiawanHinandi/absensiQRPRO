@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Siswa - absensiQRPRO</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <h1>absensiQRPRO</h1>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html">Dashboard</a></li>
+                <li><a href="students.html" class="active">Data Siswa</a></li>
+                <li><a href="attendance.html">Absensi</a></li>
+                <li><a href="reports.html">Laporan</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>Data Siswa</h2>
+            <button class="btn btn-primary" onclick="window.print()">Cetak QR Code</button>
+        </div>
+
+        <div class="filter-section">
+            <input type="text" id="searchInput" placeholder="Cari siswa (NIS, Nama, atau Kelas)..." class="search-input">
+            <select id="classFilter" class="filter-select">
+                <option value="">Semua Kelas</option>
+                <option value="10-A">10-A</option>
+                <option value="10-B">10-B</option>
+                <option value="11-A">11-A</option>
+                <option value="11-B">11-B</option>
+                <option value="12-A">12-A</option>
+                <option value="12-B">12-B</option>
+            </select>
+        </div>
+
+        <div class="table-container">
+            <table id="studentsTable">
+                <thead>
+                    <tr>
+                        <th>NIS</th>
+                        <th>Nama</th>
+                        <th>Kelas</th>
+                        <th>QR Code</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="studentsBody">
+                    <tr>
+                        <td colspan="5" class="no-data">Memuat data...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 absensiQRPRO - Sistem Absensi Berbasis QR Code</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="js/students.js"></script>
+</body>
+</html>

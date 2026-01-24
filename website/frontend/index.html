@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>absensiQRPRO - Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="logo">
+                <h1>absensiQRPRO</h1>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="active">Dashboard</a></li>
+                <li><a href="students.html">Data Siswa</a></li>
+                <li><a href="attendance.html">Absensi</a></li>
+                <li><a href="reports.html">Laporan</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="dashboard">
+            <h2>Dashboard Absensi</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">👨‍🎓</div>
+                    <div class="stat-info">
+                        <h3 id="totalStudents">0</h3>
+                        <p>Total Siswa</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">✓</div>
+                    <div class="stat-info">
+                        <h3 id="todayPresent">0</h3>
+                        <p>Hadir Hari Ini</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">✗</div>
+                    <div class="stat-info">
+                        <h3 id="todayAbsent">0</h3>
+                        <p>Tidak Hadir</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-info">
+                        <h3 id="attendanceRate">0%</h3>
+                        <p>Persentase Kehadiran</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="recent-attendance">
+                <h3>Absensi Terbaru Hari Ini</h3>
+                <div class="table-container">
+                    <table id="attendanceTable">
+                        <thead>
+                            <tr>
+                                <th>NIS</th>
+                                <th>Nama Siswa</th>
+                                <th>Kelas</th>
+                                <th>Waktu</th>
+                                <th>Status</th>
+                                <th>Guru</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceBody">
+                            <tr>
+                                <td colspan="6" class="no-data">Memuat data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="qr-section">
+                <h3>Informasi Mobile App</h3>
+                <div class="info-box">
+                    <p>📱 Download aplikasi mobile untuk guru:</p>
+                    <ul>
+                        <li>Scan QR Code kartu pelajar siswa</li>
+                        <li>Catat kehadiran secara realtime</li>
+                        <li>Lihat riwayat absensi</li>
+                        <li>Mode offline tersedia</li>
+                    </ul>
+                    <p class="note">Aplikasi tersedia di folder <code>mobile-app/</code> pada repository</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 absensiQRPRO - Sistem Absensi Berbasis QR Code</p>
+        </div>
+    </footer>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
