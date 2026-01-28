@@ -267,7 +267,7 @@ Cari penggunaan function "calculateTotal" dalam repository ini
 
 **Query Syntax:**
 ```
-content:Skill language:Java org:github
+content:authenticate language:Java org:github
 repo:owner/repo NOT is:archived
 language:Python OR language:go
 ```
@@ -500,7 +500,7 @@ Copilot, help me refactor:
 **Tools yang digunakan:**
 1. `search_code` (query: "oldApi repo:owner/repo")
 2. `get_file_contents` - Read affected files
-3. `grep` - Local search for verification
+3. `search_code` - Verify changes across repository
 
 ---
 
@@ -517,8 +517,8 @@ Copilot, prepare for release v2.0:
 **Tools yang digunakan:**
 1. `get_latest_release` - Get last release
 2. `list_commits` - Get commits since last release
-3. `search_issues` (query: "closed:>YYYY-MM-DD")
-4. `search_pull_requests` (query: "merged:>YYYY-MM-DD")
+3. `search_issues` (query: "is:closed closed:>YYYY-MM-DD") - Replace YYYY-MM-DD dengan tanggal release terakhir
+4. `search_pull_requests` (query: "is:merged merged:>YYYY-MM-DD") - Replace YYYY-MM-DD dengan tanggal release terakhir
 
 ---
 
@@ -569,7 +569,7 @@ authenticate
 **Search Issues:**
 ```
 # Good - Filtered
-is:open label:bug created:>2024-01-01
+is:open label:bug created:>2026-01-01
 
 # Bad - Unfiltered
 bug
@@ -786,7 +786,7 @@ jobs:
 
 ### 3. Custom Search Queries
 
-Save frequent searches:
+Save frequent searches (Note: Query syntax harus dalam bahasa English karena GitHub API syntax):
 
 ```json
 // .vscode/settings.json
@@ -794,7 +794,7 @@ Save frequent searches:
   "github.mcp.savedQueries": {
     "criticalBugs": "is:issue is:open label:bug label:critical",
     "myPRs": "is:pr author:@me state:open",
-    "recentReleases": "is:release created:>2024-01-01"
+    "recentReleases": "is:release created:>2026-01-01"
   }
 }
 ```
