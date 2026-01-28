@@ -45,21 +45,28 @@ GitHub MCP (Model Context Protocol) Server adalah extension yang memungkinkan VS
 
 #### 1. Install GitHub MCP Server Extension
 
+> **Note:** Nama extension dan metode instalasi dapat bervariasi. Pastikan untuk memeriksa VS Code Marketplace untuk extension yang tepat untuk GitHub MCP Server.
+
 ```bash
-# Install via VS Code Marketplace
+# Install via VS Code Marketplace (verify extension name in marketplace)
 code --install-extension github.mcp-server
 ```
 
 Atau install melalui:
 1. Buka VS Code
 2. Tekan `Ctrl+Shift+X` (Windows/Linux) atau `Cmd+Shift+X` (Mac)
-3. Cari "GitHub MCP Server"
+3. Cari "GitHub MCP Server" atau "Model Context Protocol"
 4. Klik "Install"
 
 #### 2. Konfigurasi GitHub Token
 
-Buat Personal Access Token (PAT) di GitHub:
+Buat Personal Access Token (PAT) di GitHub. GitHub menyediakan dua jenis token:
 
+**Fine-grained Personal Access Token (Recommended untuk security):**
+1. Pergi ke GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens
+2. Generate new token dengan specific repository access
+
+**Classic Personal Access Token:**
 1. Pergi ke GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
 2. Klik "Generate new token (classic)"
 3. Berikan nama token yang deskriptif (misal: "VS Code MCP Server")
@@ -72,12 +79,14 @@ Buat Personal Access Token (PAT) di GitHub:
 
 #### 3. Konfigurasi di VS Code
 
+> **Note:** Setting names dapat bervariasi tergantung versi extension. Periksa dokumentasi extension untuk setting yang tepat.
+
 **Metode 1: Via Settings UI**
 1. Buka Settings (`Ctrl+,`)
 2. Cari "GitHub MCP"
-3. Paste token di field "GitHub: MCP Token"
+3. Paste token di field GitHub MCP token
 
-**Metode 2: Via settings.json**
+**Metode 2: Via settings.json (Example)**
 ```json
 {
   "github.mcp.token": "ghp_your_token_here",
@@ -329,7 +338,7 @@ Tampilkan 5 workflow runs terakhir untuk CI workflow
 **Parameters:**
 - `owner`: Repository owner (required)
 - `repo`: Repository name (required)
-- `resource_id`: Workflow ID/filename
+- `resource_id`: Workflow ID or workflow filename (e.g., "ci.yaml")
 - `workflow_runs_filter`: Filter options
   - `status`: queued, in_progress, completed
   - `event`: push, pull_request, etc.
@@ -690,7 +699,7 @@ Copilot, update README:
 
 ---
 
-### Issue: "Copilot Tidak Respond"
+### Issue: "Copilot Tidak Merespons"
 
 **Cause:** MCP Server connection issue
 
@@ -770,10 +779,11 @@ Buat custom commands untuk common tasks:
 
 ### 2. Integration dengan CI/CD
 
-Trigger Copilot actions dari CI/CD:
+Trigger Copilot actions dari CI/CD (Contoh konseptual):
 
 ```yaml
 # .github/workflows/copilot-review.yml
+# Note: Ini adalah contoh konseptual. Verify action availability sebelum digunakan.
 name: Auto Review
 on: [pull_request]
 jobs:
@@ -781,15 +791,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Copilot Review
+        # Verify action exists before using
         uses: github/copilot-review-action@v1
 ```
 
 ### 3. Custom Search Queries
 
-Save frequent searches (Note: Query syntax harus dalam bahasa English karena GitHub API syntax):
+Save frequent searches (Contoh konseptual - verify setting availability):
 
 ```json
 // .vscode/settings.json
+// Note: Query syntax harus dalam bahasa English karena GitHub API syntax
 {
   "github.mcp.savedQueries": {
     "criticalBugs": "is:issue is:open label:bug label:critical",
