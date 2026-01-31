@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- 
+    Content Security Policy (CSP) - XSS Protection
+    This policy restricts resource loading to mitigate XSS attacks.
+    
+    IMPORTANT: When deploying to production, consider:
+    1. Moving CSP to HTTP headers for better security
+    2. Removing 'unsafe-inline' by using nonces for scripts/styles
+    3. Adding 'report-uri' for CSP violation reporting
+  -->
+  <meta http-equiv="Content-Security-Policy"
+    content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.midtrans.com https://app.sandbox.midtrans.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com data:;
+      img-src 'self' data: blob: https://*.midtrans.com https:;
+      connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:* wss://localhost:* https://*.midtrans.com https://app.sandbox.midtrans.com;
+      frame-src 'self' https://*.midtrans.com https://app.sandbox.midtrans.com;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      upgrade-insecure-requests;
+    " />
+  
+  <title>AbsensiQR Pro - Kelola Sekolah Lebih Modern</title>
+  <!-- Midtrans Snap (Sandbox Mode) -->
+  <script type="text/javascript" src="https://app.sandbox.midtrans.com/snap/snap.js"
+    data-client-key="%VITE_MIDTRANS_CLIENT_KEY%"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

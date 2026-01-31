@@ -1,0 +1,361 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1\SchoolAdmin;
+
+use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\User;
+use App\Services\StudentCardService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+
+/**
+ * Student Card Controller - STRICT AUTHORIZATION
+ * 
+ * BUSINESS RULE: Only School Admin can manage student QR cards
+ * Teachers are EXPLICITLY DENIED access to this functionality
+ */
+class StudentCardController extends Controller
+{
+    protected StudentCardService $cardService;
+
+    public function __construct(StudentCardService $cardService)
+    {
+        $this->cardService = $cardService;
+        
+        // CRITICAL: Ensure only school_admin can access ANY method in this controller
+        $this->middleware(['auth:sanctum', 'role:school_admin']);
+    }
+
+    /**
+     * Generate QR card for student
+     * 
+     * AUTHORIZATION: Only school_admin
+     * AUDIT: Log every generation
+     */
+    public function generateCard(Request $request, int $studentId): JsonResponse
+    {
+        try {
+            // CRITICAL: Double-check authorization at method level
+            if (!Gate::allows('generate', 'student-card')) {
+                $this->logSecurityViolation($request->user(), 'generate', $studentId, 'AUTHORIZATION_DENIED');
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Only School Admin can generate student cards.',
+                    'error_code' => 'INSUFFICIENT_PRIVILEGES'
+                ], 403);
+            }
+
+            $user = $request->user();
+            
+            // Validate student exists and belongs to same school
+            $student = User::where('id', $studentId)
+                ->where('school_id', $user->school_id)
+                ->where('role_type', 'student')
+                ->where('is_active', true)
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or not in your school.',
+                    'error_code' => 'STUDENT_NOT_FOUND'
+                ], 404);
+            }
+
+            // Generate the card
+            $cardData = $this->cardService->generateCard($student, $user);
+
+            // CRITICAL: Log the action for audit trail
+            $this->logCardAction($user, $student, 'student_card_generated');
+
+            return response()->json([
+                'success' => true,
+                'data' => $cardData,
+                'message' => 'Student card generated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Student card generation failed', [
+                'admin_id' => $request->user()?->id,
+                'student_id' => $studentId,
+                'error' => $e->getMessage(),
+                'school_id' => $request->user()?->school_id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate student card',
+                'error_code' => 'GENERATION_FAILED'
+            ], 500);
+        }
+    }
+
+    /**
+     * Regenerate QR card for student
+     * 
+     * AUTHORIZATION: Only school_admin
+     * AUDIT: Log every regeneration
+     */
+    public function regenerateCard(Request $request, int $studentId): JsonResponse
+    {
+        try {
+            // CRITICAL: Double-check authorization at method level
+            if (!Gate::allows('regenerate', 'student-card')) {
+                $this->logSecurityViolation($request->user(), 'regenerate', $studentId, 'AUTHORIZATION_DENIED');
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Only School Admin can regenerate student cards.',
+                    'error_code' => 'INSUFFICIENT_PRIVILEGES'
+                ], 403);
+            }
+
+            $user = $request->user();
+            
+            // Validate student exists and belongs to same school
+            $student = User::where('id', $studentId)
+                ->where('school_id', $user->school_id)
+                ->where('role_type', 'student')
+                ->where('is_active', true)
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or not in your school.',
+                    'error_code' => 'STUDENT_NOT_FOUND'
+                ], 404);
+            }
+
+            // Regenerate the card (invalidates old one)
+            $cardData = $this->cardService->regenerateCard($student, $user);
+
+            // CRITICAL: Log the action for audit trail
+            $this->logCardAction($user, $student, 'student_card_regenerated');
+
+            return response()->json([
+                'success' => true,
+                'data' => $cardData,
+                'message' => 'Student card regenerated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Student card regeneration failed', [
+                'admin_id' => $request->user()?->id,
+                'student_id' => $studentId,
+                'error' => $e->getMessage(),
+                'school_id' => $request->user()?->school_id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to regenerate student card',
+                'error_code' => 'REGENERATION_FAILED'
+            ], 500);
+        }
+    }
+
+    /**
+     * Deactivate QR card for student
+     * 
+     * AUTHORIZATION: Only school_admin
+     * AUDIT: Log every deactivation
+     */
+    public function deactivateCard(Request $request, int $studentId): JsonResponse
+    {
+        try {
+            // CRITICAL: Double-check authorization at method level
+            if (!Gate::allows('deactivate', 'student-card')) {
+                $this->logSecurityViolation($request->user(), 'deactivate', $studentId, 'AUTHORIZATION_DENIED');
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized. Only School Admin can deactivate student cards.',
+                    'error_code' => 'INSUFFICIENT_PRIVILEGES'
+                ], 403);
+            }
+
+            $user = $request->user();
+            
+            // Validate student exists and belongs to same school
+            $student = User::where('id', $studentId)
+                ->where('school_id', $user->school_id)
+                ->where('role_type', 'student')
+                ->first(); // Don't require is_active for deactivation
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or not in your school.',
+                    'error_code' => 'STUDENT_NOT_FOUND'
+                ], 404);
+            }
+
+            // Deactivate the card
+            $result = $this->cardService->deactivateCard($student, $user);
+
+            // CRITICAL: Log the action for audit trail
+            $this->logCardAction($user, $student, 'student_card_deactivated');
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+                'message' => 'Student card deactivated successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Student card deactivation failed', [
+                'admin_id' => $request->user()?->id,
+                'student_id' => $studentId,
+                'error' => $e->getMessage(),
+                'school_id' => $request->user()?->school_id,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to deactivate student card',
+                'error_code' => 'DEACTIVATION_FAILED'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get student card status
+     * 
+     * AUTHORIZATION: Only school_admin and principal
+     */
+    public function getCardStatus(Request $request, int $studentId): JsonResponse
+    {
+        try {
+            // CRITICAL: Check view authorization
+            if (!Gate::allows('view', 'student-card')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized to view student card status.',
+                    'error_code' => 'INSUFFICIENT_PRIVILEGES'
+                ], 403);
+            }
+
+            $user = $request->user();
+            
+            // Validate student exists and belongs to same school
+            $student = User::where('id', $studentId)
+                ->where('school_id', $user->school_id)
+                ->where('role_type', 'student')
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Student not found or not in your school.',
+                    'error_code' => 'STUDENT_NOT_FOUND'
+                ], 404);
+            }
+
+            // Get card status
+            $cardStatus = $this->cardService->getCardStatus($student);
+
+            return response()->json([
+                'success' => true,
+                'data' => $cardStatus,
+                'message' => 'Card status retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Get card status failed', [
+                'user_id' => $request->user()?->id,
+                'student_id' => $studentId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get card status',
+                'error_code' => 'STATUS_RETRIEVAL_FAILED'
+            ], 500);
+        }
+    }
+
+    /**
+     * CRITICAL: Log card actions for audit trail
+     */
+    private function logCardAction(User $admin, User $student, string $action): void
+    {
+        try {
+            AuditLog::create([
+                'user_id' => $admin->id,
+                'school_id' => $admin->school_id,
+                'action' => $action,
+                'description' => "Admin {$admin->name} performed {$action} for student {$student->name} (ID: {$student->id})",
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'metadata' => [
+                    'admin_id' => $admin->id,
+                    'student_id' => $student->id,
+                    'school_id' => $admin->school_id,
+                    'timestamp' => now()->toISOString(),
+                    'action_type' => 'student_card_management',
+                ],
+            ]);
+
+            // Also log to dedicated security channel
+            \Log::channel('security')->info('Student Card Action', [
+                'action' => $action,
+                'admin_id' => $admin->id,
+                'student_id' => $student->id,
+                'school_id' => $admin->school_id,
+                'timestamp' => now()->toISOString(),
+                'ip' => request()->ip(),
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to log card action', [
+                'error' => $e->getMessage(),
+                'action' => $action,
+                'admin_id' => $admin->id,
+                'student_id' => $student->id,
+            ]);
+        }
+    }
+
+    /**
+     * CRITICAL: Log security violations
+     */
+    private function logSecurityViolation(User $user, string $action, int $studentId, string $reason): void
+    {
+        \Log::critical('SECURITY VIOLATION: Unauthorized student card access attempt', [
+            'user_id' => $user->id,
+            'role' => $user->role_type,
+            'attempted_action' => $action,
+            'student_id' => $studentId,
+            'school_id' => $user->school_id,
+            'reason' => $reason,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'timestamp' => now()->toISOString(),
+        ]);
+
+        // Create audit log for security violation
+        try {
+            AuditLog::create([
+                'user_id' => $user->id,
+                'school_id' => $user->school_id,
+                'action' => 'security_violation_student_card',
+                'description' => "SECURITY VIOLATION: User {$user->name} (role: {$user->role_type}) attempted unauthorized {$action} on student card {$studentId}",
+                'ip_address' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'metadata' => [
+                    'violation_type' => 'unauthorized_student_card_access',
+                    'attempted_action' => $action,
+                    'student_id' => $studentId,
+                    'reason' => $reason,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to log security violation', ['error' => $e->getMessage()]);
+        }
+    }
+}

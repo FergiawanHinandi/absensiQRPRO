@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network Security Configuration for SSL Certificate Pinning
+    
+    This file configures certificate pinning to protect against MITM attacks.
+    
+    IMPORTANT: 
+    - Update the pin-set expiration date before it expires
+    - Always include a backup pin for certificate rotation
+    - Replace the placeholder hashes with your actual certificate hashes
+    
+    How to extract your certificate hash:
+    openssl s_client -connect YOUR_DOMAIN:443 -servername YOUR_DOMAIN 2>/dev/null | \
+        openssl x509 -pubkey -noout | \
+        openssl pkey -pubin -outform der | \
+        openssl dgst -sha256 -binary | \
+        openssl enc -base64
+-->
+<network-security-config>
+    <!-- Production API Configuration -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- 
+            Replace with your actual API domain 
+            Example: api.absensi.example.com
+        -->
+        <domain includeSubdomains="true">api.absensi.example.com</domain>
+        
+        <!-- 
+            Certificate Pin Set
+            expiration: Set to your certificate expiry date (with buffer)
+            
+            IMPORTANT: Always have at least 2 pins:
+            1. Current production certificate
+            2. Backup/next certificate for rotation
+        -->
+        <pin-set expiration="2027-12-31">
+            <!-- 
+                Primary Certificate Pin (Current Production)
+                Replace with your actual SHA-256 hash
+            -->
+            <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+            
+            <!-- 
+                Backup Certificate Pin (For Rotation)
+                Replace with your backup certificate hash
+            -->
+            <pin digest="SHA-256">BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=</pin>
+            
+            <!-- 
+                Optional: Intermediate CA Pin
+                Provides additional security layer
+            -->
+            <!-- <pin digest="SHA-256">INTERMEDIATE_CA_HASH=</pin> -->
+        </pin-set>
+        
+        <!-- 
+            Trust anchors - optional custom CA certificates
+            Uncomment if you need to trust specific CAs
+        -->
+        <!--
+        <trust-anchors>
+            <certificates src="@raw/custom_ca"/>
+        </trust-anchors>
+        -->
+    </domain-config>
+    
+    <!-- 
+        Development Configuration
+        Allow cleartext (HTTP) traffic for local development
+        
+        WARNING: These domains bypass SSL pinning!
+        Remove or restrict in production builds.
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android Emulator localhost -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        
+        <!-- Physical device local network (common ranges) -->
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        
+        <!-- Localhost -->
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+    
+    <!-- 
+        Base Configuration
+        Default settings for all other domains
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system CAs -->
+            <certificates src="system"/>
+            
+            <!-- 
+                Trust user-installed CAs in debug builds only
+                Allows using Charles Proxy / mitmproxy for debugging
+            -->
+            <certificates src="user" overridePins="true"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

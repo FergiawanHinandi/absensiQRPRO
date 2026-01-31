@@ -1,0 +1,31 @@
+<?php
+
+namespace App\Models;
+
+use App\Traits\BelongsToSchool;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Subject extends Model
+{
+    use BelongsToSchool, HasFactory, SoftDeletes;
+
+    /**
+     * Mass assignable attributes.
+     * SECURITY: Explicit fillable prevents mass assignment attacks
+     */
+    protected $fillable = [
+        'school_id',
+        'name',
+        'code',
+        'description',
+        'school_level',
+        'grade_level',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+}

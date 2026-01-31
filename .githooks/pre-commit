@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# ============================================================================
+# Pre-commit Hook: Secret Detection & Security Validation
+# ============================================================================
+# 
+# This hook prevents committing sensitive data to the repository.
+# 
+# Features:
+# - Detects APP_KEY, DB_PASSWORD, API keys
+# - Blocks commits with hardcoded secrets
+# - Provides clear error messages
+# - Zero false positives on .env.example
+# 
+# Installation:
+#   git config core.hooksPath .githooks
+# 
+# Bypass (NOT RECOMMENDED):
+#   git commit --no-verify
+# ============================================================================
+
+# ANSI color codes for better visibility
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+echo -e "${GREEN}🔒 Running secret detection pre-commit hook...${NC}"
+
+# Get list of files being committed
+FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+# Secret patterns to block (intentionally strict)
+SECRETS_FOUND=0
+
+# Pattern 1: APP_KEY with actual value (not placeholder)
+if git diff --cached | grep -E "^\+.*APP_KEY=base64:[A-Za-z0-9+/]{40,}" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: APP_KEY with actual value detected!${NC}"
+    echo -e "${YELLOW}   Never commit APP_KEY from .env file${NC}"
+    echo -e "   Files:"
+    git diff --cached --name-only | grep -E "\.(php|env|txt|md)$"
+    SECRETS_FOUND=1
+fi
+
+# Pattern 2: Database passwords (not placeholder)
+if git diff --cached | grep -E "^\+.*DB_PASSWORD=[^'\"]*[a-zA-Z0-9]{8,}" | grep -v "your-secure-password" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: DB_PASSWORD with actual value detected!${NC}"
+    echo -e "${YELLOW}   Never commit real database passwords${NC}"
+    SECRETS_FOUND=1
+fi
+
+# Pattern 3: QR_SECRET_KEY with actual value
+if git diff --cached | grep -E "^\+.*QR_SECRET_KEY=[^'\"]*[a-zA-Z0-9]{16,}" | grep -v "your-secret-key-here" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: QR_SECRET_KEY with actual value detected!${NC}"
+    echo -e "${YELLOW}   Never commit QR secret keys${NC}"
+    SECRETS_FOUND=1
+fi
+
+# Pattern 4: Sanctum/API tokens
+if git diff --cached | grep -E "^\+.*(SANCTUM_TOKEN|API_TOKEN|BEARER_TOKEN)=[^'\"]*[a-zA-Z0-9]{20,}" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: API token detected!${NC}"
+    echo -e "${YELLOW}   Never commit authentication tokens${NC}"
+    SECRETS_FOUND=1
+fi
+
+# Pattern 5: Private keys
+if git diff --cached | grep -E "^\+.*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: Private key detected!${NC}"
+    echo -e "${YELLOW}   Never commit private keys or certificates${NC}"
+    SECRETS_FOUND=1
+fi
+
+# Pattern 6: AWS credentials
+if git diff --cached | grep -E "^\+.*(AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY)=[^'\"]*[A-Z0-9]{16,}" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: AWS credentials detected!${NC}"
+    echo -e "${YELLOW}   Never commit AWS access keys${NC}"
+    SECRETS_FOUND=1
+fi
+
+# Pattern 7: Bearer tokens in code
+if git diff --cached | grep -E "^\+.*(Bearer|bearer) [a-zA-Z0-9_\-\.]{20,}" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: Bearer token detected in code!${NC}"
+    echo -e "${YELLOW}   Never hardcode Bearer tokens${NC}"
+    SECRETS_FOUND=1
+fi
+
+# Pattern 8: Generic API keys
+if git diff --cached | grep -E "^\+.*(api_key|apikey|API_KEY)=['\"]?[a-zA-Z0-9_\-]{32,}" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: API key detected!${NC}"
+    echo -e "${YELLOW}   Never commit API keys${NC}"
+    SECRETS_FOUND=1
+fi
+
+# Check for actual .env file commits
+if echo "$FILES" | grep -E "^(backend/)?\.env$" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: Attempting to commit .env file!${NC}"
+    echo -e "${YELLOW}   The .env file should NEVER be committed${NC}"
+    echo -e "   Run: git reset HEAD .env"
+    SECRETS_FOUND=1
+fi
+
+# Check for common secret file patterns
+if echo "$FILES" | grep -E "\.(pem|key|p12|pfx|asc)$" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: Certificate or key file detected!${NC}"
+    echo -e "${YELLOW}   Never commit certificate or key files${NC}"
+    echo -e "   Files:"
+    echo "$FILES" | grep -E "\.(pem|key|p12|pfx|asc)$"
+    SECRETS_FOUND=1
+fi
+
+# Check for credentials in JSON files
+if git diff --cached | grep -E "^\+.*(password|secret|token|api_key)\":\s*\"[^\"]{8,}\"" > /dev/null; then
+    echo -e "${RED}❌ BLOCKED: Credentials in JSON detected!${NC}"
+    echo -e "${YELLOW}   Never commit credentials in JSON files${NC}"
+    SECRETS_FOUND=1
+fi
+
+# If secrets found, block the commit
+if [ $SECRETS_FOUND -eq 1 ]; then
+    echo ""
+    echo -e "${RED}╔══════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║  COMMIT BLOCKED: Secrets detected in staged changes         ║${NC}"
+    echo -e "${RED}╚══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}What to do:${NC}"
+    echo "  1. Remove secrets from staged files"
+    echo "  2. Use environment variables instead"
+    echo "  3. Check docs/SECURITY_GUIDELINES.md for best practices"
+    echo ""
+    echo -e "${YELLOW}To unstage files:${NC}"
+    echo "  git reset HEAD <file>"
+    echo ""
+    echo -e "${YELLOW}To bypass this hook (NOT RECOMMENDED):${NC}"
+    echo "  git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+# Success
+echo -e "${GREEN}✅ No secrets detected - commit allowed${NC}"
+exit 0
