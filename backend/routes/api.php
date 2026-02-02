@@ -884,12 +884,14 @@ Route::prefix("v1")
                     Route::post('/export', [\App\Http\Controllers\Api\V1\SchoolAdmin\RiskOverviewController::class, 'export'])->name('export');
                 });
 
-                // Student Card Management (Strictly Admin)
+                // Student Card Lifecycle Management (Strictly Admin)
                 Route::prefix('student-cards')->group(function () {
                     Route::post('/{studentId}/generate', [\App\Http\Controllers\Api\V1\SchoolAdmin\StudentCardController::class, 'generateCard']);
                     Route::post('/{studentId}/regenerate', [\App\Http\Controllers\Api\V1\SchoolAdmin\StudentCardController::class, 'regenerateCard']);
                     Route::delete('/{studentId}', [\App\Http\Controllers\Api\V1\SchoolAdmin\StudentCardController::class, 'deactivateCard']);
                     Route::get('/{studentId}/status', [\App\Http\Controllers\Api\V1\SchoolAdmin\StudentCardController::class, 'getCardStatus']);
+                    Route::post('/{cardId}/mark-distributed', [\App\Http\Controllers\Api\V1\SchoolAdmin\StudentCardController::class, 'markDistributed']);
+                    Route::get('/{studentId}/history', [\App\Http\Controllers\Api\V1\SchoolAdmin\StudentCardController::class, 'getCardHistory']);
                 });
 
                 // Student Card PDF Generation

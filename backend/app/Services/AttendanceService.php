@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Events\StudentAttended;
+use App\Events\AttendanceRecorded;
+use App\Events\AttendanceLate;
 
 class AttendanceService
 {
@@ -427,6 +429,13 @@ class AttendanceService
 
                 // Dispatch event which awards points
                 StudentAttended::dispatch($attendance, $schoolId);
+
+                // Dispatch notification events
+                if ($attendance->status === 'late') {
+                    AttendanceLate::dispatch($attendance);
+                } else {
+                    AttendanceRecorded::dispatch($attendance);
+                }
 
                 return $this->buildSuccessResponse(
                     $student,

@@ -18,6 +18,11 @@ use Illuminate\Support\Str;
  * - HMAC validation (cepat) + Database verification (aman)
  * - Logging untuk security anomalies
  */
+use App\Events\AttendanceRecorded;
+use App\Events\AttendanceLate;
+use App\Events\AttendanceAbsent;
+use App\Models\Schedule;
+
 class EnhancedAttendanceService
 {
     public function __construct(
@@ -361,11 +366,26 @@ class EnhancedAttendanceService
 
             $attendance->update([
                 'status' => $data['status'],
+            // Dispatch events
+            if ($attendance->status === 'absent') {
+                AttendanceAbsent::dispatch($attendance);
+            } elseif ($attendance->status === 'late') {
+                AttendanceLate::dispatch($attendance);
+            } elseif ($attendance->status === 'present') {
+                AttendanceRecorded::dispatch($attendance);
+            }
+
                 'notes' => $data['notes'] ?? null,
                 'is_manual' => true,
                 'recorded_by' => $recordedBy,
-            ]);
+           Fetch Schedule to get Subject ID
+        $schedule = Schedule::find($data['schedule_id']);
+        if (!$schedule) {
+            throw new Exception('Jadwal tidak ditemukan.');
+        }
 
+        //  ]);
+$atedance= 
             return $attendance;
         }
 
@@ -375,7 +395,18 @@ class EnhancedAttendanceService
             'schedule_id' => $data['schedule_id'],
             'subject_id' => $schedule->subject_id,
             'student_id' => $data['student_id'],
-            'attendance_date' => $data['attendance_date'],
+         );
+
+        // Dispatch events
+        if ($attendance->status === 'absent') {
+            AttendanceAbsent::dispatch($attendance);
+        } elseif ($attendance->status === 'late') {
+            AttendanceLate::dispatch($attendance ;
+        } elseif ($attendance->status === 'present') {
+            AttendanceRecorded::dispatch($attendance);
+        }
+
+        return $attendance  'attendance_date' => $data['attendance_date'],
             'status' => $data['status'],
             'notes' => $data['notes'] ?? null,
             'is_manual' => true,

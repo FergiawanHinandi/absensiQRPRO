@@ -38,7 +38,7 @@ class SendAttendanceNotification implements ShouldQueue
                 $time = $attendance->check_in_time ? \Carbon\Carbon::parse($attendance->check_in_time)->format('H:i') : 'Unknown';
                 
                 // Notify Student
-                $this->createNotification($student, 'Kehadiran Tercatat', "Anak Anda telah hadir di sekolah pukul {$time}.", 'attendance');
+                $this->createNotification($student, 'Kehadiran Tercatat', "Anda telah hadir di sekolah pukul {$time}.", 'attendance');
                 
                 // Notify Parent
                 foreach ($parents as $parent) {

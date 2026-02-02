@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use App\Events\AttendanceRecorded;
+use App\Events\AttendanceLate;
 
 /**
  * AttendanceCheckInService
