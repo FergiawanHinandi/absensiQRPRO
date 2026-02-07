@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
  *
  * SECURITY DESIGN:
  * ================
- * 
+ *
  * 1. NEVER store raw device_id
  *    - Only SHA-256 hash is stored
  *    - Cannot be reversed to identify specific device
@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Log;
  *    - Same device_id produces different hash in different installations
  *
  * @author Security Team
+ *
  * @version 1.0.0
  */
 final class DeviceFingerprintService
@@ -72,17 +73,16 @@ final class DeviceFingerprintService
      *
      * All components are hashed together using SHA-256 with app key as salt.
      *
-     * @param Request $request HTTP request
-     * @param int|null $userId Authenticated user ID
-     * @param string|null $deviceId Client-provided device ID
-     * @return DeviceFingerprint
+     * @param  Request  $request  HTTP request
+     * @param  int|null  $userId  Authenticated user ID
+     * @param  string|null  $deviceId  Client-provided device ID
      */
     public function generate(Request $request, ?int $userId = null, ?string $deviceId = null): DeviceFingerprint
     {
         $rawDeviceId = $deviceId ?? $request->header('X-Device-ID') ?? '';
         $ipAddress = $request->ip() ?? '';
         $userAgent = $request->userAgent() ?? '';
-        
+
         // Extract user ID from authenticated user if not provided
         if ($userId === null && $request->user()) {
             $userId = $request->user()->id;
@@ -92,7 +92,7 @@ final class DeviceFingerprintService
         $deviceHash = $this->hashComponent('device', $rawDeviceId);
         $ipHash = $this->hashComponent('ip', $ipAddress);
         $uaHash = $this->hashComponent('ua', $this->normalizeUserAgent($userAgent));
-        
+
         // Generate full fingerprint (composite hash)
         $fullFingerprint = $this->generateFullFingerprint(
             $rawDeviceId,
@@ -179,9 +179,8 @@ final class DeviceFingerprintService
      * - Proxy attendance (joki)
      * - Account sharing
      *
-     * @param DeviceFingerprint $fingerprint Current fingerprint
-     * @param int $userId User to check
-     * @return DeviceAnomalyResult
+     * @param  DeviceFingerprint  $fingerprint  Current fingerprint
+     * @param  int  $userId  User to check
      */
     public function detectAnomalies(DeviceFingerprint $fingerprint, int $userId): DeviceAnomalyResult
     {
@@ -213,7 +212,7 @@ final class DeviceFingerprintService
         $riskScore = min(100, $riskScore);
 
         return new DeviceAnomalyResult(
-            hasAnomalies: !empty($anomalies),
+            hasAnomalies: ! empty($anomalies),
             anomalies: $anomalies,
             riskScore: $riskScore,
             recommendation: $this->getRecommendation($riskScore)
@@ -226,16 +225,16 @@ final class DeviceFingerprintService
     private function checkIpAnomalies(DeviceFingerprint $fingerprint, int $userId): array
     {
         $anomalies = [];
-        $cacheKey = self::CACHE_PREFIX . "ip_history:{$userId}";
-        
+        $cacheKey = self::CACHE_PREFIX."ip_history:{$userId}";
+
         // Get IP history
         $ipHistory = Cache::get($cacheKey, []);
-        
+
         // Add current IP
         $currentIp = $fingerprint->ipHash;
-        if (!empty($currentIp) && !in_array($currentIp, $ipHistory)) {
+        if (! empty($currentIp) && ! in_array($currentIp, $ipHistory)) {
             $ipHistory[] = $currentIp;
-            
+
             // Check for too many IPs
             if (count($ipHistory) > self::MAX_IP_CHANGES) {
                 $anomalies[] = [
@@ -248,7 +247,7 @@ final class DeviceFingerprintService
                     ),
                 ];
             }
-            
+
             // Update cache
             Cache::put($cacheKey, $ipHistory, self::CACHE_TTL);
         }
@@ -262,17 +261,17 @@ final class DeviceFingerprintService
     private function checkMultiUserDevice(DeviceFingerprint $fingerprint): array
     {
         $anomalies = [];
-        
+
         if (empty($fingerprint->deviceHash)) {
             return $anomalies;
         }
 
-        $cacheKey = self::CACHE_PREFIX . "device_users:{$fingerprint->deviceHash}";
+        $cacheKey = self::CACHE_PREFIX."device_users:{$fingerprint->deviceHash}";
         $userList = Cache::get($cacheKey, []);
-        
-        if ($fingerprint->userId && !in_array($fingerprint->userId, $userList)) {
+
+        if ($fingerprint->userId && ! in_array($fingerprint->userId, $userList)) {
             $userList[] = $fingerprint->userId;
-            
+
             if (count($userList) > 1) {
                 $anomalies[] = [
                     'type' => 'multi_user_device',
@@ -284,7 +283,7 @@ final class DeviceFingerprintService
                     'user_count' => count($userList),
                 ];
             }
-            
+
             Cache::put($cacheKey, $userList, self::CACHE_TTL);
         }
 
@@ -297,10 +296,10 @@ final class DeviceFingerprintService
     private function checkRapidDeviceChanges(int $userId): array
     {
         $anomalies = [];
-        $cacheKey = self::CACHE_PREFIX . "user_devices:{$userId}";
-        
+        $cacheKey = self::CACHE_PREFIX."user_devices:{$userId}";
+
         $deviceHistory = Cache::get($cacheKey, []);
-        
+
         // If more than 3 different devices in a day, flag it
         if (count($deviceHistory) > 3) {
             $anomalies[] = [
@@ -322,28 +321,28 @@ final class DeviceFingerprintService
     public function recordUsage(DeviceFingerprint $fingerprint, int $userId): void
     {
         // Record device for user
-        $deviceKey = self::CACHE_PREFIX . "user_devices:{$userId}";
+        $deviceKey = self::CACHE_PREFIX."user_devices:{$userId}";
         $devices = Cache::get($deviceKey, []);
-        if (!in_array($fingerprint->deviceHash, $devices)) {
+        if (! in_array($fingerprint->deviceHash, $devices)) {
             $devices[] = $fingerprint->deviceHash;
             Cache::put($deviceKey, $devices, self::CACHE_TTL);
         }
 
         // Record user for device
-        if (!empty($fingerprint->deviceHash)) {
-            $userKey = self::CACHE_PREFIX . "device_users:{$fingerprint->deviceHash}";
+        if (! empty($fingerprint->deviceHash)) {
+            $userKey = self::CACHE_PREFIX."device_users:{$fingerprint->deviceHash}";
             $users = Cache::get($userKey, []);
-            if (!in_array($userId, $users)) {
+            if (! in_array($userId, $users)) {
                 $users[] = $userId;
                 Cache::put($userKey, $users, self::CACHE_TTL);
             }
         }
 
         // Record IP for user
-        if (!empty($fingerprint->ipHash)) {
-            $ipKey = self::CACHE_PREFIX . "ip_history:{$userId}";
+        if (! empty($fingerprint->ipHash)) {
+            $ipKey = self::CACHE_PREFIX."ip_history:{$userId}";
             $ips = Cache::get($ipKey, []);
-            if (!in_array($fingerprint->ipHash, $ips)) {
+            if (! in_array($fingerprint->ipHash, $ips)) {
                 $ips[] = $fingerprint->ipHash;
                 Cache::put($ipKey, $ips, self::CACHE_TTL);
             }
@@ -384,10 +383,10 @@ final class DeviceFingerprintService
     ): void {
         $logData = array_merge([
             'event' => $event,
-            'fingerprint' => substr($fingerprint->fingerprint, 0, 16) . '...',
-            'device_hash' => $fingerprint->deviceHash ? substr($fingerprint->deviceHash, 0, 16) . '...' : null,
-            'ip_hash' => $fingerprint->ipHash ? substr($fingerprint->ipHash, 0, 16) . '...' : null,
-            'ua_hash' => $fingerprint->userAgentHash ? substr($fingerprint->userAgentHash, 0, 16) . '...' : null,
+            'fingerprint' => substr($fingerprint->fingerprint, 0, 16).'...',
+            'device_hash' => $fingerprint->deviceHash ? substr($fingerprint->deviceHash, 0, 16).'...' : null,
+            'ip_hash' => $fingerprint->ipHash ? substr($fingerprint->ipHash, 0, 16).'...' : null,
+            'ua_hash' => $fingerprint->userAgentHash ? substr($fingerprint->userAgentHash, 0, 16).'...' : null,
             'user_id' => $fingerprint->userId,
             'timestamp' => $fingerprint->timestamp->toIso8601String(),
         ], $context);

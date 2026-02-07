@@ -6,10 +6,6 @@ class SecurityHelper
 {
     /**
      * Mask sensitive data except last 4 characters.
-     *
-     * @param string $value
-     * @param int $visibleCount
-     * @return string
      */
     public static function maskSecret(string $value, int $visibleCount = 4): string
     {
@@ -17,7 +13,7 @@ class SecurityHelper
         if ($len <= $visibleCount) {
             return $value; // Too short to mask
         }
-        
-        return str_repeat('*', $len - $visibleCount) . substr($value, -$visibleCount);
+
+        return str_repeat('*', $len - $visibleCount).substr($value, -$visibleCount);
     }
 }

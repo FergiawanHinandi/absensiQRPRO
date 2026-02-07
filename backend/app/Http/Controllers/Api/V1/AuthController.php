@@ -17,7 +17,9 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     protected LoginRateLimiter $rateLimiter;
+
     protected TokenHardeningService $tokenService;
+
     protected AdminAuditService $auditService;
 
     public function __construct(
@@ -55,8 +57,8 @@ class AuthController extends Controller
 
             throw ValidationException::withMessages([
                 'email' => [
-                    "Akun Anda telah dikunci karena terlalu banyak percobaan login yang gagal. "
-                    ."Silakan coba lagi dalam {$remainingMinutes} menit.",
+                    'Akun Anda telah dikunci karena terlalu banyak percobaan login yang gagal. '
+                        . "Silakan coba lagi dalam {$remainingMinutes} menit.",
                 ],
             ]);
         }
@@ -71,13 +73,14 @@ class AuthController extends Controller
                 \Illuminate\Support\Facades\Log::channel('security')->warning('Failed Login Attempt', [
                     'username' => $request->username,
                     'ip' => $request->ip(),
-                    'reason' => 'Invalid Password'
+                    'reason' => 'Invalid Password',
                 ]);
 
                 // Check if should lock account (after recording attempt)
                 $this->rateLimiter->hit($request, $request->username);
-                
-                if ($this->rateLimiter->shouldLockAccount($request, $request->username)) {
+
+                // Check DB-based failure count for robust lockout
+                if ($this->rateLimiter->shouldLockUser($user)) {
                     $this->rateLimiter->lockAccount($user);
                 }
             } else {
@@ -88,7 +91,7 @@ class AuthController extends Controller
                 \Illuminate\Support\Facades\Log::channel('security')->warning('Failed Login Attempt', [
                     'username' => $request->username,
                     'ip' => $request->ip(),
-                    'reason' => 'User Not Found'
+                    'reason' => 'User Not Found',
                 ]);
             }
 
@@ -109,9 +112,9 @@ class AuthController extends Controller
 
                 throw ValidationException::withMessages([
                     'email' => [
-                        'Sekolah Anda sedang tidak aktif. '.
-                        'Silakan hubungi administrator platform untuk informasi lebih lanjut. '.
-                        'Email: amhyer21091993@gmail.com atau Telepon: 082352538105',
+                        'Sekolah Anda sedang tidak aktif. ' .
+                            'Silakan hubungi administrator platform untuk informasi lebih lanjut. ' .
+                            'Email: amhyer21091993@gmail.com atau Telepon: 082352538105',
                     ],
                 ]);
             }
@@ -206,10 +209,9 @@ class AuthController extends Controller
                 ]);
             }
         } elseif ($request->filled('device_id') && empty($user->device_id)) {
-             // For students, bind the first device they use as their 'primary' attendance device (optional but good practice)
-             $user->update(['device_id' => $request->device_id]);
+            // For students, bind the first device they use as their 'primary' attendance device (optional but good practice)
+            $user->update(['device_id' => $request->device_id]);
         }
-
 
         // --- SECURITY LOGGING ---
         try {
@@ -240,9 +242,18 @@ class AuthController extends Controller
                 'user_agent' => $userAgent,
             ]);
 
+            // Log to security channel for centralized monitoring
+            \Illuminate\Support\Facades\Log::channel('security')->info('Login Successful', [
+                'user_id' => $user->id,
+                'username' => $user->username,
+                'ip' => $ip,
+                'user_agent' => $userAgent,
+                'location' => $location,
+                'timestamp' => now()->toIso8601String(),
+            ]);
         } catch (\Exception $e) {
             // Logging failure should not block login
-            \Illuminate\Support\Facades\Log::error('Login logging failed: '.$e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Login logging failed: ' . $e->getMessage());
         }
         // ------------------------
 
@@ -344,7 +355,7 @@ class AuthController extends Controller
 
     /**
      * Refresh token using refresh token rotation.
-     * 
+     *
      * Old refresh token is revoked, new one issued.
      * For web: reads refresh token from HttpOnly cookie.
      * For mobile: reads from request body.
@@ -354,10 +365,10 @@ class AuthController extends Controller
     public function refresh(Request $request)
     {
         // Get refresh token from cookie (web) or request body (mobile)
-        $refreshTokenPlaintext = $request->cookie('refresh_token') 
+        $refreshTokenPlaintext = $request->cookie('refresh_token')
             ?? $request->input('refresh_token');
 
-        if (!$refreshTokenPlaintext) {
+        if (! $refreshTokenPlaintext) {
             return response()->json([
                 'success' => false,
                 'message' => 'Refresh token required',
@@ -386,10 +397,9 @@ class AuthController extends Controller
             }
 
             return $response;
-
         } catch (\Exception $e) {
             $statusCode = $e->getCode() ?: 401;
-            
+
             $response = response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -450,9 +460,6 @@ class AuthController extends Controller
 
     /**
      * Get abilities for a specific role type
-     *
-     * @param  string  $roleType
-     * @return array
      */
     private function getAbilitiesForRole(string $roleType): array
     {

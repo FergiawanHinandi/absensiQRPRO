@@ -14,38 +14,38 @@ return new class extends Migration
     {
         Schema::table('security_alerts', function (Blueprint $table) {
             // Add user and school tracking
-            if (!Schema::hasColumn('security_alerts', 'related_user_id')) {
+            if (! Schema::hasColumn('security_alerts', 'related_user_id')) {
                 $table->foreignId('related_user_id')->nullable()->after('details')
                     ->constrained('users')->nullOnDelete();
             }
-            
-            if (!Schema::hasColumn('security_alerts', 'school_id')) {
+
+            if (! Schema::hasColumn('security_alerts', 'school_id')) {
                 $table->foreignId('school_id')->nullable()->after('related_user_id')
                     ->constrained('schools')->nullOnDelete();
             }
-            
+
             // Add notification tracking
-            if (!Schema::hasColumn('security_alerts', 'notification_sent')) {
+            if (! Schema::hasColumn('security_alerts', 'notification_sent')) {
                 $table->boolean('notification_sent')->default(false)->after('is_resolved');
             }
-            
-            if (!Schema::hasColumn('security_alerts', 'notification_sent_at')) {
+
+            if (! Schema::hasColumn('security_alerts', 'notification_sent_at')) {
                 $table->timestamp('notification_sent_at')->nullable()->after('notification_sent');
             }
-            
+
             // Add IP and device info
-            if (!Schema::hasColumn('security_alerts', 'ip_address')) {
+            if (! Schema::hasColumn('security_alerts', 'ip_address')) {
                 $table->string('ip_address', 45)->nullable()->after('school_id');
             }
-            
-            if (!Schema::hasColumn('security_alerts', 'device_id')) {
+
+            if (! Schema::hasColumn('security_alerts', 'device_id')) {
                 $table->string('device_id')->nullable()->after('ip_address');
             }
-            
+
             // Add event_type alias for consistency
             // Rename 'type' to 'event_type' for clarity
         });
-        
+
         // Add indexes for better querying
         Schema::table('security_alerts', function (Blueprint $table) {
             $table->index(['school_id', 'severity'], 'idx_alert_school_severity');
@@ -62,7 +62,7 @@ return new class extends Migration
             $table->dropIndex('idx_alert_user_time');
             $table->dropIndex('idx_alert_type_time');
             $table->dropIndex('idx_alert_notify_severity');
-            
+
             $table->dropColumn([
                 'related_user_id',
                 'school_id',

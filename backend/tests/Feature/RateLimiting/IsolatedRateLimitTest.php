@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 /**
  * Isolated Rate Limiting Tests
- * 
+ *
  * Tests ONLY rate limiting without any business logic, policies, or validation.
  * Uses dedicated test-only routes that return simple JSON responses.
  */
@@ -20,8 +20,11 @@ class IsolatedRateLimitTest extends TestCase
     use RefreshDatabase;
 
     private School $schoolA;
+
     private School $schoolB;
+
     private User $userSchoolA;
+
     private User $userSchoolB;
 
     protected function setUp(): void
@@ -77,10 +80,10 @@ class IsolatedRateLimitTest extends TestCase
         // First 5 requests should succeed
         for ($i = 1; $i <= 5; $i++) {
             $response = $this->postJson('/api/v1/test/rate-limit');
-            
+
             $response->assertStatus(200)
                 ->assertJson(['success' => true]);
-            
+
             // Check rate limit headers
             $this->assertNotNull($response->headers->get('X-RateLimit-Limit'));
             $this->assertNotNull($response->headers->get('X-RateLimit-Remaining'));
@@ -88,7 +91,7 @@ class IsolatedRateLimitTest extends TestCase
 
         // 6th request should be rate limited
         $response = $this->postJson('/api/v1/test/rate-limit');
-        
+
         $response->assertStatus(429)
             ->assertJsonStructure(['message', 'retry_after']);
     }
@@ -100,14 +103,14 @@ class IsolatedRateLimitTest extends TestCase
         // First 60 requests should succeed
         for ($i = 1; $i <= 60; $i++) {
             $response = $this->getJson('/api/v1/test/rate-limit/api');
-            
+
             $response->assertStatus(200)
                 ->assertJson(['ok' => true]);
         }
 
         // 61st request should be rate limited
         $response = $this->getJson('/api/v1/test/rate-limit/api');
-        
+
         $response->assertStatus(429);
     }
 
@@ -118,14 +121,14 @@ class IsolatedRateLimitTest extends TestCase
         // First 10 requests should succeed
         for ($i = 1; $i <= 10; $i++) {
             $response = $this->getJson('/api/v1/test/rate-limit/scan');
-            
+
             $response->assertStatus(200)
                 ->assertJson(['ok' => true]);
         }
 
         // 11th request should be rate limited
         $response = $this->getJson('/api/v1/test/rate-limit/scan');
-        
+
         $response->assertStatus(429);
     }
 
@@ -133,7 +136,7 @@ class IsolatedRateLimitTest extends TestCase
     {
         // School A user makes 5 requests (reaches limit)
         Sanctum::actingAs($this->userSchoolA, ['*']);
-        
+
         for ($i = 1; $i <= 5; $i++) {
             $response = $this->postJson('/api/v1/test/rate-limit');
             $response->assertStatus(200);
@@ -145,7 +148,7 @@ class IsolatedRateLimitTest extends TestCase
 
         // School B user should have separate counter - all 5 requests succeed
         Sanctum::actingAs($this->userSchoolB, ['*']);
-        
+
         for ($i = 1; $i <= 5; $i++) {
             $response = $this->postJson('/api/v1/test/rate-limit');
             $response->assertStatus(200);
@@ -161,14 +164,14 @@ class IsolatedRateLimitTest extends TestCase
         Sanctum::actingAs($this->userSchoolA, ['*']);
 
         $response = $this->postJson('/api/v1/test/rate-limit');
-        
+
         $response->assertStatus(200);
-        
+
         // Verify rate limit headers exist (values may vary due to multiple middleware layers)
         $this->assertTrue($response->headers->has('X-RateLimit-Limit'));
         $this->assertTrue($response->headers->has('X-RateLimit-Remaining'));
         $this->assertTrue($response->headers->has('X-RateLimit-Reset'));
-        
+
         // Verify the remaining count is less than limit
         $limit = (int) $response->headers->get('X-RateLimit-Limit');
         $remaining = (int) $response->headers->get('X-RateLimit-Remaining');
@@ -182,18 +185,18 @@ class IsolatedRateLimitTest extends TestCase
 
         // Make 3 requests and verify remaining decreases
         $previousRemaining = null;
-        
+
         for ($i = 1; $i <= 3; $i++) {
             $response = $this->postJson('/api/v1/test/rate-limit');
-            
+
             $response->assertStatus(200);
             $remaining = (int) $response->headers->get('X-RateLimit-Remaining');
-            
+
             if ($previousRemaining !== null) {
                 // Remaining should decrease with each request
                 $this->assertLessThan($previousRemaining, $remaining);
             }
-            
+
             $previousRemaining = $remaining;
         }
     }
@@ -246,7 +249,7 @@ class IsolatedRateLimitTest extends TestCase
     {
         // Without authentication, school-based rate limiting is bypassed
         // (It returns next($request) when no user or school_id)
-        
+
         for ($i = 1; $i <= 10; $i++) {
             $response = $this->postJson('/api/v1/test/rate-limit');
             // Should get 401 Unauthenticated, not 429 Rate Limited
@@ -265,7 +268,7 @@ class IsolatedRateLimitTest extends TestCase
 
         // Get rate limited response
         $response = $this->postJson('/api/v1/test/rate-limit');
-        
+
         $response->assertStatus(429)
             ->assertJsonStructure(['retry_after'])
             ->assertJson([

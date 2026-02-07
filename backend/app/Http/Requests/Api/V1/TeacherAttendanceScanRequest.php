@@ -13,6 +13,7 @@ class TeacherAttendanceScanRequest extends FormRequest
     {
         // User must be authenticated and be a teacher
         $user = $this->user();
+
         return $user && in_array($user->role_type, ['teacher', 'homeroom_teacher', 'admin']);
     }
 

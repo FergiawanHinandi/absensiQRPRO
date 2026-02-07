@@ -7,7 +7,7 @@ return new class extends Migration
 {
     /**
      * CRITICAL: Add composite indexes for Daily Report and common query patterns
-     * 
+     *
      * PERFORMANCE IMPACT:
      * - Daily Report queries: 10x faster
      * - Teacher Assignment queries: 5x faster

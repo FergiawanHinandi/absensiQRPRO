@@ -1,0 +1,244 @@
+# Elasticsearch Index Template for AbsensiQRPro Logs
+# Apply with: PUT _index_template/absensi-logs
+
+PUT _index_template/absensi-logs
+{
+  "index_patterns": ["absensi-*", "logs-absensi-*"],
+  "priority": 100,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "index.lifecycle.name": "absensi-logs-policy",
+      "index.lifecycle.rollover_alias": "absensi-logs",
+      "index.refresh_interval": "5s"
+    },
+    "mappings": {
+      "dynamic": "true",
+      "dynamic_templates": [
+        {
+          "strings_as_keywords": {
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "message": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "level": {
+          "type": "keyword"
+        },
+        "level_value": {
+          "type": "integer"
+        },
+        "channel": {
+          "type": "keyword"
+        },
+        "app": {
+          "type": "keyword"
+        },
+        "environment": {
+          "type": "keyword"
+        },
+        "service": {
+          "type": "keyword"
+        },
+        "request_id": {
+          "type": "keyword"
+        },
+        "user_id": {
+          "type": "keyword"
+        },
+        "school_id": {
+          "type": "keyword"
+        },
+        "endpoint": {
+          "type": "keyword"
+        },
+        "response_time_ms": {
+          "type": "float"
+        },
+        "ip": {
+          "type": "ip"
+        },
+        "request": {
+          "properties": {
+            "id": { "type": "keyword" },
+            "method": { "type": "keyword" },
+            "endpoint": { "type": "keyword" },
+            "url": { "type": "keyword" },
+            "ip": { "type": "ip" },
+            "user_agent": { "type": "keyword" },
+            "response_time_ms": { "type": "float" },
+            "status_code": { "type": "integer" },
+            "trace_id": { "type": "keyword" }
+          }
+        },
+        "user": {
+          "properties": {
+            "id": { "type": "keyword" },
+            "school_id": { "type": "keyword" },
+            "role": { "type": "keyword" },
+            "email": { "type": "keyword" }
+          }
+        },
+        "server": {
+          "properties": {
+            "hostname": { "type": "keyword" },
+            "instance_id": { "type": "keyword" },
+            "php_version": { "type": "keyword" },
+            "memory_usage": { "type": "long" },
+            "peak_memory": { "type": "long" }
+          }
+        },
+        "exception": {
+          "properties": {
+            "class": { "type": "keyword" },
+            "message": { "type": "text" },
+            "code": { "type": "integer" },
+            "file": { "type": "keyword" },
+            "line": { "type": "integer" },
+            "trace": {
+              "type": "text",
+              "index": false
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "dynamic": true
+        },
+        "extra": {
+          "type": "object",
+          "dynamic": true
+        },
+        "geoip": {
+          "properties": {
+            "country_name": { "type": "keyword" },
+            "country_code2": { "type": "keyword" },
+            "city_name": { "type": "keyword" },
+            "region_name": { "type": "keyword" },
+            "location": { "type": "geo_point" }
+          }
+        },
+        "event_category": { "type": "keyword" },
+        "event_domain": { "type": "keyword" },
+        "event_action": { "type": "keyword" },
+        "event_result": { "type": "keyword" },
+        "response_time_bucket": { "type": "keyword" }
+      }
+    }
+  },
+  "composed_of": [],
+  "_meta": {
+    "description": "Index template for AbsensiQRPro application logs"
+  }
+}
+
+---
+
+# ILM Policy for log retention
+# Apply with: PUT _ilm/policy/absensi-logs-policy
+
+PUT _ilm/policy/absensi-logs-policy
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "min_age": "0ms",
+        "actions": {
+          "rollover": {
+            "max_age": "1d",
+            "max_primary_shard_size": "10gb"
+          },
+          "set_priority": {
+            "priority": 100
+          }
+        }
+      },
+      "warm": {
+        "min_age": "7d",
+        "actions": {
+          "shrink": {
+            "number_of_shards": 1
+          },
+          "forcemerge": {
+            "max_num_segments": 1
+          },
+          "set_priority": {
+            "priority": 50
+          }
+        }
+      },
+      "cold": {
+        "min_age": "30d",
+        "actions": {
+          "set_priority": {
+            "priority": 0
+          },
+          "freeze": {}
+        }
+      },
+      "delete": {
+        "min_age": "90d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}
+
+---
+
+# Security logs ILM (longer retention)
+PUT _ilm/policy/absensi-security-logs-policy
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "min_age": "0ms",
+        "actions": {
+          "rollover": {
+            "max_age": "1d",
+            "max_primary_shard_size": "5gb"
+          }
+        }
+      },
+      "warm": {
+        "min_age": "30d",
+        "actions": {
+          "shrink": {
+            "number_of_shards": 1
+          }
+        }
+      },
+      "cold": {
+        "min_age": "90d",
+        "actions": {
+          "freeze": {}
+        }
+      },
+      "delete": {
+        "min_age": "365d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}

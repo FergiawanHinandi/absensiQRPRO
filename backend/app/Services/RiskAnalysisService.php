@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\Attendance;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -11,9 +11,6 @@ class RiskAnalysisService
 {
     /**
      * Calculate comprehensive risk score for a student.
-     * 
-     * @param User $student
-     * @return array
      */
     public function calculateStudentRisk(User $student): array
     {
@@ -27,7 +24,7 @@ class RiskAnalysisService
             'attendance_rate_score' => 0,
             'absence_streak_score' => 0,
             'late_frequency_score' => 0,
-            'attendance_drop_score' => 0
+            'attendance_drop_score' => 0,
         ];
 
         // 1. Attendance Rate (Last 30 Days)
@@ -50,11 +47,11 @@ class RiskAnalysisService
         if ($rateRecent < 70) {
             $score += 40;
             $breakdown['attendance_rate_score'] = 40;
-            $factors[] = 'Attendance rate < 70% (' . number_format($rateRecent, 1) . '%)';
+            $factors[] = 'Attendance rate < 70% ('.number_format($rateRecent, 1).'%)';
         } elseif ($rateRecent < 85) {
             $score += 20;
             $breakdown['attendance_rate_score'] = 20;
-            $factors[] = 'Attendance rate 70-85% (' . number_format($rateRecent, 1) . '%)';
+            $factors[] = 'Attendance rate 70-85% ('.number_format($rateRecent, 1).'%)';
         }
 
         // 2. Consecutive Absences
@@ -108,8 +105,8 @@ class RiskAnalysisService
             ->first();
 
         $totalPrev = $prevStats->total ?? 0;
-        $ratePrev = $totalPrev > 0 
-            ? ($prevStats->present / $totalPrev) * 100 
+        $ratePrev = $totalPrev > 0
+            ? ($prevStats->present / $totalPrev) * 100
             : 100; // Assume perfect if no history
 
         // Only calculate drop if we have significant history (e.g., > 5 records in previous month)
@@ -136,7 +133,7 @@ class RiskAnalysisService
         // 5. Trend Analysis (vs 14 days ago)
         $trend = 'unchanged';
         $trendMessage = 'Stable';
-        
+
         // Find risk record closest to 14 days ago (range 10-20 days)
         $historicalRisk = DB::table('student_attendance_risk')
             ->where('student_id', $student->id)
@@ -146,7 +143,7 @@ class RiskAnalysisService
 
         if ($historicalRisk) {
             $prevScore = $historicalRisk->risk_score;
-             if ($score < $prevScore) {
+            if ($score < $prevScore) {
                 $trend = 'improved';
                 $diff = $prevScore - $score;
                 $trendMessage = "Improved (Score dropped by {$diff})";
@@ -156,8 +153,8 @@ class RiskAnalysisService
                 $trendMessage = "Worsened (Score increased by {$diff})";
             }
         } else {
-             $trend = 'new';
-             $trendMessage = 'New Assessment';
+            $trend = 'new';
+            $trendMessage = 'New Assessment';
         }
 
         return [
@@ -174,9 +171,9 @@ class RiskAnalysisService
                 'current_rate' => round($rateRecent, 1),
                 'previous_rate' => round($ratePrev, 1),
                 'consecutive_absent' => $consecutiveAbsent,
-                'late_count' => $lateCount
+                'late_count' => $lateCount,
             ],
-            'assessed_at' => now()->toIso8601String()
+            'assessed_at' => now()->toIso8601String(),
         ];
     }
 }

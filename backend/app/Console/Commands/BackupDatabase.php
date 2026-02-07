@@ -26,6 +26,7 @@ class BackupDatabase extends Command
         if (empty($encryptionKey)) {
             $this->error('CRITICAL: backup.backup.password is not set');
             $this->error('Backups must be encrypted. Aborting.');
+
             return 1;
         }
 
@@ -64,10 +65,10 @@ class BackupDatabase extends Command
             // --passphrase-fd 0: Read password from std input (piped)
             // OR use --passphrase arg (less secure in ps, but easiest for simple PHP exec)
             // Better: use GPG_PASSPHRASE env var injection if possible, but here we construct command string.
-            // CAUTION: passing passphrase in command line shows in process list. 
+            // CAUTION: passing passphrase in command line shows in process list.
             // Better approach: set environment variable for the exec call or pipe it.
-            // For simplicity in this script context, we'll use '--passphrase' but warn about process list visibility 
-            // or better, write password to a temp fd. 
+            // For simplicity in this script context, we'll use '--passphrase' but warn about process list visibility
+            // or better, write password to a temp fd.
             // Let's use the env var approach for exec() which is safer.
 
             $gpgCommand = sprintf(
@@ -80,12 +81,12 @@ class BackupDatabase extends Command
             // Note: escapeshellarg on password might expose it in 'ps' if anyone looks exactly then.
             // A more robust way available in production is using 'gpg-agent' or public keys.
             // For this implementation, we assume a standalone server env where root/user is trusted.
-            
+
             $fullCommand = "{$dumpCommand} | {$gpgCommand}";
 
             // Execute backup using Process to hide DB Password
             $this->info('Streaming database dump to encrypted file...');
-            
+
             $result = Process::env(['PGPASSWORD' => $password])
                 ->timeout(3600)
                 ->run($fullCommand);
@@ -101,7 +102,7 @@ class BackupDatabase extends Command
             $this->info("Encrypted backup created: {$filename}");
 
             // Verify the file exists and has size
-            if (!file_exists($filepath) || filesize($filepath) === 0) {
+            if (! file_exists($filepath) || filesize($filepath) === 0) {
                 throw new \Exception('Backup file is empty or missing.');
             }
 
@@ -147,7 +148,7 @@ class BackupDatabase extends Command
         try {
             // Upload to S3/Google Cloud
             $disk = \Illuminate\Support\Facades\Storage::disk('s3');
-            
+
             // Stream the file for memory efficiency
             $stream = fopen($filepath, 'r+');
             $disk->put('backups/'.$filename, $stream);
@@ -180,4 +181,3 @@ class BackupDatabase extends Command
         }
     }
 }
-

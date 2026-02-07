@@ -46,7 +46,7 @@ class TeacherRecognitionTest extends TestCase
         ]);
 
         // Create Attendance Scan Request ID (dummy string or UUID)
-        $requestId = 'req_' . uniqid();
+        $requestId = 'req_'.uniqid();
 
         // Create Attendances (This Month)
         // Class 1: 100% attendance (1 record)
@@ -74,7 +74,7 @@ class TeacherRecognitionTest extends TestCase
             'check_in' => null,
             'check_out' => null,
             'method' => 'manual',
-            'request_id' => $requestId . '_2',
+            'request_id' => $requestId.'_2',
         ]);
 
         // Create Attendances (Last Month) for Improvement
@@ -90,7 +90,7 @@ class TeacherRecognitionTest extends TestCase
             'check_in' => '07:00:00',
             'check_out' => '12:00:00',
             'method' => 'qr',
-            'request_id' => $requestId . '_3',
+            'request_id' => $requestId.'_3',
         ]);
         Attendance::create([
             'school_id' => $school->id,
@@ -102,7 +102,7 @@ class TeacherRecognitionTest extends TestCase
             'check_in' => null,
             'check_out' => null,
             'method' => 'manual',
-            'request_id' => $requestId . '_4',
+            'request_id' => $requestId.'_4',
         ]);
 
         // Class 1 Improvement: This Month (100%) - Last Month (50%) = +50%
@@ -127,13 +127,13 @@ class TeacherRecognitionTest extends TestCase
                             'class_id',
                             'class_name',
                             'improvement',
-                        ]
-                    ]
-                ]
+                        ],
+                    ],
+                ],
             ]);
 
         $data = $response->json('data');
-        
+
         // Assert Best Teacher is Teacher 1
         $this->assertEquals($teacher1->id, $data['best_attendance_teacher']['teacher_id']);
         $this->assertEquals(100, $data['best_attendance_teacher']['attendance_rate']);

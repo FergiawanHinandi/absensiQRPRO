@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\SecurityAlert;
 use App\Services\ImmutableSecurityLogService;
 use App\Services\SecurityAlertService;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +15,7 @@ use Illuminate\Support\Facades\Validator;
 
 /**
  * MobileSecurityController
- * 
+ *
  * Handles security event reporting from mobile applications.
  * Logs device security violations (root, emulator, tampering, SSL failures)
  * to the security audit trail for monitoring and incident response.
@@ -64,7 +63,7 @@ class MobileSecurityController extends Controller
 
     /**
      * Report a single mobile security event
-     * 
+     *
      * POST /api/v1/security/mobile-event
      */
     public function reportEvent(Request $request): JsonResponse
@@ -126,7 +125,7 @@ class MobileSecurityController extends Controller
 
     /**
      * Report multiple mobile security events in batch
-     * 
+     *
      * POST /api/v1/security/mobile-events/batch
      */
     public function reportBatch(Request $request): JsonResponse
@@ -195,7 +194,7 @@ class MobileSecurityController extends Controller
 
     /**
      * Report device integrity check result (called on login)
-     * 
+     *
      * POST /api/v1/security/device-integrity
      */
     public function reportDeviceIntegrity(Request $request): JsonResponse
@@ -234,7 +233,7 @@ class MobileSecurityController extends Controller
             actorId: $user?->id,
             targetType: 'device',
             targetId: $data['device_fingerprint'],
-            description: $data['is_secure'] 
+            description: $data['is_secure']
                 ? 'Device passed integrity check'
                 : "Device failed integrity check (risk: {$data['risk_level']})",
             metadata: [
@@ -251,7 +250,7 @@ class MobileSecurityController extends Controller
         );
 
         // Create alert if device is not secure
-        if (!$data['is_secure'] && in_array($data['risk_level'], ['high', 'critical'])) {
+        if (! $data['is_secure'] && in_array($data['risk_level'], ['high', 'critical'])) {
             $this->alertService->create(
                 type: 'insecure_device',
                 severity: $data['risk_level'],
@@ -271,7 +270,7 @@ class MobileSecurityController extends Controller
             'message' => 'Device integrity recorded',
             'data' => [
                 'device_binding_valid' => $deviceBindingValid,
-                'requires_admin_approval' => !$deviceBindingValid && $user?->role_type === 'teacher',
+                'requires_admin_approval' => ! $deviceBindingValid && $user?->role_type === 'teacher',
             ],
         ]);
     }
@@ -349,17 +348,17 @@ class MobileSecurityController extends Controller
      */
     private function validateDeviceBinding($user, string $deviceFingerprint): bool
     {
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
         // Check if user has a stored device binding
         // This would typically be in a user_devices or teacher_devices table
         // For now, we'll check the user's metadata or a dedicated field
-        
+
         $storedFingerprint = $user->device_fingerprint ?? null;
-        
-        if (!$storedFingerprint) {
+
+        if (! $storedFingerprint) {
             // No binding yet - this is the first device
             return true;
         }

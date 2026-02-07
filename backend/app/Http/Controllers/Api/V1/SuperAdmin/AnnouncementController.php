@@ -14,16 +14,16 @@ class AnnouncementController extends Controller
             'title' => 'required|string|max:255',
             'content' => 'required|string',
             'target_schools' => 'nullable|array', // If null, global
-            'priority' => 'in:normal,high,critical'
+            'priority' => 'in:normal,high,critical',
         ]);
 
         // Create announcement
         $priorityMap = [
             'normal' => 'info',
             'high' => 'warning',
-            'critical' => 'critical'
+            'critical' => 'critical',
         ];
-        
+
         $announcementId = DB::table('announcements')->insertGetId([
             'title' => $request->title,
             'content' => $request->content,
@@ -40,7 +40,7 @@ class AnnouncementController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Announcement broadcasted successfully.',
-            'announcement_id' => $announcementId
+            'announcement_id' => $announcementId,
         ]);
     }
 }

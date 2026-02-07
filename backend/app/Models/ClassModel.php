@@ -31,4 +31,22 @@ class ClassModel extends Model
         'is_active' => 'boolean',
         'capacity' => 'integer',
     ];
+
+    // Relationships
+    public function homeroom_teacher()
+    {
+        return $this->belongsTo(User::class, 'homeroom_teacher_id');
+    }
+
+    public function students()
+    {
+        return $this->belongsToMany(User::class, 'class_students', 'class_id', 'student_id')
+            ->wherePivot('status', 'active')
+            ->withTimestamps();
+    }
+
+    public function academic_year()
+    {
+        return $this->belongsTo(AcademicYear::class);
+    }
 }

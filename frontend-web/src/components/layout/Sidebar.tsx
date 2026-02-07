@@ -6,10 +6,12 @@ import { MENUS } from '../../config/navigation';
 import type { RoleType, MenuItem } from '../../config/navigation';
 import { X, ChevronDown, ChevronRight, Search, Star, Pin } from 'lucide-react';
 import { apiClient } from '../../lib/api';
+import type { ThemeConfig } from '../../config/dashboardThemes';
 
 interface SidebarProps {
     isOpen: boolean;
     toggleSidebar: () => void;
+    theme: ThemeConfig;
 }
 
 interface TeacherProfile {
@@ -24,7 +26,7 @@ interface TeacherProfile {
     }>;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar, theme }) => {
     const { user } = useAuthStore();
     const { isMaintenance } = useMaintenanceStore();
     const role = user?.role_type as RoleType;
@@ -121,23 +123,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
         }, []);
     }, [menus, searchQuery]);
 
-    // Get Pinned Menus
-    const pinnedMenus = React.useMemo(() => {
-        const pinned: MenuItem[] = [];
-        const findPinned = (items: MenuItem[]) => {
-            items.forEach(item => {
-                if (pinnedPaths.includes(item.path)) {
-                    pinned.push(item);
-                }
-                if (item.children) {
-                    findPinned(item.children);
-                }
-            });
-        };
-        findPinned(menus);
-        return pinned;
-    }, [menus, pinnedPaths]);
-
     // Auto expand on search
     useEffect(() => {
         if (searchQuery) {
@@ -168,17 +153,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
                 <div key={menu.label} className="mb-1">
                     <button
                         onClick={() => toggleSubmenu(menu.label)}
-                        className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-100 transition-colors group ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium ${theme.borderRadius} transition-colors group ${isLocked ? 'opacity-50 cursor-not-allowed' : ''} ${isExpanded ? theme.colors.primaryLight : `text-slate-700 hover:bg-slate-100`}`}
                         disabled={isLocked}
                     >
                         <div className="flex items-center gap-3">
-                            <Icon className="w-5 h-5 text-slate-500 group-hover:text-blue-600 transition-colors" />
-                            <span className="group-hover:text-slate-900">{menu.label}</span>
+                            <Icon className={`w-5 h-5 transition-colors ${isExpanded ? '' : 'text-slate-500 group-hover:text-current'}`} />
+                            <span>{menu.label}</span>
                         </div>
                         <div className="flex items-center gap-2">
                             {isLocked && <div className="p-1"><span role="img" aria-label="locked">🔒</span></div>}
                             {menu.badge && (
-                                <span className="px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">
+                                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${theme.colors.primaryLight}`}>
                                     {menu.badge}
                                 </span>
                             )}
@@ -191,7 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
                     </button>
 
                     {isExpanded && !isLocked && (
-                        <div className="mt-1 ml-4 pl-4 border-l-2 border-slate-200 space-y-1">
+                        <div className={`mt-1 ml-4 pl-4 border-l-2 ${theme.colors.sidebarBorder} space-y-1`}>
                             {menu.children!.map((child) => {
                                 const ChildIcon = child.icon;
                                 const isChildPinned = pinnedPaths.includes(child.path);
@@ -200,8 +185,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
                                         <NavLink
                                             to={child.path}
                                             className={({ isActive }) =>
-                                                `flex items-center gap-3 px-4 py-2 text-sm rounded-lg transition-colors ${isActive
-                                                    ? 'bg-blue-50 text-blue-700 font-medium'
+                                                `flex items-center gap-3 px-4 py-2 text-sm ${theme.borderRadius} transition-colors ${isActive
+                                                    ? theme.colors.primaryLight + ' font-medium'
                                                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                                                 }`
                                             }
@@ -235,16 +220,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
                 <NavLink
                     to={isLocked ? '#' : menu.path}
                     className={({ isActive }) =>
-                        `flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${isActive && !isLocked && !isPinnedSection
-                            ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30'
+                        `flex items-center gap-3 px-4 py-3 text-sm font-medium ${theme.borderRadius} transition-all duration-200 ${isActive && !isLocked && !isPinnedSection
+                            ? `bg-gradient-to-r ${theme.colors.primaryGradient} text-white shadow-lg`
                             : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
                         } ${isLocked ? 'pointer-events-none opacity-50' : ''}`
                     }
                 >
-                    <Icon className={`w-5 h-5 ${isPinnedSection ? 'text-blue-600' : ''}`} />
+                    <Icon className={`w-5 h-5 ${isPinnedSection ? '' : ''}`} />
                     <span>{menu.label}</span>
                     {menu.badge && !isPinnedSection && (
-                        <span className="ml-auto px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">
+                        <span className="ml-auto px-2 py-0.5 text-xs font-semibold bg-white/20 text-white rounded-full">
                             {menu.badge}
                         </span>
                     )}
@@ -252,7 +237,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
                 {!isLocked && !isPinnedSection && (
                     <button
                         onClick={(e) => togglePin(menu.path, e)}
-                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-slate-200 transition-opacity ${isPinned ? 'text-yellow-500 opacity-100' : 'text-slate-400 opacity-0 group-hover/item:opacity-100'}`}
+                        className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-slate-200/50 transition-opacity ${isPinned ? 'text-yellow-500 opacity-100' : 'text-slate-400 opacity-0 group-hover/item:opacity-100'}`}
                         title={isPinned ? "Unpin" : "Pin"}
                     >
                         {isPinned ? <Star className="w-3.5 h-3.5 fill-current" /> : <Pin className="w-3.5 h-3.5" />}
@@ -282,11 +267,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
 
             {/* Sidebar Container */}
             <div
-                className={`fixed top-16 bottom-0 left-0 z-40 w-72 bg-white shadow-xl border-r border-slate-200 transform transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+                className={`fixed top-16 bottom-0 left-0 z-40 w-72 ${theme.colors.sidebarBg} shadow-xl border-r ${theme.colors.sidebarBorder} transform transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
                     }`}
             >
                 {/* Search Box */}
-                <div className="p-4 border-b border-slate-100">
+                <div className={`p-4 border-b ${theme.colors.sidebarBorder}`}>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
@@ -294,53 +279,87 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
                             placeholder="Cari menu..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400 bg-slate-50"
+                            className={`w-full pl-9 pr-4 py-2 text-sm border ${theme.colors.sidebarBorder} ${theme.borderRadius} focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all placeholder:text-slate-400 bg-white/50`}
+                            style={{ '--tw-ring-color': theme.colors.primary } as React.CSSProperties}
                         />
                     </div>
                 </div>
 
-                {/* Menu Items */}
-                <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto h-[calc(100%-80px)] custom-scrollbar">
+                {/* Menu List */}
+                <div className="overflow-y-auto h-[calc(100vh-8rem)] p-4 space-y-4 custom-scrollbar">
                     {/* Pinned Section */}
-                    {pinnedMenus.length > 0 && !searchQuery && (
-                        <div className="mb-4">
-                            <div className="px-2 mb-2">
-                                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                                    <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                                    Quick Access
-                                </p>
+                    {pinnedPaths.length > 0 && (
+                        <div className="mb-6">
+                            <h3 className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                Pinned
+                            </h3>
+                            <div className="space-y-1">
+                                {menus.flatMap(m => {
+                                    if (pinnedPaths.includes(m.path)) return [renderMenuItem(m, true)];
+                                    if (m.children) {
+                                        return m.children
+                                            .filter(c => pinnedPaths.includes(c.path))
+                                            .map(c => {
+                                                const Icon = c.icon;
+                                                return (
+                                                    <div key={c.path} className="relative group/item mb-1">
+                                                        <NavLink
+                                                            to={c.path}
+                                                            className={({ isActive }) =>
+                                                                `flex items-center gap-3 px-4 py-2 text-sm ${theme.borderRadius} transition-colors ${isActive
+                                                                    ? theme.colors.primaryLight + ' font-medium'
+                                                                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                                                }`
+                                                            }
+                                                        >
+                                                            <Icon className="w-4 h-4" />
+                                                            <span>{c.label}</span>
+                                                        </NavLink>
+                                                        <button
+                                                            onClick={(e) => togglePin(c.path, e)}
+                                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-red-500"
+                                                            title="Unpin"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            });
+                                    }
+                                    return [];
+                                })}
                             </div>
-                            {pinnedMenus.map(menu => renderMenuItem(menu, true))}
-                            <div className="h-px bg-slate-100 my-4 mx-2" />
+                            <div className={`mt-4 border-b ${theme.colors.sidebarBorder}`} />
                         </div>
                     )}
 
-                    {filteredMenus.map((menu, index) => {
-                        const showSection = menu.section && (index === 0 || menu.section !== filteredMenus[index - 1].section) && !searchQuery;
+                    {/* Regular Menu */}
+                    <div className="space-y-1">
+                        {filteredMenus.map((menu, index) => {
+                            const showSection = menu.section && (index === 0 || menu.section !== filteredMenus[index - 1].section);
+                            return (
+                                <React.Fragment key={menu.label}>
+                                    {showSection && (
+                                        <div className="px-4 mt-6 mb-2 first:mt-2">
+                                            <p className={`text-xs font-bold uppercase tracking-wider opacity-60 ${theme.colors.sidebarText}`}>
+                                                {menu.section}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {renderMenuItem(menu)}
+                                </React.Fragment>
+                            );
+                        })}
+                    </div>
 
-                        return (
-                            <React.Fragment key={menu.path || menu.label}>
-                                {showSection && (
-                                    <div className="px-2 mt-6 mb-2 first:mt-2">
-                                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                            {menu.section}
-                                        </p>
-                                    </div>
-                                )}
-                                {renderMenuItem(menu)}
-                            </React.Fragment>
-                        );
-                    })}
-
+                    {/* Empty Search Result */}
                     {filteredMenus.length === 0 && (
-                        <div className="text-center py-8">
-                            <p className="text-sm text-slate-500">Menu tidak ditemukan</p>
+                        <div className="text-center py-8 text-slate-500">
+                            <p className="text-sm">Menu tidak ditemukan</p>
                         </div>
                     )}
-
-                    {/* Extra padding for bottom */}
-                    <div className="h-8"></div>
-                </nav>
+                </div>
             </div>
         </>
     );

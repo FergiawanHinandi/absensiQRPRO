@@ -2,15 +2,15 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use App\Models\User;
-use App\Models\School;
 use App\Models\Attendance;
 use App\Models\ClassModel;
 use App\Models\Schedule;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\School;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
 
 class StudentSemesterReportTest extends TestCase
 {
@@ -26,24 +26,24 @@ class StudentSemesterReportTest extends TestCase
             'school_id' => $school->id,
             'role_type' => 'admin', // school_admin
         ]);
-        
+
         $teacher = User::factory()->create(['school_id' => $school->id, 'role_type' => 'teacher']);
-        
+
         // Use ClassModel instead of Classes
         $class = ClassModel::factory()->create([
             'school_id' => $school->id,
-            'homeroom_teacher_id' => $teacher->id
+            'homeroom_teacher_id' => $teacher->id,
         ]);
 
         $student = User::factory()->create([
             'school_id' => $school->id,
             'role_type' => 'student',
-            'total_points' => 600 // Gold Tier (>500)
+            'total_points' => 600, // Gold Tier (>500)
         ]);
 
         $schedule = Schedule::factory()->create([
             'school_id' => $school->id,
-            'class_id' => $class->id
+            'class_id' => $class->id,
         ]);
 
         // 2. Create Attendances (In Semester: July - Dec)
@@ -57,7 +57,7 @@ class StudentSemesterReportTest extends TestCase
             'attendance_date' => '2025-08-01',
             'check_in' => '07:00:00',
             'method' => 'qr',
-            'request_id' => 'req_1'
+            'request_id' => 'req_1',
         ]);
 
         // Late: Aug 2
@@ -70,7 +70,7 @@ class StudentSemesterReportTest extends TestCase
             'attendance_date' => '2025-08-02',
             'check_in' => '07:45:00',
             'method' => 'qr',
-            'request_id' => 'req_2'
+            'request_id' => 'req_2',
         ]);
 
         // Absent: Aug 3
@@ -82,7 +82,7 @@ class StudentSemesterReportTest extends TestCase
             'status' => 'absent',
             'attendance_date' => '2025-08-03',
             'method' => 'manual',
-            'request_id' => 'req_3'
+            'request_id' => 'req_3',
         ]);
 
         // 3. Create Attendance (Out of Semester: Jan 2025)
@@ -95,7 +95,7 @@ class StudentSemesterReportTest extends TestCase
             'attendance_date' => '2025-01-15', // Previous semester
             'check_in' => '07:00:00',
             'method' => 'qr',
-            'request_id' => 'req_old'
+            'request_id' => 'req_old',
         ]);
 
         // 4. Authenticate as Admin
@@ -115,9 +115,9 @@ class StudentSemesterReportTest extends TestCase
                     'late_count' => 1,
                     'absence_count' => 1,
                     'present_percentage' => 66.7, // (2 / 3) * 100
-                ]
+                ],
             ]);
-            
+
         // Check date range in response
         $data = $response->json('data');
         $this->assertEquals('2025-07-01', $data['period']['start']);

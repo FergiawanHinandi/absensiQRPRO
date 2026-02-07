@@ -38,7 +38,7 @@ return new class extends Migration
 
             // Unique: One attendance per teacher per day
             $table->unique(['teacher_id', 'attendance_date']);
-            
+
             // Indexes for querying
             $table->index(['school_id', 'attendance_date']);
             $table->index(['teacher_id', 'attendance_date']);

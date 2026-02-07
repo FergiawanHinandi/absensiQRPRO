@@ -10,13 +10,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Advanced Rate Limiting Middleware
- * 
+ *
  * Implements multiple layers of rate limiting:
  * 1. Global IP-based rate limiting (prevent DDoS)
  * 2. Login brute force protection
  * 3. QR scan spam protection per device
  * 4. API endpoint-specific limits
- * 
+ *
  * CRITICAL SECURITY:
  * - Prevents brute force attacks
  * - Prevents DDoS attacks
@@ -104,7 +104,7 @@ class AdvancedRateLimiting
 
     /**
      * Resolve scan signature (user + device + school)
-     * 
+     *
      * Prevents:
      * - Same device scanning multiple times rapidly
      * - Same user scanning from different devices rapidly

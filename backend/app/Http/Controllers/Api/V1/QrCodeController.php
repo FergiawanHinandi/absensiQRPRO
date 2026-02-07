@@ -31,6 +31,9 @@ class QrCodeController extends Controller
         // Authorization check via policy
         $this->authorize('create', QrCode::class);
 
+        // Generate unique nonce for this QR session
+        $nonce = bin2hex(random_bytes(16));
+
         // Create QR record in database
         $qrCode = QrCode::create([
             'school_id' => $request->user()->school_id,
@@ -41,13 +44,15 @@ class QrCodeController extends Controller
             'max_scans' => $request->input('max_scans', $schedule->class->student_count ?? 50),
             'scan_count' => 0,
             'is_active' => true,
+            'nonce' => $nonce, // Add nonce for race condition prevention
         ]);
 
-        // Generate stateless token
+        // Generate stateless token with nonce
         $token = $this->qrService->generate([
             'schedule_id' => $schedule->id,
             'qr_id' => $qrCode->id,
             'type' => $qrCode->qr_type,
+            'nonce' => $nonce, // Include nonce in token
         ]);
 
         // Store token for reference (optional)
@@ -60,6 +65,7 @@ class QrCodeController extends Controller
                 'valid_until' => $qrCode->valid_until,
                 'max_scans' => $qrCode->max_scans,
                 'qr_type' => $qrCode->qr_type,
+                'nonce' => $nonce, // Return nonce for client validation
             ],
         ], 'QR Code berhasil dibuat', 201);
     }

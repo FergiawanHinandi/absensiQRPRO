@@ -18,7 +18,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * Job to generate report exports asynchronously
- * 
+ *
  * This job handles heavy report generation (Excel/PDF) in the background
  * to prevent API timeout and improve user experience.
  */
@@ -66,7 +66,7 @@ class GenerateReportExport implements ShouldQueue
             $export->markAsProcessing();
 
             // Generate the report based on type and format
-            $result = match($export->type) {
+            $result = match ($export->type) {
                 ReportExport::TYPE_ATTENDANCE => $this->generateAttendanceReport($export),
                 ReportExport::TYPE_SUMMARY => $this->generateSummaryReport($export),
                 default => throw new \Exception("Unknown report type: {$export->type}"),
@@ -106,7 +106,7 @@ class GenerateReportExport implements ShouldQueue
     {
         $params = $export->parameters;
         $schoolId = $export->school_id;
-        
+
         $export->updateProgress(10);
 
         if ($export->format === ReportExport::FORMAT_EXCEL) {
@@ -168,7 +168,7 @@ class GenerateReportExport implements ShouldQueue
             ->where('school_id', $schoolId)
             ->whereBetween('attendance_date', [$params['start_date'], $params['end_date']]);
 
-        if (!empty($params['class_id'])) {
+        if (! empty($params['class_id'])) {
             $query->whereHas('schedule', function ($q) use ($params) {
                 $q->where('class_id', $params['class_id']);
             });
@@ -240,10 +240,9 @@ class GenerateReportExport implements ShouldQueue
         ]);
 
         $this->reportExport->markAsFailed(
-            "Export gagal setelah {$this->tries} percobaan: " . $exception->getMessage()
+            "Export gagal setelah {$this->tries} percobaan: ".$exception->getMessage()
         );
     }
-
 
     /**
      * Get the middleware the job should pass through.
@@ -251,7 +250,7 @@ class GenerateReportExport implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new \Illuminate\Queue\Middleware\RateLimited('heavy_jobs'))
+            (new \Illuminate\Queue\Middleware\RateLimited('heavy_jobs')),
         ];
     }
 }

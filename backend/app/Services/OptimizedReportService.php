@@ -4,12 +4,12 @@ namespace App\Services;
 
 use App\Models\Attendance;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * CRITICAL: Optimized Report Service for High-Performance Queries
- * 
+ *
  * FEATURES:
  * - Single-query aggregations
  * - Memory-efficient processing
@@ -24,7 +24,7 @@ class OptimizedReportService
     public function getDailyAttendanceStats(int $schoolId, string $date): array
     {
         $cacheKey = "daily_stats_{$schoolId}_{$date}";
-        
+
         return Cache::remember($cacheKey, 600, function () use ($schoolId, $date) {
             // CRITICAL: Single query with multiple aggregations
             $stats = Attendance::selectRaw('
@@ -37,9 +37,9 @@ class OptimizedReportService
                     THEN EXTRACT(EPOCH FROM check_in_time::time) END) as avg_check_in_time,
                 COUNT(CASE WHEN is_manual = true THEN 1 END) as manual_entries
             ', ['present', 'late', 'sick', 'permit'])
-            ->where('school_id', $schoolId)
-            ->whereDate('attendance_date', $date)
-            ->first();
+                ->where('school_id', $schoolId)
+                ->whereDate('attendance_date', $date)
+                ->first();
 
             // CRITICAL: Get total students in single query
             $totalStudents = User::where('school_id', $schoolId)
@@ -70,7 +70,7 @@ class OptimizedReportService
     public function getWeeklyAttendanceTrends(int $schoolId, string $startDate, string $endDate): array
     {
         $cacheKey = "weekly_trends_{$schoolId}_{$startDate}_{$endDate}";
-        
+
         return Cache::remember($cacheKey, 1800, function () use ($schoolId, $startDate, $endDate) {
             // CRITICAL: Single query for weekly trends
             $trends = Attendance::selectRaw('
@@ -79,11 +79,11 @@ class OptimizedReportService
                 COUNT(DISTINCT CASE WHEN status = ? THEN student_id END) as late,
                 COUNT(DISTINCT student_id) as total_attended
             ', ['present', 'late'])
-            ->where('school_id', $schoolId)
-            ->whereBetween('attendance_date', [$startDate, $endDate])
-            ->groupBy('attendance_date')
-            ->orderBy('attendance_date')
-            ->get();
+                ->where('school_id', $schoolId)
+                ->whereBetween('attendance_date', [$startDate, $endDate])
+                ->groupBy('attendance_date')
+                ->orderBy('attendance_date')
+                ->get();
 
             return $trends->map(function ($trend) {
                 return [
@@ -91,7 +91,7 @@ class OptimizedReportService
                     'present' => $trend->present,
                     'late' => $trend->late,
                     'total_attended' => $trend->total_attended,
-                    'attendance_rate' => $trend->total_attended > 0 ? 
+                    'attendance_rate' => $trend->total_attended > 0 ?
                         round(($trend->present / $trend->total_attended) * 100, 1) : 0,
                 ];
             })->toArray();
@@ -104,19 +104,19 @@ class OptimizedReportService
     public function getClassAttendanceSummary(int $schoolId, string $date): array
     {
         $cacheKey = "class_summary_{$schoolId}_{$date}";
-        
+
         return Cache::remember($cacheKey, 900, function () use ($schoolId, $date) {
             // CRITICAL: Optimized query with proper joins
             $summary = DB::table('classes')
                 ->leftJoin('class_students', 'classes.id', '=', 'class_students.class_id')
                 ->leftJoin('users as students', function ($join) {
                     $join->on('class_students.student_id', '=', 'students.id')
-                         ->where('students.is_active', true)
-                         ->where('class_students.status', 'active');
+                        ->where('students.is_active', true)
+                        ->where('class_students.status', 'active');
                 })
                 ->leftJoin('attendances', function ($join) use ($date) {
                     $join->on('students.id', '=', 'attendances.student_id')
-                         ->whereDate('attendances.attendance_date', $date);
+                        ->whereDate('attendances.attendance_date', $date);
                 })
                 ->where('classes.school_id', $schoolId)
                 ->where('classes.is_active', true)
@@ -147,7 +147,7 @@ class OptimizedReportService
                     'present' => $class->present ?? 0,
                     'late' => $class->late ?? 0,
                     'alpha' => $alpha,
-                    'attendance_rate' => $totalStudents > 0 ? 
+                    'attendance_rate' => $totalStudents > 0 ?
                         round(($totalAttended / $totalStudents) * 100, 1) : 0,
                 ];
             })->toArray();
@@ -163,13 +163,13 @@ class OptimizedReportService
         return Attendance::with([
             'student:id,name,username',
             'schedule.subject:id,name',
-            'schedule.class:id,name'
+            'schedule.class:id,name',
         ])
-        ->where('school_id', $schoolId)
-        ->whereBetween('attendance_date', [$startDate, $endDate])
-        ->orderBy('attendance_date')
-        ->orderBy('student_id')
-        ->lazy(500); // Process 500 records at a time
+            ->where('school_id', $schoolId)
+            ->whereBetween('attendance_date', [$startDate, $endDate])
+            ->orderBy('attendance_date')
+            ->orderBy('student_id')
+            ->lazy(500); // Process 500 records at a time
     }
 
     /**
@@ -184,11 +184,11 @@ class OptimizedReportService
             COUNT(DISTINCT CASE WHEN status = ? THEN student_id END) as late,
             COUNT(DISTINCT student_id) as total_attended
         ', ['present', 'late'])
-        ->whereIn('school_id', $schoolIds)
-        ->whereDate('attendance_date', $date)
-        ->groupBy('school_id')
-        ->get()
-        ->keyBy('school_id');
+            ->whereIn('school_id', $schoolIds)
+            ->whereDate('attendance_date', $date)
+            ->groupBy('school_id')
+            ->get()
+            ->keyBy('school_id');
 
         $result = [];
         foreach ($schoolIds as $schoolId) {

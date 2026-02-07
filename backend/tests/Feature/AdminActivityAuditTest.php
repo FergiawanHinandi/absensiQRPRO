@@ -14,8 +14,11 @@ class AdminActivityAuditTest extends TestCase
     use RefreshDatabase;
 
     private User $superAdmin;
+
     private User $schoolAdmin;
+
     private School $school;
+
     private AdminAuditService $auditService;
 
     protected function setUp(): void
@@ -24,7 +27,7 @@ class AdminActivityAuditTest extends TestCase
 
         // Create test data
         $this->school = School::factory()->create(['name' => 'Test School']);
-        
+
         $this->superAdmin = User::factory()->create([
             'role_type' => 'super_admin',
             'school_id' => null,
@@ -76,7 +79,7 @@ class AdminActivityAuditTest extends TestCase
         );
 
         $this->assertTrue($log->isHighRisk());
-        
+
         $normalLog = $this->auditService->log(
             AdminActivityLog::ACTION_TEACHER_CREATE,
             'Teacher',
@@ -231,7 +234,7 @@ class AdminActivityAuditTest extends TestCase
         $this->auditService->log(AdminActivityLog::ACTION_STUDENT_CREATE, 'Student', 2, 'Created student');
 
         $response = $this->actingAs($this->superAdmin)
-            ->getJson('/api/v1/admin/system/admin-activity?action_type=' . AdminActivityLog::ACTION_TEACHER_CREATE);
+            ->getJson('/api/v1/admin/system/admin-activity?action_type='.AdminActivityLog::ACTION_TEACHER_CREATE);
 
         $response->assertOk();
 
@@ -356,7 +359,7 @@ class AdminActivityAuditTest extends TestCase
     public function query_scopes_work_correctly()
     {
         $this->actingAs($this->schoolAdmin);
-        
+
         // Create various logs
         $log1 = $this->auditService->log(AdminActivityLog::ACTION_TEACHER_CREATE, 'Teacher', 1, 'Log 1');
         $log2 = $this->auditService->log(AdminActivityLog::ACTION_TEACHER_DEVICE_RESET, 'Teacher', 2, 'Log 2');

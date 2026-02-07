@@ -7,7 +7,7 @@ use Illuminate\Auth\Access\HandlesAuthorization;
 
 /**
  * CRITICAL: Student Policy for proper authorization
- * 
+ *
  * FIXES:
  * - Authorization before data loading
  * - School-scoped access control
@@ -23,12 +23,12 @@ class StudentPolicy
     public function viewAny(User $user): bool
     {
         return in_array($user->role_type, [
-            'super_admin', 
-            'school_admin', 
-            'principal', 
-            'vice_principal', 
+            'super_admin',
+            'school_admin',
+            'principal',
+            'vice_principal',
             'teacher',
-            'homeroom_teacher'
+            'homeroom_teacher',
         ]);
     }
 
@@ -59,11 +59,11 @@ class StudentPolicy
 
         // School staff can view students in their school
         return in_array($user->role_type, [
-            'school_admin', 
-            'principal', 
-            'vice_principal', 
+            'school_admin',
+            'principal',
+            'vice_principal',
             'teacher',
-            'homeroom_teacher'
+            'homeroom_teacher',
         ]);
     }
 
@@ -75,7 +75,7 @@ class StudentPolicy
         return in_array($user->role_type, [
             'super_admin',
             'school_admin',
-            'principal'
+            'principal',
         ]);
     }
 
@@ -97,7 +97,7 @@ class StudentPolicy
         // Only school admin and principal can update students
         return in_array($user->role_type, [
             'school_admin',
-            'principal'
+            'principal',
         ]);
     }
 
@@ -129,7 +129,7 @@ class StudentPolicy
             'super_admin',
             'school_admin',
             'principal',
-            'vice_principal'
+            'vice_principal',
         ]);
     }
 
@@ -141,7 +141,7 @@ class StudentPolicy
         return in_array($user->role_type, [
             'super_admin',
             'school_admin',
-            'principal'
+            'principal',
         ]);
     }
 }

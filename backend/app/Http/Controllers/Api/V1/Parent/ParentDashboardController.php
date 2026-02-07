@@ -59,7 +59,7 @@ class ParentDashboardController extends Controller
         $key = "parent_child_dashboard_{$schoolId}_{$childId}";
 
         // CACHE: 60 seconds
-        $data = $this->cacheWithTags(['parent_dashboard', "student_{$childId}"], $key, 60, function () use ($child, $schoolId) {
+        $data = $this->cacheWithTags(['parent_dashboard', "student_{$childId}"], $key, 60, function () use ($child) {
             $currentDate = \Carbon\Carbon::now();
             $todayStr = $currentDate->toDateString();
             $startOfMonth = $currentDate->copy()->startOfMonth()->toDateString();
@@ -85,12 +85,12 @@ class ParentDashboardController extends Controller
                 ->first();
 
             $statusToday = $todayRecord ? $todayRecord->status : 'not_checked_in';
-            $checkInTime = $todayRecord && $todayRecord->check_in_time 
-                ? \Carbon\Carbon::parse($todayRecord->check_in_time)->format('H:i') 
+            $checkInTime = $todayRecord && $todayRecord->check_in_time
+                ? \Carbon\Carbon::parse($todayRecord->check_in_time)->format('H:i')
                 : '-';
 
             // Override status logic if needed (e.g. absent if not checked in by X time? - Keep simple for now)
-            if (!$todayRecord) {
+            if (! $todayRecord) {
                 // Check if it's a holiday or weekend? Assuming standard "Not yet"
                 $statusToday = 'not_checked_in';
             }
@@ -108,7 +108,9 @@ class ParentDashboardController extends Controller
 
             $totalRecords = $monthlyStats->total ?? 0;
             $attRate = $totalRecords > 0 ? round(($monthlyStats->present_count / $totalRecords) * 100, 1) : 0;
-            if ($totalRecords == 0) $attRate = 100; // Default optimistic
+            if ($totalRecords == 0) {
+                $attRate = 100;
+            } // Default optimistic
 
             $absencesMonth = (int) ($monthlyStats->absent_count ?? 0);
 
@@ -119,13 +121,13 @@ class ParentDashboardController extends Controller
                 ->orderBy('attendance_date', 'desc')
                 ->limit(10)
                 ->get();
-            
+
             $streak = 0;
             foreach ($recentRecords as $rec) {
                 if (in_array($rec->status, ['absent', 'alpha', 'sick', 'permit'])) {
                     $streak++;
                 } else {
-                    break; 
+                    break;
                 }
             }
 
@@ -141,17 +143,20 @@ class ParentDashboardController extends Controller
                 $d = $currentDate->copy()->subDays($i)->toDateString();
                 $dayLabel = \Carbon\Carbon::parse($d)->isoFormat('dd');
                 $status = $trendData[$d] ?? 'no_data';
-                
+
                 // Map status to value for simple chart (1=Present, 0.5=Late, 0=Absent)
                 $chartValue = 0;
-                if ($status === 'present') $chartValue = 1;
-                elseif ($status === 'late') $chartValue = 0.5;
-                
+                if ($status === 'present') {
+                    $chartValue = 1;
+                } elseif ($status === 'late') {
+                    $chartValue = 0.5;
+                }
+
                 $chartData[] = [
                     'date' => $d,
                     'label' => $dayLabel,
                     'status' => $status,
-                    'value' => $chartValue
+                    'value' => $chartValue,
                 ];
             }
 
@@ -170,20 +175,20 @@ class ParentDashboardController extends Controller
                 'student_profile' => [
                     'name' => $childName,
                     'class' => $className,
-                    'photo' => $child->profile_photo_url // Mock or check property
+                    'photo' => $child->profile_photo_url, // Mock or check property
                 ],
                 'today_status' => [
                     'status' => $statusToday,
                     'check_in_time' => $checkInTime,
-                    'is_late' => $statusToday === 'late'
+                    'is_late' => $statusToday === 'late',
                 ],
                 'monthly_insight' => [
                     'attendance_rate' => $attRate,
                     'total_absences' => $absencesMonth,
-                    'streak_count' => $streak
+                    'streak_count' => $streak,
                 ],
                 'risk_level' => $riskLevel,
-                'weekly_trend' => $chartData
+                'weekly_trend' => $chartData,
             ];
         });
 
@@ -214,10 +219,10 @@ class ParentDashboardController extends Controller
         }
 
         $query = Attendance::with([
-            'schedule.subject:id,name', 
-            'schedule.teacher:id,name'
+            'schedule.subject:id,name',
+            'schedule.teacher:id,name',
         ])
-        ->where('student_id', $childId);
+            ->where('student_id', $childId);
 
         // Apply Filters
         if ($request->filled('start_date') && $request->filled('end_date')) {
@@ -242,7 +247,7 @@ class ParentDashboardController extends Controller
                     'check_in_time' => $att->check_in_time ? \Carbon\Carbon::parse($att->check_in_time)->format('H:i') : '-',
                     'subject' => $att->schedule->subject->name ?? '-',
                     'teacher' => $att->schedule->teacher->name ?? '-',
-                    'notes' => $att->notes
+                    'notes' => $att->notes,
                 ];
             });
 
@@ -260,7 +265,7 @@ class ParentDashboardController extends Controller
         $user = $request->user();
 
         $child = $user->children()->where('student_parents.student_id', $childId)->first();
-        if (!$child) {
+        if (! $child) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -286,10 +291,10 @@ class ParentDashboardController extends Controller
 
         $avgTime = '-';
         if ($arrivalTimes->isNotEmpty()) {
-            $avgSeconds = $arrivalTimes->map(function($time) {
+            $avgSeconds = $arrivalTimes->map(function ($time) {
                 return \Carbon\Carbon::parse($time)->secondsSinceMidnight();
             })->average();
-            $avgTime = gmdate('H:i', (int)$avgSeconds);
+            $avgTime = gmdate('H:i', (int) $avgSeconds);
         }
 
         // 3. Most Frequent Late Day (Last 3 Months)
@@ -298,10 +303,10 @@ class ParentDashboardController extends Controller
             ->where('status', 'late')
             ->whereBetween('attendance_date', [$startPattern, $endOfMonth])
             ->get()
-            ->groupBy(function($item) {
+            ->groupBy(function ($item) {
                 return \Carbon\Carbon::parse($item->attendance_date)->format('l'); // Monday, Tuesday...
             })
-            ->map(function($group) {
+            ->map(function ($group) {
                 return $group->count();
             })
             ->sortDesc();
@@ -318,9 +323,9 @@ class ParentDashboardController extends Controller
                 'most_frequent_late_day' => [
                     'day' => $mostFrequentDay,
                     'count' => $mostFrequentCount,
-                    'analysis_period' => 'Last 3 Months'
-                ]
-            ]
+                    'analysis_period' => 'Last 3 Months',
+                ],
+            ],
         ]);
     }
 
@@ -333,7 +338,7 @@ class ParentDashboardController extends Controller
 
         // 1. Verify Relationship
         $child = $user->children()->where('student_parents.student_id', $childId)->first();
-        if (!$child) {
+        if (! $child) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -360,10 +365,10 @@ class ParentDashboardController extends Controller
                 'type' => 'critical',
                 'title' => "Absent Today ({$statusLabel})",
                 'message' => "Ananda {$child->name} tercatat tidak hadir hari ini ({$statusLabel}).",
-                'action' => 'contact_homeroom'
+                'action' => 'contact_homeroom',
             ];
         }
-        // If NO record exists, it might mean "Net yet checked in" or "Absent". 
+        // If NO record exists, it might mean "Net yet checked in" or "Absent".
         // We usually don't alert "Not yet checked in" as "Absent" until end of day, but let's stick to explicit records for now.
 
         // Trigger B: Absent 2+ Consecutive Days
@@ -374,7 +379,7 @@ class ParentDashboardController extends Controller
             ->orderBy('attendance_date', 'desc')
             ->limit(5)
             ->get();
-        
+
         $streak = 0;
         foreach ($recentRecords as $rec) {
             if (in_array($rec->status, ['absent', 'alpha', 'sick', 'permit'])) {
@@ -389,7 +394,7 @@ class ParentDashboardController extends Controller
                 'type' => 'warning',
                 'title' => "{$streak} Days Consecutive Absence",
                 'message' => "Ananda {$child->name} telah tidak hadir selama {$streak} hari berturut-turut.",
-                'action' => 'check_details'
+                'action' => 'check_details',
             ];
         }
 
@@ -411,14 +416,14 @@ class ParentDashboardController extends Controller
             $alerts[] = [
                 'type' => 'warning',
                 'title' => "Low Attendance Rate ({$formattedRate}%)",
-                'message' => "Tingkat kehadiran bulan ini di bawah 75%. Mohon perhatian orang tua.",
-                'action' => 'review_monthly'
+                'message' => 'Tingkat kehadiran bulan ini di bawah 75%. Mohon perhatian orang tua.',
+                'action' => 'review_monthly',
             ];
         }
 
         return response()->json([
             'success' => true,
-            'data' => $alerts
+            'data' => $alerts,
         ]);
     }
 
@@ -431,7 +436,7 @@ class ParentDashboardController extends Controller
 
         // 1. Verify Relationship
         $child = $user->children()->where('student_parents.student_id', $childId)->first();
-        if (!$child) {
+        if (! $child) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -445,13 +450,13 @@ class ParentDashboardController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$classStudent) {
+        if (! $classStudent) {
             return response()->json([
-                'success' => true, 
+                'success' => true,
                 'data' => [
                     'overview' => null,
-                    'timeline' => []
-                ]
+                    'timeline' => [],
+                ],
             ]);
         }
 
@@ -479,10 +484,10 @@ class ParentDashboardController extends Controller
                     'overview' => [
                         'date' => $todayStr,
                         'day' => \Carbon\Carbon::now()->format('l'),
-                        'message' => 'No school schedule today'
+                        'message' => 'No school schedule today',
                     ],
-                    'timeline' => []
-                ]
+                    'timeline' => [],
+                ],
             ]);
         }
 
@@ -494,14 +499,14 @@ class ParentDashboardController extends Controller
             ->keyBy('schedule_id');
 
         // 5. Build Timeline
-        $timeline = $schedules->map(function($schedule) use ($attendances) {
+        $timeline = $schedules->map(function ($schedule) use ($attendances) {
             $att = $attendances[$schedule->id] ?? null;
-            
-            $status = 'upcoming'; 
+
+            $status = 'upcoming';
             $currentTime = \Carbon\Carbon::now()->format('H:i:s');
-            
+
             // Determine logical status if no attendance record
-            if (!$att) {
+            if (! $att) {
                 if ($currentTime > $schedule->end_time) {
                     $status = 'missing'; // Should have attended but no record
                 } elseif ($currentTime >= $schedule->start_time) {
@@ -515,7 +520,7 @@ class ParentDashboardController extends Controller
                 'schedule_id' => $schedule->id,
                 'subject' => $schedule->subject_name,
                 'teacher' => $schedule->teacher_name,
-                'time_range' => substr($schedule->start_time, 0, 5) . ' - ' . substr($schedule->end_time, 0, 5),
+                'time_range' => substr($schedule->start_time, 0, 5).' - '.substr($schedule->end_time, 0, 5),
                 'status' => ucfirst($status),
                 'status_raw' => $status,
                 'check_in_time' => $att && $att->check_in_time ? \Carbon\Carbon::parse($att->check_in_time)->format('H:i') : null,
@@ -534,15 +539,15 @@ class ParentDashboardController extends Controller
             'first_check_in' => $firstCheckIn ? \Carbon\Carbon::parse($firstCheckIn->check_in_time)->format('H:i') : '-',
             'last_check_out' => $lastCheckOut ? \Carbon\Carbon::parse($lastCheckOut->check_out_time)->format('H:i') : '-',
             'total_classes' => $schedules->count(),
-            'completed_classes' => $attendances->count()
+            'completed_classes' => $attendances->count(),
         ];
 
         return response()->json([
             'success' => true,
             'data' => [
                 'overview' => $overview,
-                'timeline' => $timeline
-            ]
+                'timeline' => $timeline,
+            ],
         ]);
     }
 
@@ -555,13 +560,13 @@ class ParentDashboardController extends Controller
 
         // 1. Verify Relationship
         $child = $user->children()->where('student_parents.student_id', $childId)->first();
-        if (!$child) {
+        if (! $child) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
         $startOfMonth = \Carbon\Carbon::now()->startOfMonth()->toDateString();
         $endOfMonth = \Carbon\Carbon::now()->endOfMonth()->toDateString();
-        
+
         $startLastMonth = \Carbon\Carbon::now()->subMonth()->startOfMonth()->toDateString();
         $endLastMonth = \Carbon\Carbon::now()->subMonth()->endOfMonth()->toDateString();
 
@@ -571,35 +576,36 @@ class ParentDashboardController extends Controller
                 ->where('student_id', $childId)
                 ->whereBetween('attendance_date', [$start, $end])
                 ->get();
-            
+
             // Group by date to determine daily status
-            // Logic: 
+            // Logic:
             // - If ANY 'late' in a day -> Day is Late (if present)
             // - If ALL 'absent' -> Day is Absent
             // - Else if ANY 'present' -> Day is Present
-            
+
             $days = $records->groupBy('attendance_date');
-            
+
             $stats = [
                 'total_days' => $days->count(),
                 'days_present' => 0,
                 'days_late' => 0, // Late is a type of present
-                'days_absent' => 0
+                'days_absent' => 0,
             ];
 
             foreach ($days as $date => $dayRecords) {
                 $statusList = $dayRecords->pluck('status')->toArray();
-                
+
                 // Check Absence first
-                $isAbsent = collect($statusList)->every(fn($s) => in_array($s, ['absent', 'alpha', 'sick', 'permit']));
-                
+                $isAbsent = collect($statusList)->every(fn ($s) => in_array($s, ['absent', 'alpha', 'sick', 'permit']));
+
                 if ($isAbsent) {
                     $stats['days_absent']++;
+
                     continue;
                 }
 
                 // If not absent, they are present. Check if late.
-                // We'll consider them "Late" for the day if the FIRST schedule was late, or ANY late? 
+                // We'll consider them "Late" for the day if the FIRST schedule was late, or ANY late?
                 // Usually "Late to school" is first entry. Let's look for ANY 'late' for simplicity or specific logic.
                 // Let's assume ANY 'late' tag makes the day "Late".
                 if (in_array('late', $statusList)) {
@@ -608,7 +614,7 @@ class ParentDashboardController extends Controller
                     $stats['days_present']++;
                 }
             }
-            
+
             return $stats;
         };
 
@@ -618,14 +624,14 @@ class ParentDashboardController extends Controller
         // Calculate Rate
         $totalSchoolDays = $currentStats['total_days'];
         $totalPresentDays = $currentStats['days_present'] + $currentStats['days_late'];
-        
+
         $rate = $totalSchoolDays > 0 ? ($totalPresentDays / $totalSchoolDays) * 100 : 0;
-        
+
         // Comparison
         $lastTotalPresent = $lastStats['days_present'] + $lastStats['days_late'];
         $lastTotalDays = $lastStats['total_days'];
         $lastRate = $lastTotalDays > 0 ? ($lastTotalPresent / $lastTotalDays) * 100 : 0;
-        
+
         $diff = $rate - $lastRate;
         $trend = $diff >= 0 ? 'up' : 'down';
 
@@ -643,9 +649,9 @@ class ParentDashboardController extends Controller
                 'comparison' => [
                     'last_month_percentage' => round($lastRate, 1),
                     'difference' => abs(round($diff, 1)),
-                    'trend' => $trend
-                ]
-            ]
+                    'trend' => $trend,
+                ],
+            ],
         ]);
     }
 
@@ -658,7 +664,7 @@ class ParentDashboardController extends Controller
 
         // 1. Verify Relationship
         $child = $user->children()->where('student_parents.student_id', $childId)->first();
-        if (!$child) {
+        if (! $child) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -700,7 +706,7 @@ class ParentDashboardController extends Controller
                         $message = "Ananda {$child->name} checked in tepat waktu untuk {$subject}.";
                     }
                     break;
-                
+
                 case 'manual_create':
                 case 'manual_update':
                     if (in_array($log->new_status, ['absent', 'alpha', 'sick', 'permit'])) {
@@ -716,10 +722,10 @@ class ParentDashboardController extends Controller
                         // Generic update
                         $type = 'info';
                         $title = 'Attendance Updated';
-                        $message = "Status kehadiran diperbarui menjadi: " . ucfirst($log->new_status);
+                        $message = 'Status kehadiran diperbarui menjadi: '.ucfirst($log->new_status);
                     }
                     break;
-                
+
                 case 'scan_out':
                     $type = 'success';
                     $title = 'Check Out';
@@ -739,7 +745,7 @@ class ParentDashboardController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $feed
+            'data' => $feed,
         ]);
     }
 
@@ -752,7 +758,7 @@ class ParentDashboardController extends Controller
 
         // 1. Verify Relationship
         $child = $user->children()->where('student_parents.student_id', $childId)->first();
-        if (!$child) {
+        if (! $child) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -781,7 +787,7 @@ class ParentDashboardController extends Controller
                 ->where('academic_year_id', $academicYearId)
                 ->with('teacher:id,name')
                 ->first();
-            
+
             if ($teacherRole && $teacherRole->teacher) {
                 $homeroomTeacherName = $teacherRole->teacher->name;
             }
@@ -800,7 +806,9 @@ class ParentDashboardController extends Controller
 
         $totalRecords = $monthlyStats->total ?? 0;
         $attRate = $totalRecords > 0 ? ($monthlyStats->present_count / $totalRecords) * 100 : 0;
-        if ($totalRecords == 0) $attRate = 100; // Optimistic
+        if ($totalRecords == 0) {
+            $attRate = 100;
+        } // Optimistic
 
         // 4. Last 10 Attendance Records
         $history = \App\Models\Attendance::with(['schedule.subject:id,name'])
@@ -813,7 +821,7 @@ class ParentDashboardController extends Controller
                     'date' => $att->attendance_date,
                     'status' => ucfirst($att->status),
                     'check_in_time' => $att->check_in_time ? \Carbon\Carbon::parse($att->check_in_time)->format('H:i') : '-',
-                    'subject' => $att->schedule->subject->name ?? '-'
+                    'subject' => $att->schedule->subject->name ?? '-',
                 ];
             });
 
@@ -830,10 +838,10 @@ class ParentDashboardController extends Controller
                 'stats' => [
                     'month' => \Carbon\Carbon::now()->format('F'),
                     'attendance_rate' => round($attRate, 1),
-                    'late_count' => (int) ($monthlyStats->late_count ?? 0)
+                    'late_count' => (int) ($monthlyStats->late_count ?? 0),
                 ],
-                'recent_activity' => $history
-            ]
+                'recent_activity' => $history,
+            ],
         ]);
     }
 }

@@ -13,13 +13,13 @@ return new class extends Migration
     {
         Schema::table('announcements', function (Blueprint $table) {
             // Add support for targeting specific schools
-            if (!Schema::hasColumn('announcements', 'target_type')) {
+            if (! Schema::hasColumn('announcements', 'target_type')) {
                 $table->string('target_type', 50)->default('global'); // global, school, user
             }
-            if (!Schema::hasColumn('announcements', 'target_ids')) {
+            if (! Schema::hasColumn('announcements', 'target_ids')) {
                 $table->jsonb('target_ids')->nullable(); // List of school IDs
             }
-            if (!Schema::hasColumn('announcements', 'created_by')) {
+            if (! Schema::hasColumn('announcements', 'created_by')) {
                 $table->foreignId('created_by')->nullable()->constrained('users');
             }
         });

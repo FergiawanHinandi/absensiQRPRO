@@ -2,14 +2,14 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     /**
      * Run the migrations.
-     * 
+     *
      * Creates an immutable security log table with hash chaining
      * for tamper-proof audit trail.
      */
@@ -17,26 +17,26 @@ return new class extends Migration
     {
         Schema::create('immutable_security_logs', function (Blueprint $table) {
             $table->id();
-            
+
             // Event information
             $table->string('event_type', 100)->index();
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('school_id')->nullable()->constrained()->nullOnDelete();
             $table->text('description');
             $table->json('metadata')->nullable();
-            
+
             // Hash chain fields - CRITICAL for integrity
             $table->char('previous_hash', 64)->index(); // SHA256 produces 64 hex chars
             $table->char('current_hash', 64)->unique(); // Must be unique to detect duplicates
-            
+
             // Timestamp - no updated_at since records are immutable
             $table->timestamp('created_at')->useCurrent();
-            
+
             // Additional integrity fields
             $table->string('ip_address', 45)->nullable();
             $table->string('user_agent', 500)->nullable();
             $table->unsignedBigInteger('sequence_number')->unique(); // Sequential ordering
-            
+
             // Indexes for efficient querying
             $table->index(['school_id', 'created_at']);
             $table->index(['user_id', 'created_at']);
@@ -47,7 +47,7 @@ return new class extends Migration
         // Create database-level protection against updates and deletes
         // This uses database triggers for additional security layer
         $this->createDatabaseTriggers();
-        
+
         // Insert genesis block (first record in the chain)
         $this->insertGenesisBlock();
     }
@@ -92,7 +92,7 @@ return new class extends Migration
                     SET MESSAGE_TEXT = 'immutable_security_logs table does not allow UPDATE operations';
                 END;
             ");
-            
+
             DB::unprepared("
                 CREATE TRIGGER prevent_delete_immutable_logs
                 BEFORE DELETE ON immutable_security_logs
@@ -156,14 +156,14 @@ return new class extends Migration
 
         // Drop triggers first
         if ($driver === 'pgsql') {
-            DB::unprepared("
+            DB::unprepared('
                 DROP TRIGGER IF EXISTS prevent_update_immutable_logs ON immutable_security_logs;
                 DROP TRIGGER IF EXISTS prevent_delete_immutable_logs ON immutable_security_logs;
                 DROP FUNCTION IF EXISTS prevent_immutable_log_modification();
-            ");
+            ');
         } elseif ($driver === 'mysql') {
-            DB::unprepared("DROP TRIGGER IF EXISTS prevent_update_immutable_logs");
-            DB::unprepared("DROP TRIGGER IF EXISTS prevent_delete_immutable_logs");
+            DB::unprepared('DROP TRIGGER IF EXISTS prevent_update_immutable_logs');
+            DB::unprepared('DROP TRIGGER IF EXISTS prevent_delete_immutable_logs');
         }
 
         Schema::dropIfExists('immutable_security_logs');

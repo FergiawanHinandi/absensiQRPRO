@@ -10,12 +10,11 @@ use App\Services\BehaviorAnomalyService;
 use App\Services\BehaviorBaselineService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Daily Behavior Analysis Command
- * 
+ *
  * Runs every night to:
  * 1. Aggregate daily metrics from attendance and security logs
  * 2. Update behavioral baselines
@@ -36,6 +35,7 @@ class AnalyzeBehaviorDaily extends Command
     protected $description = 'Aggregate daily behavior metrics, update baselines, and detect anomalies';
 
     protected BehaviorBaselineService $baselineService;
+
     protected BehaviorAnomalyService $anomalyService;
 
     public function __construct(
@@ -49,16 +49,16 @@ class AnalyzeBehaviorDaily extends Command
 
     public function handle(): int
     {
-        $date = $this->option('date') 
-            ? Carbon::parse($this->option('date')) 
+        $date = $this->option('date')
+            ? Carbon::parse($this->option('date'))
             : Carbon::yesterday();
-        
+
         $isDryRun = $this->option('dry-run');
         $schoolId = $this->option('school');
         $userId = $this->option('user');
 
         $this->info("=== Behavior Analysis for {$date->toDateString()} ===");
-        
+
         if ($isDryRun) {
             $this->warn('DRY RUN - No changes will be saved');
         }
@@ -72,27 +72,27 @@ class AnalyzeBehaviorDaily extends Command
         ];
 
         // Step 1: Aggregate daily metrics
-        if (!$this->option('skip-metrics')) {
+        if (! $this->option('skip-metrics')) {
             $this->info("\n[Step 1] Aggregating daily metrics...");
             $stats['metrics_aggregated'] = $this->aggregateMetrics($date, $schoolId, $userId, $isDryRun);
             $this->info("  → Aggregated metrics for {$stats['metrics_aggregated']} teachers");
         }
 
         // Step 2: Update baselines
-        if (!$this->option('skip-baseline')) {
+        if (! $this->option('skip-baseline')) {
             $this->info("\n[Step 2] Updating behavior baselines...");
             $stats['baselines_updated'] = $this->updateBaselines($schoolId, $userId, $isDryRun);
             $this->info("  → Updated {$stats['baselines_updated']} baselines");
         }
 
         // Step 3: Run anomaly detection
-        if (!$this->option('skip-anomaly')) {
+        if (! $this->option('skip-anomaly')) {
             $this->info("\n[Step 3] Running anomaly detection...");
             $anomalyStats = $this->runAnomalyDetection($date, $schoolId, $userId, $isDryRun);
             $stats = array_merge($stats, $anomalyStats);
             $this->info("  → Detected {$stats['anomalies_detected']} anomalies");
             $this->info("  → Created {$stats['alerts_created']} alerts");
-            
+
             if ($stats['critical_risks'] > 0) {
                 $this->error("  → {$stats['critical_risks']} CRITICAL RISKS detected!");
             }
@@ -100,7 +100,7 @@ class AnalyzeBehaviorDaily extends Command
 
         // Summary
         $this->newLine();
-        $this->info("=== Analysis Complete ===");
+        $this->info('=== Analysis Complete ===');
         $this->table(
             ['Metric', 'Count'],
             [
@@ -128,7 +128,7 @@ class AnalyzeBehaviorDaily extends Command
         // Get teachers to analyze
         $teachersQuery = User::where('role_type', 'teacher')
             ->where('is_active', true);
-        
+
         if ($schoolId) {
             $teachersQuery->where('school_id', $schoolId);
         }
@@ -140,12 +140,12 @@ class AnalyzeBehaviorDaily extends Command
 
         foreach ($teachers as $teacher) {
             $metrics = $this->calculateTeacherMetrics($teacher, $dateStr);
-            
+
             if ($metrics['total_scans'] === 0) {
                 continue; // Skip teachers with no activity
             }
 
-            if (!$isDryRun) {
+            if (! $isDryRun) {
                 BehaviorMetricDaily::updateOrCreate(
                     [
                         'user_id' => $teacher->id,
@@ -161,6 +161,7 @@ class AnalyzeBehaviorDaily extends Command
         }
 
         $this->newLine();
+
         return $count;
     }
 
@@ -268,16 +269,19 @@ class AnalyzeBehaviorDaily extends Command
 
         if ($userId) {
             $baseline = $this->baselineService->calculateBaseline($userId);
+
             return $baseline ? 1 : 0;
         }
 
         if ($schoolId) {
             $results = $this->baselineService->recalculateSchoolBaselines($schoolId);
+
             return $results['updated'];
         }
 
         // All schools
         $results = $this->baselineService->recalculateAllBaselines();
+
         return $results['updated'];
     }
 
@@ -294,7 +298,7 @@ class AnalyzeBehaviorDaily extends Command
 
         // Get metrics for the date
         $metricsQuery = BehaviorMetricDaily::forDate($date->toDateString());
-        
+
         if ($schoolId) {
             $metricsQuery->forSchool($schoolId);
         }
@@ -313,8 +317,8 @@ class AnalyzeBehaviorDaily extends Command
 
             if (isset($analysis['total_score']) && $analysis['total_score'] >= 3) {
                 $stats['anomalies_detected']++;
-                
-                if (!$isDryRun) {
+
+                if (! $isDryRun) {
                     $stats['alerts_created']++;
                 }
 

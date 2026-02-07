@@ -13,7 +13,9 @@ class SchoolRateLimitingTest extends TestCase
     use RefreshDatabase;
 
     protected School $school;
+
     protected User $student;
+
     protected User $admin;
 
     protected function setUp(): void
@@ -194,7 +196,7 @@ class SchoolRateLimitingTest extends TestCase
             ]);
         }
 
-        $this->assertNotEquals(429, $response2->status(), 
+        $this->assertNotEquals(429, $response2->status(),
             'School 2 should not be rate limited (uses different school_id in cache key)');
     }
 

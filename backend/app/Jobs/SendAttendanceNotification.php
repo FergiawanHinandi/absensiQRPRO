@@ -57,4 +57,18 @@ class SendAttendanceNotification implements ShouldQueue
         // Future Integration:
         // Http::post('https://wa-gateway.com/send', ['phone' => $parent->phone, 'message' => $message]);
     }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('SendAttendanceNotification job failed', [
+            'job' => self::class,
+            'attendance_id' => $this->attendance->id,
+            'student_id' => $this->attendance->student_id,
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
+    }
 }

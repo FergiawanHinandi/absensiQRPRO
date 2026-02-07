@@ -2,9 +2,6 @@
 
 namespace App\Listeners;
 
-use App\Events\AttendanceAbsent;
-use App\Events\AttendanceLate;
-use App\Events\AttendanceRecorded;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\ClassModel;
@@ -24,22 +21,24 @@ class SendAttendanceNotification implements ShouldQueue
         try {
             $attendance = $event->attendance;
             $student = User::find($attendance->student_id);
-            if (!$student) return;
+            if (! $student) {
+                return;
+            }
 
             // Get Parent and Homeroom Teacher
             $parents = $this->getParents($student);
             $homeroomTeacher = $this->getHomeroomTeacher($student);
 
             $eventName = class_basename($event);
-            $logDescription = "";
+            $logDescription = '';
 
             if ($eventName === 'AttendanceRecorded') {
                 // Present
                 $time = $attendance->check_in_time ? \Carbon\Carbon::parse($attendance->check_in_time)->format('H:i') : 'Unknown';
-                
+
                 // Notify Student
                 $this->createNotification($student, 'Kehadiran Tercatat', "Anda telah hadir di sekolah pukul {$time}.", 'attendance');
-                
+
                 // Notify Parent
                 foreach ($parents as $parent) {
                     $this->createNotification($parent, 'Kehadiran Anak', "Anak Anda telah hadir di sekolah pukul {$time}.", 'attendance');
@@ -62,11 +61,11 @@ class SendAttendanceNotification implements ShouldQueue
 
             } elseif ($eventName === 'AttendanceAbsent') {
                 // Absent
-                
+
                 // Check if notification already sent today to prevent spam
                 // We check one parent as a proxy (assuming if one got it, others did too, or just check per parent)
                 // Better: check inside the loop.
-                
+
                 // Notify Parent
                 foreach ($parents as $parent) {
                     $exists = Notification::where('user_id', $parent->id)
@@ -75,19 +74,19 @@ class SendAttendanceNotification implements ShouldQueue
                         ->whereDate('created_at', today())
                         ->exists();
 
-                    if (!$exists) {
-                        $this->createNotification($parent, 'Ketidakhadiran', "Anak Anda tidak tercatat hadir hari ini.", 'attendance');
+                    if (! $exists) {
+                        $this->createNotification($parent, 'Ketidakhadiran', 'Anak Anda tidak tercatat hadir hari ini.', 'attendance');
                     }
                 }
                 // Notify Homeroom
                 if ($homeroomTeacher) {
-                     $exists = Notification::where('user_id', $homeroomTeacher->id)
+                    $exists = Notification::where('user_id', $homeroomTeacher->id)
                         ->where('type', 'attendance')
                         ->where('title', 'Siswa Absen')
                         ->whereDate('created_at', today())
                         ->exists();
 
-                    if (!$exists) {
+                    if (! $exists) {
                         $this->createNotification($homeroomTeacher, 'Siswa Absen', "Siswa {$student->name} tidak hadir hari ini.", 'attendance');
                     }
                 }
@@ -99,16 +98,16 @@ class SendAttendanceNotification implements ShouldQueue
                     ->orderBy('attendance_date', 'desc')
                     ->take(2)
                     ->count();
-                
+
                 if ($consecutive >= 2) {
                     // High Priority Alert
                     foreach ($parents as $parent) {
-                         $this->createNotification($parent, 'PERINGATAN: Absen Berturut-turut', "Anak Anda telah absen 2 hari berturut-turut.", 'risk');
+                        $this->createNotification($parent, 'PERINGATAN: Absen Berturut-turut', 'Anak Anda telah absen 2 hari berturut-turut.', 'risk');
                     }
-                     if ($homeroomTeacher) {
+                    if ($homeroomTeacher) {
                         $this->createNotification($homeroomTeacher, 'PERINGATAN: Siswa Absen Berturut-turut', "Siswa {$student->name} telah absen 2 hari berturut-turut.", 'risk');
                     }
-                    $logDescription .= " (High Priority Alert: Consecutive Absences)";
+                    $logDescription .= ' (High Priority Alert: Consecutive Absences)';
                 }
             }
 
@@ -125,14 +124,14 @@ class SendAttendanceNotification implements ShouldQueue
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Failed to send attendance notification: " . $e->getMessage());
+            Log::error('Failed to send attendance notification: '.$e->getMessage());
             AuditLog::create([
                 'school_id' => 1,
                 'user_id' => null,
                 'action' => 'notification_failed',
                 'module' => 'notification',
                 'severity' => 'error',
-                'description' => "Failed to send notification: " . $e->getMessage(),
+                'description' => 'Failed to send notification: '.$e->getMessage(),
                 'ip_address' => 'system',
                 'user_agent' => 'system',
             ]);
@@ -164,6 +163,7 @@ class SendAttendanceNotification implements ShouldQueue
                 return User::find($class->homeroom_teacher_id);
             }
         }
+
         return null;
     }
 }

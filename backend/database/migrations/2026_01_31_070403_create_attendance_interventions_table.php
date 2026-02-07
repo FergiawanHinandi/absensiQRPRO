@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('action_taken'); // call_parent, counseling, warning, home_visit
             $table->text('notes')->nullable();
             $table->timestamps();
-            
+
             // Index for quick lookup
             $table->index(['student_id', 'created_at']);
         });

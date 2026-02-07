@@ -64,7 +64,7 @@ final readonly class DeviceAnomalyResult
     {
         return array_filter(
             $this->anomalies,
-            fn($a) => ($a['severity'] ?? '') === $severity
+            fn ($a) => ($a['severity'] ?? '') === $severity
         );
     }
 

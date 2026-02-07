@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class TrustedDevice extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToSchool;
 
     protected $fillable = [
         'user_id',

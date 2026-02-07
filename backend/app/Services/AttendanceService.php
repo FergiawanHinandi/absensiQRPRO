@@ -2,27 +2,30 @@
 
 namespace App\Services;
 
+use App\Core\Services\Attendance\QrReplayPreventionService;
+use App\Events\AttendanceLate;
+use App\Events\AttendanceRecorded;
+use App\Events\StudentAttended;
+use App\Exceptions\AttendanceException;
 use App\Models\Attendance;
 use App\Models\ClassStudent;
 use App\Models\Schedule;
 use App\Models\School;
 use App\Models\User;
-use App\Core\Services\Attendance\QrReplayPreventionService;
-use App\Exceptions\AttendanceException;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Events\StudentAttended;
-use App\Events\AttendanceRecorded;
-use App\Events\AttendanceLate;
 
 class AttendanceService
 {
     protected StudentQrService $qrService;
+
     protected QrReplayPreventionService $replayPreventionService;
+
     protected SecurityAlertService $alertService;
+
     protected SecurityPolicyService $policyService;
 
     /**
@@ -72,11 +75,11 @@ class AttendanceService
         // ============================================================
         // STEP 1: VERIFY TEACHER ROLE
         // ============================================================
-        if ($teacher->role_type !== "teacher") {
-            $this->logSecurityAnomaly("invalid_role_scan_attempt", [
-                "user_id" => $teacher->id,
-                "role" => $teacher->role_type,
-                "expected" => "teacher",
+        if ($teacher->role_type !== 'teacher') {
+            $this->logSecurityAnomaly('invalid_role_scan_attempt', [
+                'user_id' => $teacher->id,
+                'role' => $teacher->role_type,
+                'expected' => 'teacher',
             ]);
             throw AttendanceException::invalidRole();
         }
@@ -88,37 +91,37 @@ class AttendanceService
             $payload = $this->qrService->verify($qrToken);
         } catch (\Exception $e) {
             $this->logSecurityEvent(
-                "signature_failed",
+                'signature_failed',
                 $teacher,
                 $qrToken,
                 $e->getMessage(),
             );
-            throw new AttendanceException("QR Code tidak valid atau rusak.");
+            throw new AttendanceException('QR Code tidak valid atau rusak.');
         }
 
-        $studentId = $payload["sid"];
-        $schoolId = $payload["sch"];
-        $nonce = $payload["n"] ?? null;
+        $studentId = $payload['sid'];
+        $schoolId = $payload['sch'];
+        $nonce = $payload['n'] ?? null;
 
         // Validate school isolation
         if ($schoolId !== $teacher->school_id) {
-            $this->logSecurityAnomaly("cross_school_scan_attempt", [
-                "teacher_id" => $teacher->id,
-                "teacher_school" => $teacher->school_id,
-                "qr_school" => $schoolId,
+            $this->logSecurityAnomaly('cross_school_scan_attempt', [
+                'teacher_id' => $teacher->id,
+                'teacher_school' => $teacher->school_id,
+                'qr_school' => $schoolId,
             ]);
             throw new AttendanceException(
-                "QR Code tidak valid untuk sekolah ini.",
+                'QR Code tidak valid untuk sekolah ini.',
             );
         }
 
         // Check QR expiration
-        if (isset($payload["exp"]) && $payload["exp"] < now()->timestamp) {
+        if (isset($payload['exp']) && $payload['exp'] < now()->timestamp) {
             $this->logSecurityEvent(
-                "qr_expired",
+                'qr_expired',
                 $teacher,
                 $qrToken,
-                "QR Expired",
+                'QR Expired',
             );
             throw AttendanceException::expired();
         }
@@ -133,7 +136,7 @@ class AttendanceService
             );
         } catch (\Exception $e) {
             $this->logSecurityEvent(
-                "student_validation_failed",
+                'student_validation_failed',
                 $teacher,
                 $qrToken,
                 $e->getMessage(),
@@ -146,7 +149,7 @@ class AttendanceService
         // ============================================================
         $dayOfWeek = now()->dayOfWeek;
         $now = now();
-        $currentTime = $now->format("H:i:s");
+        $currentTime = $now->format('H:i:s');
 
         // Get configurable tolerances from policy service
         $toleranceBefore = $this->policyService->getScheduleToleranceBefore(
@@ -160,36 +163,36 @@ class AttendanceService
         $windowStartTime = $now
             ->copy()
             ->subMinutes($toleranceAfter)
-            ->format("H:i:s");
+            ->format('H:i:s');
         $windowEndTime = $now
             ->copy()
             ->addMinutes($toleranceBefore)
-            ->format("H:i:s");
+            ->format('H:i:s');
 
         // Load schedule within time window (with tolerance)
         // Teacher can scan X minutes BEFORE schedule starts (configurable)
         // Teacher can scan X minutes AFTER schedule ends (configurable)
-        $schedule = Schedule::with(["class", "subject"])
-            ->where("school_id", $teacher->school_id)
-            ->where("day_of_week", $dayOfWeek)
-            ->where("is_active", true)
-            ->where("start_time", "<=", $windowEndTime) // Schedule starts before current + tolerance
-            ->where("end_time", ">=", $windowStartTime) // Schedule ends after current - tolerance
+        $schedule = Schedule::with(['class', 'subject'])
+            ->where('school_id', $teacher->school_id)
+            ->where('day_of_week', $dayOfWeek)
+            ->where('is_active', true)
+            ->where('start_time', '<=', $windowEndTime) // Schedule starts before current + tolerance
+            ->where('end_time', '>=', $windowStartTime) // Schedule ends after current - tolerance
             ->first();
 
-        if (!$schedule) {
+        if (! $schedule) {
             throw AttendanceException::scheduleNotFound();
         }
 
         // CRITICAL: Verify teacher owns this schedule
         if ($schedule->teacher_id !== $teacher->id) {
-            $this->logSecurityAnomaly("unauthorized_schedule_scan", [
-                "teacher_id" => $teacher->id,
-                "schedule_id" => $schedule->id,
-                "schedule_teacher_id" => $schedule->teacher_id,
+            $this->logSecurityAnomaly('unauthorized_schedule_scan', [
+                'teacher_id' => $teacher->id,
+                'schedule_id' => $schedule->id,
+                'schedule_teacher_id' => $schedule->teacher_id,
             ]);
             throw new AttendanceException(
-                "Anda bukan pengajar pada jadwal ini.",
+                'Anda bukan pengajar pada jadwal ini.',
             );
         }
 
@@ -201,7 +204,7 @@ class AttendanceService
         $windowStart = $scheduleStart->copy()->subMinutes($toleranceBefore);
         $windowEnd = $scheduleEnd->copy()->addMinutes($toleranceAfter);
 
-        $currentTimeCarbon = Carbon::parse($now->format("H:i:s"));
+        $currentTimeCarbon = Carbon::parse($now->format('H:i:s'));
 
         if (
             $currentTimeCarbon->lt($windowStart) ||
@@ -213,16 +216,16 @@ class AttendanceService
         // ============================================================
         // STEP 6: VERIFY CLASS MATCH
         // ============================================================
-        $isStudentInClass = ClassStudent::where("student_id", $student->id)
-            ->where("class_id", $schedule->class_id)
-            ->where("status", "active")
+        $isStudentInClass = ClassStudent::where('student_id', $student->id)
+            ->where('class_id', $schedule->class_id)
+            ->where('status', 'active')
             ->exists();
 
-        if (!$isStudentInClass) {
-            $this->logSecurityAnomaly("student_class_mismatch", [
-                "student_id" => $student->id,
-                "student_class_id" => $student->class_id ?? "N/A",
-                "schedule_class_id" => $schedule->class_id,
+        if (! $isStudentInClass) {
+            $this->logSecurityAnomaly('student_class_mismatch', [
+                'student_id' => $student->id,
+                'student_class_id' => $student->class_id ?? 'N/A',
+                'schedule_class_id' => $schedule->class_id,
             ]);
             throw AttendanceException::studentNotInClass();
         }
@@ -255,15 +258,14 @@ class AttendanceService
                 }
 
                 if ($distance > $maxRadius) {
-                    $this->logSecurityAnomaly("teacher_geofence_violation", [
-                        "teacher_id" => $teacher->id,
-                        "school_id" => $teacher->school_id,
-                        "distance" => round($distance, 2),
-                        "max_radius" => $maxRadius,
-                        "lat" => $lat,
-                        "lng" => $lng,
-                        "geofence_policy" =>
-                            "attendance.teacher_geofence_radius_meters",
+                    $this->logSecurityAnomaly('teacher_geofence_violation', [
+                        'teacher_id' => $teacher->id,
+                        'school_id' => $teacher->school_id,
+                        'distance' => round($distance, 2),
+                        'max_radius' => $maxRadius,
+                        'lat' => $lat,
+                        'lng' => $lng,
+                        'geofence_policy' => 'attendance.teacher_geofence_radius_meters',
                     ]);
 
                     // Dispatch security alert
@@ -288,15 +290,15 @@ class AttendanceService
         // STEP 7: ATOMIC ATTENDANCE RECORDING WITH RACE CONDITION PREVENTION
         // ============================================================
         $lockKey =
-            "student_attendance_{$student->id}_{$schedule->id}_" .
-            today()->format("Y-m-d");
+            "student_attendance_{$student->id}_{$schedule->id}_".
+            today()->format('Y-m-d');
 
         $lock = Cache::lock($lockKey, self::ATTENDANCE_LOCK_TIMEOUT);
 
-        if (!$lock->get()) {
+        if (! $lock->get()) {
             // Another request is processing this exact student+schedule
             throw new AttendanceException(
-                "Sedang memproses absensi. Coba lagi dalam beberapa detik.",
+                'Sedang memproses absensi. Coba lagi dalam beberapa detik.',
             );
         }
 
@@ -328,14 +330,14 @@ class AttendanceService
                             $schedule->id,
                             $schoolId,
                             $nonce,
-                            "teacher_scan_nonce_replay",
+                            'teacher_scan_nonce_replay',
                         );
 
                         $this->logSecurityEvent(
-                            "nonce_replay",
+                            'nonce_replay',
                             $teacher,
                             $qrToken,
-                            "QR nonce already used",
+                            'QR nonce already used',
                         );
                         throw AttendanceException::replayDetected();
                     }
@@ -345,11 +347,11 @@ class AttendanceService
                 // STEP 7b: CHECK DUPLICATE WITH ROW-LEVEL LOCK
                 // ============================================================
                 $existingAttendance = Attendance::where(
-                    "student_id",
+                    'student_id',
                     $student->id,
                 )
-                    ->where("schedule_id", $schedule->id)
-                    ->whereDate("attendance_date", today())
+                    ->where('schedule_id', $schedule->id)
+                    ->whereDate('attendance_date', today())
                     ->lockForUpdate()
                     ->first();
 
@@ -367,9 +369,9 @@ class AttendanceService
                 // ============================================================
                 // STEP 7c: IDEMPOTENCY CHECK
                 // ============================================================
-                $reqId = $requestId ?: request()->header("X-Request-ID");
+                $reqId = $requestId ?: request()->header('X-Request-ID');
                 if ($reqId) {
-                    $existing = Attendance::where("request_id", $reqId)
+                    $existing = Attendance::where('request_id', $reqId)
                         ->lockForUpdate()
                         ->first();
                     if ($existing) {
@@ -385,24 +387,24 @@ class AttendanceService
                 // STEP 7d: CREATE ATTENDANCE RECORD
                 // ============================================================
                 $attendance = Attendance::create([
-                    "school_id" => $teacher->school_id,
-                    "class_id" => $schedule->class_id,
-                    "schedule_id" => $schedule->id,
-                    "subject_id" => $schedule->subject_id,
-                    "student_id" => $student->id,
-                    "attendance_date" => today(),
-                    "attendance_type" => "teacher_scan",
-                    "status" => $this->determineAttendanceStatus(
+                    'school_id' => $teacher->school_id,
+                    'class_id' => $schedule->class_id,
+                    'schedule_id' => $schedule->id,
+                    'subject_id' => $schedule->subject_id,
+                    'student_id' => $student->id,
+                    'attendance_date' => today(),
+                    'attendance_type' => 'teacher_scan',
+                    'status' => $this->determineAttendanceStatus(
                         $schedule,
                         $teacher->school_id,
                     ),
-                    "check_in_time" => now(),
-                    "lat_in" => $lat,
-                    "lng_in" => $lng,
-                    "device_id_in" => $deviceId,
-                    "recorded_by" => $teacher->id, // WHO SCANNED
-                    "is_manual" => false,
-                    "request_id" => $reqId ?: (string) Str::uuid(),
+                    'check_in_time' => now(),
+                    'lat_in' => $lat,
+                    'lng_in' => $lng,
+                    'device_id_in' => $deviceId,
+                    'recorded_by' => $teacher->id, // WHO SCANNED
+                    'is_manual' => false,
+                    'request_id' => $reqId ?: (string) Str::uuid(),
                 ]);
 
                 // ============================================================
@@ -456,17 +458,17 @@ class AttendanceService
         ?int $schoolId = null,
     ): string {
         $scheduleStart = Carbon::parse($schedule->start_time);
-        $now = Carbon::parse(now()->format("H:i:s"));
+        $now = Carbon::parse(now()->format('H:i:s'));
 
         // Get late threshold from policy service (configurable per school)
         $lateThreshold = $this->policyService->getLateThreshold($schoolId);
 
         // If checked in after schedule start + threshold minutes, mark as late
         if ($now->gt($scheduleStart->copy()->addMinutes($lateThreshold))) {
-            return "late";
+            return 'late';
         }
 
-        return "present";
+        return 'present';
     }
 
     /**
@@ -478,12 +480,12 @@ class AttendanceService
         int $attendanceId,
     ): array {
         return [
-            "student_name" => $student->name,
-            "class" => $schedule->class->name,
-            "subject" => $schedule->subject->name,
-            "time" => now()->format("H:i"),
-            "status" => "Berhasil",
-            "attendance_id" => $attendanceId,
+            'student_name' => $student->name,
+            'class' => $schedule->class->name,
+            'subject' => $schedule->subject->name,
+            'time' => now()->format('H:i'),
+            'status' => 'Berhasil',
+            'attendance_id' => $attendanceId,
         ];
     }
 
@@ -496,14 +498,14 @@ class AttendanceService
         string $token,
         string $details,
     ): void {
-        Log::channel("attendance")->warning("Security Alert: {$type}", [
-            "actor_id" => $actor->id,
-            "actor_name" => $actor->name,
-            "ip" => request()->ip(),
-            "user_agent" => request()->userAgent(),
-            "token_snippet" => substr($token, 0, 10) . "...",
-            "details" => $details,
-            "timestamp" => now()->toIso8601String(),
+        Log::channel('attendance')->warning("Security Alert: {$type}", [
+            'actor_id' => $actor->id,
+            'actor_name' => $actor->name,
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'token_snippet' => substr($token, 0, 10).'...',
+            'details' => $details,
+            'timestamp' => now()->toIso8601String(),
         ]);
     }
 
@@ -512,17 +514,17 @@ class AttendanceService
      */
     private function logSecurityAnomaly(string $type, array $context): void
     {
-        Log::channel("security")->alert(
+        Log::channel('security')->alert(
             "ANOMALY: {$type}",
             array_merge($context, [
-                "ip" => request()->ip(),
-                "user_agent" => request()->userAgent(),
-                "timestamp" => now()->toIso8601String(),
+                'ip' => request()->ip(),
+                'user_agent' => request()->userAgent(),
+                'timestamp' => now()->toIso8601String(),
             ]),
         );
 
         // Track repeated anomalies per IP
-        $anomalyKey = "security_anomaly_{$type}_" . md5(request()->ip());
+        $anomalyKey = "security_anomaly_{$type}_".md5(request()->ip());
         $count = Cache::increment($anomalyKey);
 
         if ($count === 1) {
@@ -531,9 +533,9 @@ class AttendanceService
 
         // Alert on repeated anomalies
         if ($count >= 3) {
-            Log::channel("security")->critical("REPEATED ANOMALY: {$type}", [
-                "count" => $count,
-                "ip" => request()->ip(),
+            Log::channel('security')->critical("REPEATED ANOMALY: {$type}", [
+                'count' => $count,
+                'ip' => request()->ip(),
             ]);
         }
 
@@ -548,60 +550,60 @@ class AttendanceService
     {
         try {
             $userId =
-                $context["teacher_id"] ??
-                ($context["student_id"] ?? ($context["user_id"] ?? null));
-            $schoolId = $context["school_id"] ?? auth()->user()?->school_id;
+                $context['teacher_id'] ??
+                ($context['student_id'] ?? ($context['user_id'] ?? null));
+            $schoolId = $context['school_id'] ?? auth()->user()?->school_id;
 
             switch ($type) {
-                case "teacher_geofence_violation":
+                case 'teacher_geofence_violation':
                     $this->alertService->alertGeofenceViolation(
                         $userId,
                         $schoolId,
-                        $context["lat"] ?? 0,
-                        $context["lng"] ?? 0,
-                        $context["distance"] ?? 0,
-                        $context["max_radius"] ?? 0,
+                        $context['lat'] ?? 0,
+                        $context['lng'] ?? 0,
+                        $context['distance'] ?? 0,
+                        $context['max_radius'] ?? 0,
                         request()->ip(),
                     );
                     break;
 
-                case "teacher_not_schedule_owner":
-                case "schedule_ownership_mismatch":
+                case 'teacher_not_schedule_owner':
+                case 'schedule_ownership_mismatch':
                     $this->alertService->alertUnauthorizedSchedule(
                         $userId,
                         $schoolId,
-                        $context["schedule_id"] ?? 0,
+                        $context['schedule_id'] ?? 0,
                         request()->ip(),
                     );
                     break;
 
-                case "nonce_replay":
-                case "teacher_scan_nonce_replay":
+                case 'nonce_replay':
+                case 'teacher_scan_nonce_replay':
                     $this->alertService->alertQrReplay(
-                        $context["student_id"] ?? $userId,
+                        $context['student_id'] ?? $userId,
                         $schoolId,
-                        "QR code nonce replay detected",
+                        'QR code nonce replay detected',
                         request()->ip(),
                     );
                     break;
 
-                case "student_class_mismatch":
+                case 'student_class_mismatch':
                     $this->alertService->createAlert(
                         SecurityAlertService::TYPE_UNAUTHORIZED_SCHEDULE,
-                        "medium",
-                        "Student (ID: {$context["student_id"]}) attempted to scan in wrong class",
+                        'medium',
+                        "Student (ID: {$context['student_id']}) attempted to scan in wrong class",
                         $context,
-                        $context["student_id"],
+                        $context['student_id'],
                         $schoolId,
                         request()->ip(),
                     );
                     break;
 
-                case "race_condition_blocked":
+                case 'race_condition_blocked':
                     $this->alertService->alertRaceConditionBlocked(
                         $userId,
                         $schoolId,
-                        $context["schedule_id"] ?? 0,
+                        $context['schedule_id'] ?? 0,
                         request()->ip(),
                     );
                     break;
@@ -609,8 +611,8 @@ class AttendanceService
                 default:
                     // Generic security alert for unhandled types
                     $this->alertService->createAlert(
-                        "security_anomaly",
-                        "medium",
+                        'security_anomaly',
+                        'medium',
                         "Security anomaly detected: {$type}",
                         $context,
                         $userId,
@@ -620,9 +622,9 @@ class AttendanceService
             }
         } catch (\Throwable $e) {
             // Don't let alert failures affect the main flow
-            Log::error("Failed to dispatch security alert", [
-                "type" => $type,
-                "error" => $e->getMessage(),
+            Log::error('Failed to dispatch security alert', [
+                'type' => $type,
+                'error' => $e->getMessage(),
             ]);
         }
     }

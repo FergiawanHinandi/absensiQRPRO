@@ -6,10 +6,24 @@ use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
-        commands: __DIR__.'/../routes/console.php',
-
+        web: __DIR__ . '/../routes/web.php',
+        api: __DIR__ . '/../routes/api.php',
+        commands: __DIR__ . '/../routes/console.php',
+        then: function () {
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(base_path('routes/api_rollback.php'));
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(base_path('routes/api_monitoring.php'));
+            Route::middleware('web')
+                ->group(base_path('routes/health.php'));
+            Route::middleware('web')
+                ->group(base_path('routes/metrics.php'));
+            Route::middleware('api')
+                ->prefix('api/v1')
+                ->group(base_path('routes/api_secure_files.php'));
+        },
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -27,14 +41,21 @@ return Application::configure(basePath: dirname(__DIR__))
             'rate.limit' => \App\Http\Middleware\AdvancedRateLimiting::class,
             'school.rate.limit' => \App\Http\Middleware\RateLimitBySchool::class,
             'attendance.throttle' => \App\Http\Middleware\AttendanceScanThrottle::class,
+            'critical.rate.limit' => \App\Http\Middleware\CriticalRateLimiting::class,
             'log.superadmin' => \App\Http\Middleware\LogSuperAdminActivity::class,
             'impersonation' => \App\Http\Middleware\CheckImpersonation::class,
             'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
             'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+            'admin' => \App\Http\Middleware\EnsureUserHasRole::class,
+            'validate.multi.tenant.restore' => \App\Http\Middleware\ValidateMultiTenantRestore::class,
+            // NEW: Attendance Security Middleware
+            'attendance.security' => \App\Http\Middleware\AttendanceSecurityMiddleware::class,
         ]);
 
         // Add CORS middleware
         $middleware->api(prepend: [
+            \App\Http\Middleware\TraceRequestMiddleware::class,
+            \App\Http\Middleware\SecurityHeaders::class,
             \Illuminate\Http\Middleware\HandleCors::class,
             // \App\Http\Middleware\SecurityHeaders::class,
             // \App\Http\Middleware\StandardizeErrorResponse::class, // Run early to capture timing
@@ -44,22 +65,29 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Check user active status on every authenticated request
         $middleware->api(append: [
+            \App\Http\Middleware\InputSanitization::class,
             \App\Http\Middleware\CheckUserActive::class,
             \App\Http\Middleware\CheckImpersonation::class,
             // \App\Http\Middleware\CheckDeviceReverification::class,
+        ]);
+
+        $middleware->web(prepend: [
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
 
         $middleware->preventRequestsDuringMaintenance(except: [
             'api/*',
         ]);
 
-        $middleware->trustProxies(at: [
-            '*',
-        ], headers: \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
-            \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST |
-            \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT |
-            \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO |
-            \Illuminate\Http\Request::HEADER_X_FORWARDED_AWS_ELB
+        $middleware->trustProxies(
+            at: [
+                '*',
+            ],
+            headers: \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST |
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT |
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO |
+                \Illuminate\Http\Request::HEADER_X_FORWARDED_AWS_ELB
         );
     })
     ->withExceptions(function (Exceptions $exceptions) {

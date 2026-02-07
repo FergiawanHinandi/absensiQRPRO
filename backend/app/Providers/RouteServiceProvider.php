@@ -94,6 +94,7 @@ class RouteServiceProvider extends ServiceProvider
         // Login rate limit (brute force protection)
         RateLimiter::for('login', function (Request $request) {
             $key = $request->input('username', $request->ip());
+
             return Limit::perMinute(5)->by($key)->response(function () {
                 return response()->json([
                     'success' => false,
@@ -104,7 +105,8 @@ class RouteServiceProvider extends ServiceProvider
 
         // Scan rate limit (per user + IP)
         RateLimiter::for('scan', function (Request $request) {
-            $key = ($request->user()?->id ?? 'guest') . '|' . $request->ip();
+            $key = ($request->user()?->id ?? 'guest').'|'.$request->ip();
+
             return Limit::perMinute(30)->by($key);
         });
 
@@ -121,7 +123,8 @@ class RouteServiceProvider extends ServiceProvider
         // School-scoped rate limit
         RateLimiter::for('school', function (Request $request) {
             $schoolId = $request->user()?->school_id ?? 0;
-            return Limit::perMinute(100)->by('school:' . $schoolId);
+
+            return Limit::perMinute(100)->by('school:'.$schoolId);
         });
     }
 }

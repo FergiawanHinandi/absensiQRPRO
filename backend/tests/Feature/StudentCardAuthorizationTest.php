@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 /**
  * Student Card Authorization Test
- * 
+ *
  * CRITICAL SECURITY TESTS:
  * - Only School Admin can generate/regenerate/deactivate cards
  * - Teachers are EXPLICITLY DENIED access
@@ -23,10 +23,15 @@ class StudentCardAuthorizationTest extends TestCase
     use RefreshDatabase;
 
     private School $school;
+
     private User $schoolAdmin;
+
     private User $teacher;
+
     private User $student;
+
     private User $otherSchoolAdmin;
+
     private User $otherStudent;
 
     protected function setUp(): void
@@ -35,7 +40,7 @@ class StudentCardAuthorizationTest extends TestCase
 
         // Create test school
         $this->school = School::factory()->create();
-        
+
         // Create other school for cross-school testing
         $otherSchool = School::factory()->create();
 
@@ -80,18 +85,18 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
 
         $response->assertStatus(200)
-                ->assertJsonStructure([
-                    'success',
-                    'data' => [
-                        'card_id',
-                        'card_number',
-                        'qr_code',
-                        'expires_at',
-                        'student',
-                        'generated_at',
-                    ],
-                    'message'
-                ]);
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'card_id',
+                    'card_number',
+                    'qr_code',
+                    'expires_at',
+                    'student',
+                    'generated_at',
+                ],
+                'message',
+            ]);
 
         $this->assertDatabaseHas('student_cards', [
             'student_id' => $this->student->id,
@@ -109,11 +114,11 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
 
         $response->assertStatus(403)
-                ->assertJson([
-                    'success' => false,
-                    'message' => 'Unauthorized. Only School Admin can generate student cards.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES'
-                ]);
+            ->assertJson([
+                'success' => false,
+                'message' => 'Unauthorized. Only School Admin can generate student cards.',
+                'error_code' => 'INSUFFICIENT_PRIVILEGES',
+            ]);
 
         $this->assertDatabaseMissing('student_cards', [
             'student_id' => $this->student->id,
@@ -128,11 +133,11 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->postJson("/api/v1/admin/students/{$this->otherStudent->id}/generate-card");
 
         $response->assertStatus(404)
-                ->assertJson([
-                    'success' => false,
-                    'message' => 'Student not found or not in your school.',
-                    'error_code' => 'STUDENT_NOT_FOUND'
-                ]);
+            ->assertJson([
+                'success' => false,
+                'message' => 'Student not found or not in your school.',
+                'error_code' => 'STUDENT_NOT_FOUND',
+            ]);
 
         $this->assertDatabaseMissing('student_cards', [
             'student_id' => $this->otherStudent->id,
@@ -151,23 +156,23 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/regenerate-card");
 
         $response->assertStatus(200)
-                ->assertJsonStructure([
-                    'success',
-                    'data' => [
-                        'card_id',
-                        'card_number',
-                        'qr_code',
-                        'expires_at',
-                        'student',
-                        'generated_at',
-                        'previous_card_id',
-                    ],
-                    'message'
-                ]);
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'card_id',
+                    'card_number',
+                    'qr_code',
+                    'expires_at',
+                    'student',
+                    'generated_at',
+                    'previous_card_id',
+                ],
+                'message',
+            ]);
 
         // Should have 2 cards total (1 active, 1 deactivated)
         $this->assertDatabaseCount('student_cards', 2);
-        
+
         // Only 1 should be active
         $this->assertDatabaseCount('student_cards', 1, [
             'student_id' => $this->student->id,
@@ -183,11 +188,11 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/regenerate-card");
 
         $response->assertStatus(403)
-                ->assertJson([
-                    'success' => false,
-                    'message' => 'Unauthorized. Only School Admin can regenerate student cards.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES'
-                ]);
+            ->assertJson([
+                'success' => false,
+                'message' => 'Unauthorized. Only School Admin can regenerate student cards.',
+                'error_code' => 'INSUFFICIENT_PRIVILEGES',
+            ]);
     }
 
     /** @test */
@@ -202,16 +207,16 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/deactivate-card");
 
         $response->assertStatus(200)
-                ->assertJsonStructure([
-                    'success',
-                    'data' => [
-                        'card_id',
-                        'card_number',
-                        'deactivated_at',
-                        'student',
-                    ],
-                    'message'
-                ]);
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'card_id',
+                    'card_number',
+                    'deactivated_at',
+                    'student',
+                ],
+                'message',
+            ]);
 
         $this->assertDatabaseHas('student_cards', [
             'student_id' => $this->student->id,
@@ -229,11 +234,11 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/deactivate-card");
 
         $response->assertStatus(403)
-                ->assertJson([
-                    'success' => false,
-                    'message' => 'Unauthorized. Only School Admin can deactivate student cards.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES'
-                ]);
+            ->assertJson([
+                'success' => false,
+                'message' => 'Unauthorized. Only School Admin can deactivate student cards.',
+                'error_code' => 'INSUFFICIENT_PRIVILEGES',
+            ]);
     }
 
     /** @test */
@@ -247,17 +252,17 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->getJson("/api/v1/admin/students/{$this->student->id}/card-status");
 
         $response->assertStatus(200)
-                ->assertJsonStructure([
-                    'success',
-                    'data' => [
-                        'has_active_card',
-                        'active_card',
-                        'total_cards_generated',
-                        'last_generated',
-                        'card_history',
-                    ],
-                    'message'
-                ]);
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'has_active_card',
+                    'active_card',
+                    'total_cards_generated',
+                    'last_generated',
+                    'card_history',
+                ],
+                'message',
+            ]);
     }
 
     /** @test */
@@ -268,11 +273,11 @@ class StudentCardAuthorizationTest extends TestCase
         $response = $this->getJson("/api/v1/admin/students/{$this->student->id}/card-status");
 
         $response->assertStatus(403)
-                ->assertJson([
-                    'success' => false,
-                    'message' => 'Unauthorized to view student card status.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES'
-                ]);
+            ->assertJson([
+                'success' => false,
+                'message' => 'Unauthorized to view student card status.',
+                'error_code' => 'INSUFFICIENT_PRIVILEGES',
+            ]);
     }
 
     /** @test */
@@ -313,14 +318,14 @@ class StudentCardAuthorizationTest extends TestCase
 
         // Generate first card
         $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
-        
+
         // Generate second card (should deactivate first)
         $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
 
         // Should have exactly 1 active card
         $activeCards = StudentCard::where('student_id', $this->student->id)
-                                 ->where('is_active', true)
-                                 ->count();
+            ->where('is_active', true)
+            ->count();
 
         $this->assertEquals(1, $activeCards);
 
@@ -343,8 +348,8 @@ class StudentCardAuthorizationTest extends TestCase
 
         foreach ($protectedRoutes as [$method, $route]) {
             $response = $this->json($method, $route);
-            
-            $this->assertEquals(403, $response->getStatusCode(), 
+
+            $this->assertEquals(403, $response->getStatusCode(),
                 "Route {$method} {$route} should be blocked for teachers");
         }
     }

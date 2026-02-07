@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Behavior Metrics Daily
- * 
+ *
  * Aggregated daily behavior metrics for each teacher.
  * Used to establish baselines and detect anomalies.
  */
@@ -100,7 +100,7 @@ class BehaviorMetricDaily extends Model
     public function scopeLastNDays($query, int $days)
     {
         return $query->where('date', '>=', now()->subDays($days)->toDateString())
-                     ->where('date', '<', now()->toDateString());
+            ->where('date', '<', now()->toDateString());
     }
 
     public function scopeWithFailures($query)
@@ -112,9 +112,9 @@ class BehaviorMetricDaily extends Model
     {
         return $query->where(function ($q) {
             $q->where('outside_radius_attempts', '>', 0)
-              ->orWhere('device_mismatch_attempts', '>', 0)
-              ->orWhere('schedule_mismatch_attempts', '>', 0)
-              ->orWhere('qr_replay_attempts', '>', 0);
+                ->orWhere('device_mismatch_attempts', '>', 0)
+                ->orWhere('schedule_mismatch_attempts', '>', 0)
+                ->orWhere('qr_replay_attempts', '>', 0);
         });
     }
 
@@ -127,6 +127,7 @@ class BehaviorMetricDaily extends Model
         if ($this->total_scans === 0) {
             return 0;
         }
+
         return round($this->failed_scans / $this->total_scans, 4);
     }
 
@@ -135,13 +136,14 @@ class BehaviorMetricDaily extends Model
         if ($this->total_scans === 0) {
             return 0;
         }
+
         return round($this->successful_scans / $this->total_scans, 4);
     }
 
     public function getTotalViolationsAttribute(): int
     {
-        return $this->outside_radius_attempts 
-             + $this->device_mismatch_attempts 
+        return $this->outside_radius_attempts
+             + $this->device_mismatch_attempts
              + $this->schedule_mismatch_attempts
              + $this->qr_replay_attempts;
     }

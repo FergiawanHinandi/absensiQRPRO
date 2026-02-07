@@ -239,6 +239,17 @@ export const secureFetch = async <T = unknown>(
                     };
                 }
 
+                if (response.status === 429) {
+                    // Rate limit exceeded - structured error response
+                    const retryAfter = parseInt(response.headers?.['retry-after'] || '60');
+                    throw {
+                        type: 'RATE_LIMIT',
+                        retryAfter: retryAfter,
+                        message: data?.message || 'Terlalu banyak permintaan. Coba lagi nanti.',
+                        userMessage: 'Terlalu banyak permintaan. Coba lagi nanti.',
+                    };
+                }
+
                 throw {
                     type: SecureApiErrorType.SERVER_ERROR,
                     message: `Server error: ${response.status}`,
@@ -287,6 +298,17 @@ export const secureFetch = async <T = unknown>(
                             type: SecureApiErrorType.UNAUTHORIZED,
                             message: 'Unauthorized',
                             userMessage: 'Sesi Anda telah berakhir. Silakan login kembali.',
+                        };
+                    }
+
+                    if (response.status === 429) {
+                        // Rate limit exceeded - structured error response
+                        const retryAfter = parseInt(response.headers.get('retry-after') || '60');
+                        throw {
+                            type: 'RATE_LIMIT',
+                            retryAfter: retryAfter,
+                            message: data?.message || 'Terlalu banyak permintaan. Coba lagi nanti.',
+                            userMessage: 'Terlalu banyak permintaan. Coba lagi nanti.',
                         };
                     }
 

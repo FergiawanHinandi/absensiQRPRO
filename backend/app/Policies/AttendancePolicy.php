@@ -38,12 +38,19 @@ class AttendancePolicy
      * Role constants for better maintainability
      */
     private const SUPER_ADMIN = 'super_admin';
+
     private const SCHOOL_ADMIN = 'school_admin';
+
     private const ADMIN = 'admin';
+
     private const PRINCIPAL = 'principal';
+
     private const HOMEROOM_TEACHER = 'homeroom_teacher';
+
     private const TEACHER = 'teacher';
+
     private const STUDENT = 'student';
+
     private const PARENT = 'parent';
 
     /**
@@ -83,14 +90,15 @@ class AttendancePolicy
         // Super admin bypasses checks, BUT historical protection must still apply
         // We let update/delete/forceDelete fall through to their specific methods
         if ($this->isSuperAdmin($user)) {
-             if (in_array($ability, ['update', 'delete', 'forceDelete', 'restore'])) {
-                 return null; 
-             }
-             return true;
+            if (in_array($ability, ['update', 'delete', 'forceDelete', 'restore'])) {
+                return null;
+            }
+
+            return true;
         }
 
         // Inactive users cannot do anything
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             return false;
         }
 
@@ -119,7 +127,7 @@ class AttendancePolicy
     public function view(User $user, Attendance $attendance): Response
     {
         // SECURITY CHECK 1: School isolation
-        if (!$this->isSameSchool($user, $attendance)) {
+        if (! $this->isSameSchool($user, $attendance)) {
             return Response::deny('Anda tidak dapat mengakses data dari sekolah lain.');
         }
 
@@ -128,6 +136,7 @@ class AttendancePolicy
             if ($user->id === $attendance->student_id) {
                 return Response::allow();
             }
+
             return Response::deny('Anda hanya dapat melihat absensi Anda sendiri.');
         }
 
@@ -136,6 +145,7 @@ class AttendancePolicy
             if ($this->isParentOfStudent($user, $attendance->student_id)) {
                 return Response::allow();
             }
+
             return Response::deny('Anda hanya dapat melihat absensi anak Anda.');
         }
 
@@ -144,6 +154,7 @@ class AttendancePolicy
             if ($this->canTeacherViewAttendance($user, $attendance)) {
                 return Response::allow();
             }
+
             return Response::deny('Anda tidak mengajar kelas ini.');
         }
 
@@ -202,19 +213,20 @@ class AttendancePolicy
     {
         // SUPER ADMIN CHECK: Historical Data Protection
         if ($this->isSuperAdmin($user)) {
-             if ($attendance->created_at < now()->subHours(24)) {
-                 return Response::deny('Super Admin cannot edit historical data (>24h old) for audit integrity.');
-             }
-             return Response::allow();
+            if ($attendance->created_at < now()->subHours(24)) {
+                return Response::deny('Super Admin cannot edit historical data (>24h old) for audit integrity.');
+            }
+
+            return Response::allow();
         }
 
         // SECURITY CHECK 1: School isolation
-        if (!$this->isSameSchool($user, $attendance)) {
+        if (! $this->isSameSchool($user, $attendance)) {
             return Response::deny('Anda tidak dapat mengubah data dari sekolah lain.');
         }
 
         // BUSINESS RULE: Only manual attendance can be updated
-        if (!$attendance->is_manual) {
+        if (! $attendance->is_manual) {
             return Response::deny('Absensi otomatis (via QR) tidak dapat diubah.');
         }
 
@@ -223,6 +235,7 @@ class AttendancePolicy
             if ($this->canTeacherManageAttendance($user, $attendance)) {
                 return Response::allow();
             }
+
             return Response::deny('Anda hanya dapat mengubah absensi kelas yang Anda ajar.');
         }
 
@@ -243,14 +256,15 @@ class AttendancePolicy
     {
         // SUPER ADMIN CHECK: Historical Data Protection
         if ($this->isSuperAdmin($user)) {
-             if ($attendance->created_at < now()->subHours(24)) {
-                 return Response::deny('Super Admin cannot delete historical data (>24h old) for audit integrity.');
-             }
-             return Response::allow();
+            if ($attendance->created_at < now()->subHours(24)) {
+                return Response::deny('Super Admin cannot delete historical data (>24h old) for audit integrity.');
+            }
+
+            return Response::allow();
         }
 
         // SECURITY CHECK 1: School isolation
-        if (!$this->isSameSchool($user, $attendance)) {
+        if (! $this->isSameSchool($user, $attendance)) {
             return Response::deny('Anda tidak dapat menghapus data dari sekolah lain.');
         }
 
@@ -279,11 +293,13 @@ class AttendancePolicy
     public function forceDelete(User $user, Attendance $attendance): Response
     {
         if ($this->isSuperAdmin($user)) {
-             if ($attendance->created_at < now()->subHours(24)) {
-                 return Response::deny('Super Admin cannot force delete historical data (>24h old).');
-             }
-             return Response::allow();
+            if ($attendance->created_at < now()->subHours(24)) {
+                return Response::deny('Super Admin cannot force delete historical data (>24h old).');
+            }
+
+            return Response::allow();
         }
+
         return Response::deny('Penghapusan permanen tidak diizinkan.');
     }
 
@@ -296,7 +312,7 @@ class AttendancePolicy
             return Response::deny('Hanya siswa yang dapat melakukan scan QR.');
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             return Response::deny('Akun Anda tidak aktif.');
         }
 
@@ -308,11 +324,11 @@ class AttendancePolicy
      */
     public function scanStudent(User $user): Response
     {
-        if (!in_array($user->role_type, [self::TEACHER, self::HOMEROOM_TEACHER])) {
+        if (! in_array($user->role_type, [self::TEACHER, self::HOMEROOM_TEACHER])) {
             return Response::deny('Hanya guru yang dapat melakukan scan siswa.');
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             return Response::deny('Akun Anda tidak aktif.');
         }
 
@@ -367,6 +383,7 @@ class AttendancePolicy
             if ($schedule->teacher_id === $user->id) {
                 return Response::allow();
             }
+
             return Response::deny('Anda bukan pengajar jadwal ini.');
         }
 

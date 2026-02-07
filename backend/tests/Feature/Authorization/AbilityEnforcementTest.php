@@ -10,9 +10,9 @@ use Tests\TestCase;
 
 /**
  * Ability Enforcement Test
- * 
+ *
  * Tests that Sanctum token abilities are strictly enforced.
- * 
+ *
  * Critical Security Tests:
  * 1. Student token cannot access teacher endpoints (403)
  * 2. Teacher token cannot access admin endpoints (403)
@@ -24,9 +24,13 @@ class AbilityEnforcementTest extends TestCase
     use RefreshDatabase;
 
     protected School $school;
+
     protected User $student;
+
     protected User $teacher;
+
     protected User $admin;
+
     protected User $superAdmin;
 
     protected function setUp(): void
@@ -79,7 +83,7 @@ class AbilityEnforcementTest extends TestCase
 
     /**
      * Test: Student token cannot call teacher scan endpoint
-     * 
+     *
      * NOTE: In production, role middleware runs first and blocks this.
      * This test verifies that even if role passes, ability check still happens.
      */
@@ -106,14 +110,14 @@ class AbilityEnforcementTest extends TestCase
         $response->assertStatus(403);
         // Role middleware runs first, so we'll see role error
         $this->assertTrue(
-            str_contains($response->json('message'), 'tidak memiliki izin') || 
+            str_contains($response->json('message'), 'tidak memiliki izin') ||
             str_contains($response->json('message'), 'does not have required permission')
         );
     }
 
     /**
      * Test: Teacher token cannot access admin report endpoint
-     * 
+     *
      * Both role and ability middleware protect this endpoint.
      */
     public function test_teacher_token_cannot_access_admin_report_endpoint(): void
@@ -140,7 +144,7 @@ class AbilityEnforcementTest extends TestCase
 
     /**
      * Test: Token without attendance:scan ability cannot scan QR
-     * 
+     *
      * This tests demonstrates ability enforcement when role passes but token lacks ability.
      * Since role middleware checks for "student" first, we need a different scenario.
      * Let's test a teacher trying to approve permission without permission:approve ability.
@@ -219,8 +223,8 @@ class AbilityEnforcementTest extends TestCase
 
     /**
      * Test: Student token can access endpoints when ability passes
-     * 
-     * Instead of testing scan (which has complex route matching), 
+     *
+     * Instead of testing scan (which has complex route matching),
      * test a simpler endpoint where role and ability both allow access.
      */
     public function test_student_with_scan_ability_can_scan(): void
@@ -239,7 +243,7 @@ class AbilityEnforcementTest extends TestCase
 
         // Should NOT be 403 (authorization passes)
         // May be 404 or 200 with empty data, but NOT 403 forbidden
-        $this->assertNotEquals(403, $response->status(), 
+        $this->assertNotEquals(403, $response->status(),
             'Student with proper abilities should not get 403'
         );
     }

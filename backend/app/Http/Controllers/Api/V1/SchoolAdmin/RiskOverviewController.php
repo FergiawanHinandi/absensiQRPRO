@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Services\StudentRiskAnalysisService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * Risk Overview Controller for School Admin
@@ -22,9 +22,6 @@ class RiskOverviewController extends Controller
 
     /**
      * Get comprehensive risk overview for school admin dashboard
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function index(Request $request): JsonResponse
     {
@@ -33,10 +30,10 @@ class RiskOverviewController extends Controller
             $schoolId = $user->school_id;
 
             // Authorization check
-            if (!in_array($user->role_type, ['school_admin', 'principal', 'super_admin'])) {
+            if (! in_array($user->role_type, ['school_admin', 'principal', 'super_admin'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unauthorized access to risk overview'
+                    'message' => 'Unauthorized access to risk overview',
                 ], 403);
             }
 
@@ -46,7 +43,7 @@ class RiskOverviewController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $riskOverview,
-                'message' => 'Risk overview retrieved successfully'
+                'message' => 'Risk overview retrieved successfully',
             ]);
 
         } catch (\Exception $e) {
@@ -59,16 +56,13 @@ class RiskOverviewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve risk overview',
-                'error' => app()->environment('local') ? $e->getMessage() : 'Internal server error'
+                'error' => app()->environment('local') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
     }
 
     /**
      * Get detailed risk analysis for specific students
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function studentDetails(Request $request): JsonResponse
     {
@@ -87,9 +81,9 @@ class RiskOverviewController extends Controller
 
             // Get detailed student risk data
             $students = $this->riskService->getStudentsByRiskLevel(
-                $schoolId, 
-                $riskLevel, 
-                $classId, 
+                $schoolId,
+                $riskLevel,
+                $classId,
                 $limit
             );
 
@@ -101,7 +95,7 @@ class RiskOverviewController extends Controller
                     'class_id' => $classId,
                     'total_count' => count($students),
                 ],
-                'message' => "Students with {$riskLevel} risk level retrieved successfully"
+                'message' => "Students with {$riskLevel} risk level retrieved successfully",
             ]);
 
         } catch (\Exception $e) {
@@ -114,16 +108,13 @@ class RiskOverviewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve student risk details',
-                'error' => app()->environment('local') ? $e->getMessage() : 'Internal server error'
+                'error' => app()->environment('local') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
     }
 
     /**
      * Get risk trend data for charts
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function trendData(Request $request): JsonResponse
     {
@@ -146,7 +137,7 @@ class RiskOverviewController extends Controller
                     'period_days' => $days,
                     'chart_config' => $this->getChartConfig(),
                 ],
-                'message' => 'Risk trend data retrieved successfully'
+                'message' => 'Risk trend data retrieved successfully',
             ]);
 
         } catch (\Exception $e) {
@@ -159,16 +150,13 @@ class RiskOverviewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve risk trend data',
-                'error' => app()->environment('local') ? $e->getMessage() : 'Internal server error'
+                'error' => app()->environment('local') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
     }
 
     /**
      * Export risk overview data
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function export(Request $request): JsonResponse
     {
@@ -197,7 +185,7 @@ class RiskOverviewController extends Controller
                     'format' => $format,
                     'generated_at' => now()->toISOString(),
                 ],
-                'message' => 'Risk overview export generated successfully'
+                'message' => 'Risk overview export generated successfully',
             ]);
 
         } catch (\Exception $e) {
@@ -210,15 +198,13 @@ class RiskOverviewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to export risk overview',
-                'error' => app()->environment('local') ? $e->getMessage() : 'Internal server error'
+                'error' => app()->environment('local') ? $e->getMessage() : 'Internal server error',
             ], 500);
         }
     }
 
     /**
      * Get chart configuration for frontend
-     * 
-     * @return array
      */
     private function getChartConfig(): array
     {

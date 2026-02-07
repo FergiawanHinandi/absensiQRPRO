@@ -14,17 +14,17 @@ class SecurityAlertController extends Controller
     public function index(Request $request)
     {
         $alerts = SecurityAlert::orderBy('created_at', 'desc')
-            ->when($request->resolved, function($q) use ($request) {
+            ->when($request->resolved, function ($q) {
                 return $q->where('is_resolved', FILTER_VALIDATE_BOOLEAN);
             })
-            ->when($request->severity, function($q) use ($request) {
+            ->when($request->severity, function ($q) use ($request) {
                 return $q->where('severity', $request->severity);
             })
             ->paginate(20);
 
         return response()->json([
             'success' => true,
-            'data' => $alerts
+            'data' => $alerts,
         ]);
     }
 
@@ -34,7 +34,7 @@ class SecurityAlertController extends Controller
     public function resolve($id, Request $request)
     {
         $alert = SecurityAlert::findOrFail($id);
-        
+
         $alert->update([
             'is_resolved' => true,
             'resolved_by' => $request->user()->id,
@@ -43,7 +43,7 @@ class SecurityAlertController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Alert marked as resolved.'
+            'message' => 'Alert marked as resolved.',
         ]);
     }
 }

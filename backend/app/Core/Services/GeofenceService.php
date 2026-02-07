@@ -19,10 +19,10 @@ class GeofenceService
     /**
      * Calculate distance between two coordinates using Haversine formula
      *
-     * @param float $schoolLatitude School's latitude
-     * @param float $schoolLongitude School's longitude
-     * @param float $teacherLatitude Teacher's/User's latitude
-     * @param float $teacherLongitude Teacher's/User's longitude
+     * @param  float  $schoolLatitude  School's latitude
+     * @param  float  $schoolLongitude  School's longitude
+     * @param  float  $teacherLatitude  Teacher's/User's latitude
+     * @param  float  $teacherLongitude  Teacher's/User's longitude
      * @return float Distance in meters
      */
     public function calculateDistance(
@@ -44,7 +44,7 @@ class GeofenceService
         // Haversine formula
         $a = pow(sin($latDelta / 2), 2) +
              cos($schoolLatRad) * cos($teacherLatRad) * pow(sin($lngDelta / 2), 2);
-        
+
         $c = 2 * asin(sqrt($a));
 
         return self::EARTH_RADIUS_METERS * $c;
@@ -53,11 +53,11 @@ class GeofenceService
     /**
      * Check if a location is within the allowed radius
      *
-     * @param float $schoolLatitude School's latitude
-     * @param float $schoolLongitude School's longitude
-     * @param float $teacherLatitude Teacher's/User's latitude
-     * @param float $teacherLongitude Teacher's/User's longitude
-     * @param float|null $maxDistanceMeters Maximum allowed distance (default: 50m)
+     * @param  float  $schoolLatitude  School's latitude
+     * @param  float  $schoolLongitude  School's longitude
+     * @param  float  $teacherLatitude  Teacher's/User's latitude
+     * @param  float  $teacherLongitude  Teacher's/User's longitude
+     * @param  float|null  $maxDistanceMeters  Maximum allowed distance (default: 50m)
      * @return bool True if within radius, false otherwise
      */
     public function isWithinRadius(
@@ -81,12 +81,13 @@ class GeofenceService
     /**
      * Validate that location is within geofence, throw exception if not
      *
-     * @param float $schoolLatitude School's latitude
-     * @param float $schoolLongitude School's longitude
-     * @param float $teacherLatitude Teacher's/User's latitude
-     * @param float $teacherLongitude Teacher's/User's longitude
-     * @param float|null $maxDistanceMeters Maximum allowed distance (default: 50m)
+     * @param  float  $schoolLatitude  School's latitude
+     * @param  float  $schoolLongitude  School's longitude
+     * @param  float  $teacherLatitude  Teacher's/User's latitude
+     * @param  float  $teacherLongitude  Teacher's/User's longitude
+     * @param  float|null  $maxDistanceMeters  Maximum allowed distance (default: 50m)
      * @return float The calculated distance in meters
+     *
      * @throws Exception If location is outside the allowed radius
      */
     public function validateWithinRadius(
@@ -106,7 +107,7 @@ class GeofenceService
 
         if ($distance > $maxDistance) {
             throw new Exception(
-                "Anda di luar area sekolah. Jarak Anda: " . round($distance) . "m (maksimal: {$maxDistance}m)."
+                'Anda di luar area sekolah. Jarak Anda: '.round($distance)."m (maksimal: {$maxDistance}m)."
             );
         }
 
@@ -116,11 +117,11 @@ class GeofenceService
     /**
      * Get detailed geofence check result
      *
-     * @param float $schoolLatitude School's latitude
-     * @param float $schoolLongitude School's longitude
-     * @param float $teacherLatitude Teacher's/User's latitude
-     * @param float $teacherLongitude Teacher's/User's longitude
-     * @param float|null $maxDistanceMeters Maximum allowed distance (default: 50m)
+     * @param  float  $schoolLatitude  School's latitude
+     * @param  float  $schoolLongitude  School's longitude
+     * @param  float  $teacherLatitude  Teacher's/User's latitude
+     * @param  float  $teacherLongitude  Teacher's/User's longitude
+     * @param  float|null  $maxDistanceMeters  Maximum allowed distance (default: 50m)
      * @return array{distance_meters: float, max_allowed: float, is_within_radius: bool, excess_meters: float|null}
      */
     public function check(

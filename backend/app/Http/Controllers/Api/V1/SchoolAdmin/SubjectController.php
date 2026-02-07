@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Api\V1\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Subject;
 use App\Models\AuditLog;
+use App\Models\Subject;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class SubjectController extends Controller
 {
@@ -17,11 +17,11 @@ class SubjectController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        
+
         $subjects = Subject::where('school_id', $user->school_id)
             ->when($request->search, function ($query, $search) {
                 $query->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('code', 'like', "%{$search}%");
             })
             ->orderBy('name')
             ->paginate($request->get('per_page', 15));
@@ -39,12 +39,12 @@ class SubjectController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'code' => [
-                'required', 
-                'string', 
+                'required',
+                'string',
                 'max:20',
                 Rule::unique('subjects')->where(function ($query) use ($user) {
                     return $query->where('school_id', $user->school_id);
-                })
+                }),
             ],
             'grade_level' => 'nullable|string',
             'school_level' => 'nullable|string',
@@ -85,6 +85,7 @@ class SubjectController extends Controller
     public function show(Request $request, Subject $subject)
     {
         $this->authorizeSubject($request, $subject);
+
         return response()->success($subject);
     }
 
@@ -99,17 +100,17 @@ class SubjectController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'code' => [
-                'sometimes', 
-                'string', 
+                'sometimes',
+                'string',
                 'max:20',
                 Rule::unique('subjects')->where(function ($query) use ($user) {
                     return $query->where('school_id', $user->school_id);
-                })->ignore($subject->id)
+                })->ignore($subject->id),
             ],
             'grade_level' => 'nullable|string',
             'school_level' => 'nullable|string',
             'description' => 'nullable|string',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
         ]);
 
         $subject->update($validated);

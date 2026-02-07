@@ -5,7 +5,6 @@ namespace App\Repositories;
 use App\Models\Attendance;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -38,11 +37,8 @@ final class OptimizedAttendanceRepository
      * - No table lookup needed (covering index)
      * - Rows scanned: O(page_size) instead of O(total_records)
      *
-     * @param int $studentId
-     * @param int $perPage
-     * @param Carbon|null $startDate Optional date filter
-     * @param Carbon|null $endDate Optional date filter
-     * @return LengthAwarePaginator
+     * @param  Carbon|null  $startDate  Optional date filter
+     * @param  Carbon|null  $endDate  Optional date filter
      */
     public function studentHistory(
         int $studentId,
@@ -81,9 +77,7 @@ final class OptimizedAttendanceRepository
      * - Rows scanned: Exact match on schedule_id and date
      * - Very fast for real-time attendance view
      *
-     * @param int $scheduleId
-     * @param Carbon|null $date Defaults to today
-     * @return Collection
+     * @param  Carbon|null  $date  Defaults to today
      */
     public function classAttendance(int $scheduleId, ?Carbon $date = null): Collection
     {
@@ -116,9 +110,7 @@ final class OptimizedAttendanceRepository
      * - Aggregate functions computed during scan
      * - Extremely efficient for dashboard stats
      *
-     * @param int $schoolId
-     * @param Carbon|null $date Defaults to today
-     * @return array
+     * @param  Carbon|null  $date  Defaults to today
      */
     public function dailyReport(int $schoolId, ?Carbon $date = null): array
     {
@@ -178,11 +170,6 @@ final class OptimizedAttendanceRepository
      * - Index Scan with range on attendance_date
      * - Group By uses index for sorting
      * - Efficient for report generation
-     *
-     * @param int $schoolId
-     * @param int $year
-     * @param int $month
-     * @return Collection
      */
     public function monthlySummary(int $schoolId, int $year, int $month): Collection
     {
@@ -208,6 +195,7 @@ final class OptimizedAttendanceRepository
                 ->get()
                 ->map(function ($record) {
                     $total = $record->total_records;
+
                     return [
                         'student_id' => $record->student_id,
                         'student_name' => $record->student->name ?? 'N/A',
@@ -234,11 +222,6 @@ final class OptimizedAttendanceRepository
      * - Index Seek (exact match on all 3 columns)
      * - Single row lookup: O(1)
      * - Critical for check-in performance
-     *
-     * @param int $studentId
-     * @param int $scheduleId
-     * @param Carbon|null $date
-     * @return bool
      */
     public function hasCheckedIn(int $studentId, int $scheduleId, ?Carbon $date = null): bool
     {
@@ -261,10 +244,6 @@ final class OptimizedAttendanceRepository
      * - Index Scan Backward (for DESC order)
      * - Limit applied at index level
      * - Fast for real-time activity feeds
-     *
-     * @param int $schoolId
-     * @param int $limit
-     * @return Collection
      */
     public function recentActivity(int $schoolId, int $limit = 20): Collection
     {
@@ -292,11 +271,6 @@ final class OptimizedAttendanceRepository
      * Get absent/late students for alerts
      *
      * INDEX USED: idx_attendance_status_school (status, school_id, attendance_date)
-     *
-     * @param int $schoolId
-     * @param Carbon|null $date
-     * @param array $statuses
-     * @return Collection
      */
     public function studentsWithStatus(
         int $schoolId,
@@ -318,10 +292,6 @@ final class OptimizedAttendanceRepository
      * Homeroom class daily report
      *
      * INDEX USED: idx_attendance_class_date (class_id, attendance_date, status)
-     *
-     * @param int $classId
-     * @param Carbon|null $date
-     * @return array
      */
     public function classReport(int $classId, ?Carbon $date = null): array
     {
@@ -353,8 +323,6 @@ final class OptimizedAttendanceRepository
      *
      * Uses chunked insert for memory efficiency
      *
-     * @param array $records
-     * @param int $chunkSize
      * @return int Number of records inserted
      */
     public function bulkInsert(array $records, int $chunkSize = 500): int
@@ -372,9 +340,7 @@ final class OptimizedAttendanceRepository
     /**
      * Weekly trends for dashboard charts
      *
-     * @param int $schoolId
-     * @param int $weeks Number of weeks to fetch
-     * @return Collection
+     * @param  int  $weeks  Number of weeks to fetch
      */
     public function weeklyTrends(int $schoolId, int $weeks = 4): Collection
     {

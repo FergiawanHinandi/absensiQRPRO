@@ -2,10 +2,10 @@
 
 namespace App\Services\Logging;
 
+use App\Models\Attendance;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use App\Models\User;
-use App\Models\Attendance;
 
 /**
  * AttendanceLogger - Structured Logging for Attendance Events
@@ -351,15 +351,27 @@ class AttendanceLogger
      */
     protected function detectPlatform(?string $userAgent): string
     {
-        if (!$userAgent) return 'unknown';
+        if (! $userAgent) {
+            return 'unknown';
+        }
 
         $ua = strtolower($userAgent);
 
-        if (str_contains($ua, 'android')) return 'android';
-        if (str_contains($ua, 'iphone') || str_contains($ua, 'ipad')) return 'ios';
-        if (str_contains($ua, 'windows')) return 'windows';
-        if (str_contains($ua, 'macintosh')) return 'macos';
-        if (str_contains($ua, 'linux')) return 'linux';
+        if (str_contains($ua, 'android')) {
+            return 'android';
+        }
+        if (str_contains($ua, 'iphone') || str_contains($ua, 'ipad')) {
+            return 'ios';
+        }
+        if (str_contains($ua, 'windows')) {
+            return 'windows';
+        }
+        if (str_contains($ua, 'macintosh')) {
+            return 'macos';
+        }
+        if (str_contains($ua, 'linux')) {
+            return 'linux';
+        }
 
         return 'unknown';
     }

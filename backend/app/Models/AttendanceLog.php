@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Attendance Log Model
- * 
+ *
  * Records individual scan events for audit and heatmap visualization.
  */
 class AttendanceLog extends Model
@@ -126,7 +126,7 @@ class AttendanceLog extends Model
      */
     public function distanceFrom(float $lat, float $lng): float
     {
-        if (!$this->hasLocation()) {
+        if (! $this->hasLocation()) {
             return 0;
         }
 

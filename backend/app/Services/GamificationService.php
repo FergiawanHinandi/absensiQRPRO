@@ -68,12 +68,13 @@ class GamificationService
         $lastStreakDate = $student->last_streak_date ? Carbon::parse($student->last_streak_date) : null;
 
         // If no previous streak date, or if it was reset
-        if (!$lastStreakDate) {
+        if (! $lastStreakDate) {
             $student->update([
                 'current_streak' => 1,
                 'longest_streak' => max($student->longest_streak, 1),
                 'last_streak_date' => $date,
             ]);
+
             return;
         }
 
@@ -88,28 +89,28 @@ class GamificationService
         // Simple logic:
         // DiffInDays = 1 -> consecutive
         // DiffInDays > 1 -> check if gaps are weekends
-        
+
         $diff = $date->diffInDays($lastStreakDate); // absolute difference
 
         $isConsecutive = false;
-        
+
         if ($diff == 1) {
             $isConsecutive = true;
         } elseif ($diff <= 3) {
             // Check if weekend gap
-             // Iterate days between lastStreakDate and date. If all are weekends, then it is consecutive.
-             $tempDate = $lastStreakDate->copy()->addDay();
-             $allWeekends = true;
-             while ($tempDate->lt($date)) {
-                 if (!$tempDate->isWeekend()) {
-                     $allWeekends = false;
-                     break;
-                 }
-                 $tempDate->addDay();
-             }
-             if ($allWeekends) {
-                 $isConsecutive = true;
-             }
+            // Iterate days between lastStreakDate and date. If all are weekends, then it is consecutive.
+            $tempDate = $lastStreakDate->copy()->addDay();
+            $allWeekends = true;
+            while ($tempDate->lt($date)) {
+                if (! $tempDate->isWeekend()) {
+                    $allWeekends = false;
+                    break;
+                }
+                $tempDate->addDay();
+            }
+            if ($allWeekends) {
+                $isConsecutive = true;
+            }
         }
 
         if ($isConsecutive) {
@@ -175,7 +176,9 @@ class GamificationService
     private function awardBadge(\App\Models\User $student, string $slug): void
     {
         $badge = \App\Models\Badge::where('slug', $slug)->first();
-        if (!$badge) return;
+        if (! $badge) {
+            return;
+        }
 
         // Check if student already has this badge
         $hasBadge = \Illuminate\Support\Facades\DB::table('student_badges')
@@ -183,13 +186,13 @@ class GamificationService
             ->where('badge_id', $badge->id)
             ->exists();
 
-        if (!$hasBadge) {
+        if (! $hasBadge) {
             \Illuminate\Support\Facades\DB::table('student_badges')->insert([
                 'student_id' => $student->id,
                 'badge_id' => $badge->id,
                 'awarded_at' => now(),
             ]);
-            
+
             // Trigger Event
             \App\Events\BadgeAwarded::dispatch($student, $badge->name, $badge->slug);
         }
@@ -200,16 +203,16 @@ class GamificationService
         // Logic: Last 30 attendance records must be 'present' (not late, not absent, etc - wait, 'absent' breaks chain anyway?)
         // The badge says "30 consecutive days without being late".
         // This effectively means 30 attended days where status != 'late'.
-        
+
         // Let's count last 30 'attended' records (present or late) and see if 0 are late.
         // Or better: Check if the last 30 consecutive attended days were 'present'.
-        
+
         $records = Attendance::where('student_id', $student->id)
             ->whereIn('status', ['present', 'late'])
             ->orderBy('attendance_date', 'desc')
             ->limit(30)
             ->get();
-            
+
         if ($records->count() < 30) {
             return;
         }
@@ -223,7 +226,7 @@ class GamificationService
         $this->awardBadge($student, 'on-time-hero');
     }
 
-   /**
+    /**
      * Bonus: +20 points for Perfect Attendance in 1 week.
      * Strategy: Check on Friday/Saturday/Sunday if no absences recorded.
      */
@@ -247,12 +250,15 @@ class GamificationService
             ->exists();
 
         if ($alreadyAwarded) {
-             // Even if points awarded, we might need to check badge if logic is shared?
-             // Actually, "Perfect Week" badge should align with the bonus.
-             // If points awarded, badge likely awarded too.
-             // But safely re-check badge to be sure.
-             $student = \App\Models\User::find($studentId);
-             if ($student) $this->awardBadge($student, 'perfect-week');
+            // Even if points awarded, we might need to check badge if logic is shared?
+            // Actually, "Perfect Week" badge should align with the bonus.
+            // If points awarded, badge likely awarded too.
+            // But safely re-check badge to be sure.
+            $student = \App\Models\User::find($studentId);
+            if ($student) {
+                $this->awardBadge($student, 'perfect-week');
+            }
+
             return;
         }
 
@@ -282,9 +288,9 @@ class GamificationService
                 'points' => 20,
                 'source' => 'weekly_bonus',
                 'date' => $date,
-                'description' => 'Perfect attendance bonus (Week ' . $date->weekOfYear . ')',
+                'description' => 'Perfect attendance bonus (Week '.$date->weekOfYear.')',
             ]);
-            
+
             $student = \App\Models\User::find($studentId);
             if ($student) {
                 $student->increment('total_points', 20);
@@ -303,31 +309,33 @@ class GamificationService
 
         // Only check if we are at the end of the month
         if ($date->copy()->addDay()->month === $date->month) {
-             // Not the last day yet.
-             // But maybe check if today is Friday and month ends on Weekend?
-             // Simplification: Check on last calendar day OR if current date is effectively end of month attendance.
-             // Let's stick to: Check purely on Last Day of Month logic or close to it.
-             // Risk: If student attends on 28th, but month ends 31st, and 29-31 are holidays/weekends.
-             // Safer: Check if remaining days are weekends?
-             
-             // For robustness: Just return if day < 25 (skip early checks)
-             if ($date->day < 25) return;
-             
-             // If today is not the last day, we might wait?
-             // But if they don't attend on the last day (e.g. sick), they miss logic trigger if triggered by attendance.
-             // The system implies automation.
-             // Let's check: "Is the month 'completed' for school purposes?"
-             // Hard to know.
-             // Let's act on Last Day of Month only.
-             if ($date->format('Y-m-d') !== $date->copy()->endOfMonth()->format('Y-m-d')) {
-                 // Optimization: Don't block, just verifying logic.
-                 // Actually, if today is Friday 28th, and 31st is Monday, we have to wait.
-                 // Strict Check: only award if today == endOfMonth or we can prove no more school days.
-                 
-                 // Let's try to match "Business Days" count logic again.
-             }
+            // Not the last day yet.
+            // But maybe check if today is Friday and month ends on Weekend?
+            // Simplification: Check on last calendar day OR if current date is effectively end of month attendance.
+            // Let's stick to: Check purely on Last Day of Month logic or close to it.
+            // Risk: If student attends on 28th, but month ends 31st, and 29-31 are holidays/weekends.
+            // Safer: Check if remaining days are weekends?
+
+            // For robustness: Just return if day < 25 (skip early checks)
+            if ($date->day < 25) {
+                return;
+            }
+
+            // If today is not the last day, we might wait?
+            // But if they don't attend on the last day (e.g. sick), they miss logic trigger if triggered by attendance.
+            // The system implies automation.
+            // Let's check: "Is the month 'completed' for school purposes?"
+            // Hard to know.
+            // Let's act on Last Day of Month only.
+            if ($date->format('Y-m-d') !== $date->copy()->endOfMonth()->format('Y-m-d')) {
+                // Optimization: Don't block, just verifying logic.
+                // Actually, if today is Friday 28th, and 31st is Monday, we have to wait.
+                // Strict Check: only award if today == endOfMonth or we can prove no more school days.
+
+                // Let's try to match "Business Days" count logic again.
+            }
         }
-        
+
         $startOfMonth = $date->copy()->startOfMonth();
         $endOfMonth = $date->copy()->endOfMonth();
 
@@ -337,12 +345,15 @@ class GamificationService
             ->exists();
 
         if ($alreadyAwarded) {
-             // Ensure badge
-             $student = \App\Models\User::find($studentId);
-             if ($student) $this->awardBadge($student, 'perfect-month');
+            // Ensure badge
+            $student = \App\Models\User::find($studentId);
+            if ($student) {
+                $this->awardBadge($student, 'perfect-month');
+            }
+
             return;
         }
-        
+
         // 1. No Absences
         $hasAbsence = Attendance::where('student_id', $studentId)
             ->whereBetween('attendance_date', [$startOfMonth, $endOfMonth])
@@ -363,33 +374,33 @@ class GamificationService
             }
             $tempDate->addDay();
         }
-        
+
         // 3. Count Attended
         $daysAttended = Attendance::where('student_id', $studentId)
             ->whereBetween('attendance_date', [$startOfMonth, $endOfMonth])
             ->whereIn('status', ['present', 'late'])
             ->distinct('attendance_date')
             ->count();
-            
+
         // Tolerance: If holidays exist, Attended < BusinessDays.
         // We can't know holidays easily without a table.
         // MVP Rule: If Attended >= BusinessDays - 5 (generous holiday allowance?) matches roughly.
         // Or STRICT: Attended >= 20. (Most months have 20-22 school days).
-        
+
         if ($daysAttended >= ($businessDays - 2)) { // Allow 2 days margin (e.g. holidays)
-             StudentPoint::create([
+            StudentPoint::create([
                 'student_id' => $studentId,
                 'points' => 100,
                 'source' => 'monthly_bonus',
                 'date' => $date,
-                'description' => 'Perfect attendance bonus (Month ' . $date->englishMonth . ')',
+                'description' => 'Perfect attendance bonus (Month '.$date->englishMonth.')',
             ]);
-            
+
             $student = \App\Models\User::find($studentId);
-             if ($student) {
+            if ($student) {
                 $student->increment('total_points', 100);
                 $this->awardBadge($student, 'perfect-month');
-             }
+            }
         }
     }
 
@@ -399,10 +410,7 @@ class GamificationService
      * - No Absences (status='absent' count == 0)
      * - Max 1 Late (status='late' count <= 1)
      * - Highest "Present" count (or total attended count, here we treat (present+late) as attended, but rank by 'present')
-     * 
-     * @param int $classId
-     * @param int $month
-     * @param int $year
+     *
      * @return array List of User objects (or ID/name) who are champions.
      */
     public function determineMonthlyClassChampions(int $classId, int $month, int $year): array
@@ -419,7 +427,7 @@ class GamificationService
         //  - late_count
         //  - present_count
         //  - total_points (tie-breaker)
-        
+
         $candidates = \Illuminate\Support\Facades\DB::table('attendances')
             ->select('student_id',
                 \Illuminate\Support\Facades\DB::raw("COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent_count"),
@@ -441,21 +449,21 @@ class GamificationService
         // We might have multiple students with the same 'present_count'.
         // Let's get the max score.
         $maxPresent = $candidates->first()->present_count;
-        
+
         // Filter those who have the max score
-        $topCandidates = $candidates->filter(fn($c) => $c->present_count === $maxPresent);
-        
+        $topCandidates = $candidates->filter(fn ($c) => $c->present_count === $maxPresent);
+
         // Tie-breaker: Total Points (if we want single champion, or return multiple).
         // Let's fetch User details for these top candidates and sort by their total_points.
         $studentIds = $topCandidates->pluck('student_id')->toArray();
-        
+
         $champions = \App\Models\User::whereIn('id', $studentIds)
             ->orderByDesc('total_points')
             ->get();
-            
+
         // If strict single champion needed:
         // return [$champions->first()];
-        
+
         // Returning all who tied for top attendance stats, sorted by points.
         return $champions->values()->toArray();
     }

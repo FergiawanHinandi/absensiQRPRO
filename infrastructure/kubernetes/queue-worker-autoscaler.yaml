@@ -1,0 +1,250 @@
+##############################################################################
+# Kubernetes Deployment for Queue Workers with KEDA Auto-Scaling
+# KEDA scales based on queue length from Redis
+##############################################################################
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-worker
+  namespace: production
+  labels:
+    app: absensi-queue-worker
+spec:
+  # Initial replicas - KEDA will manage actual count
+  replicas: 1
+  selector:
+    matchLabels:
+      app: absensi-queue-worker
+  template:
+    metadata:
+      labels:
+        app: absensi-queue-worker
+    spec:
+      containers:
+        - name: worker
+          image: absensi-api:latest
+          command: ["php", "artisan", "queue:work"]
+          args:
+            - "--sleep=3"
+            - "--tries=3"
+            - "--max-time=3600"
+            - "--memory=128"
+          
+          envFrom:
+            - configMapRef:
+                name: absensi-api-config
+            - secretRef:
+                name: absensi-api-secrets
+          
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          
+          # Liveness probe - worker is alive
+          livenessProbe:
+            exec:
+              command:
+                - php
+                - artisan
+                - queue:monitor
+                - default
+                - --max=1000
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 10
+          
+          volumeMounts:
+            - name: storage
+              mountPath: /var/www/html/storage/app
+      
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: absensi-storage-pvc
+      
+      # Graceful termination
+      terminationGracePeriodSeconds: 60
+
+---
+##############################################################################
+# KEDA ScaledObject - Auto-scale based on Redis queue length
+##############################################################################
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: queue-worker-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: queue-worker
+  
+  # Worker Limits
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  
+  # Cooldown periods
+  cooldownPeriod: 300           # 5 minutes before scaling down
+  pollingInterval: 30           # Check every 30 seconds
+  
+  triggers:
+    # Scale based on Redis list length (pending jobs)
+    - type: redis
+      metadata:
+        # Redis connection
+        address: redis-master.redis.svc.cluster.local:6379
+        passwordFromEnv: REDIS_PASSWORD
+        listName: queues:default
+        listLength: "500"        # Scale up when >500 jobs
+        enableTLS: "false"
+        databaseIndex: "0"
+      authenticationRef:
+        name: redis-auth
+    
+    # Also monitor high priority queue
+    - type: redis
+      metadata:
+        address: redis-master.redis.svc.cluster.local:6379
+        passwordFromEnv: REDIS_PASSWORD
+        listName: queues:high
+        listLength: "100"        # More sensitive for high priority
+        enableTLS: "false"
+        databaseIndex: "0"
+      authenticationRef:
+        name: redis-auth
+    
+    # Notifications queue
+    - type: redis
+      metadata:
+        address: redis-master.redis.svc.cluster.local:6379
+        passwordFromEnv: REDIS_PASSWORD
+        listName: queues:notifications
+        listLength: "200"
+        enableTLS: "false"
+        databaseIndex: "0"
+      authenticationRef:
+        name: redis-auth
+
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 600  # 10 minutes low before scale down
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 300
+        scaleUp:
+          stabilizationWindowSeconds: 0    # Immediate scale up
+          policies:
+            - type: Pods
+              value: 2
+              periodSeconds: 60
+
+---
+##############################################################################
+# KEDA TriggerAuthentication for Redis
+##############################################################################
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: redis-auth
+  namespace: production
+spec:
+  secretTargetRef:
+    - parameter: password
+      name: redis-secret
+      key: redis-password
+
+---
+##############################################################################
+# High Priority Queue Worker (separate deployment)
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-worker-high
+  namespace: production
+  labels:
+    app: absensi-queue-worker-high
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: absensi-queue-worker-high
+  template:
+    metadata:
+      labels:
+        app: absensi-queue-worker-high
+    spec:
+      containers:
+        - name: worker
+          image: absensi-api:latest
+          command: ["php", "artisan", "queue:work"]
+          args:
+            - "--queue=high"
+            - "--sleep=1"
+            - "--tries=3"
+            - "--max-time=3600"
+          
+          envFrom:
+            - configMapRef:
+                name: absensi-api-config
+            - secretRef:
+                name: absensi-api-secrets
+          
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      
+      terminationGracePeriodSeconds: 60
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: queue-worker-high-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: queue-worker-high
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  cooldownPeriod: 300
+  pollingInterval: 15
+  
+  triggers:
+    - type: redis
+      metadata:
+        address: redis-master.redis.svc.cluster.local:6379
+        passwordFromEnv: REDIS_PASSWORD
+        listName: queues:high
+        listLength: "50"
+        enableTLS: "false"
+        databaseIndex: "0"
+      authenticationRef:
+        name: redis-auth
+
+---
+##############################################################################
+# PodDisruptionBudget for Queue Workers
+##############################################################################
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: queue-worker-pdb
+  namespace: production
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: absensi-queue-worker

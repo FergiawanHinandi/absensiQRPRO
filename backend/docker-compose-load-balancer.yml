@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # Nginx Load Balancer
+  nginx-lb:
+    image: nginx:alpine
+    container_name: nginx-load-balancer
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Status page
+    volumes:
+      - ./nginx-load-balancer.conf:/etc/nginx/conf.d/default.conf
+      - ./ssl:/etc/ssl/certs
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - app1
+      - app2
+      - app3
+    networks:
+      - laravel-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Laravel App Server 1
+  app1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel-app-1
+    environment:
+      - APP_NAME=LaravelApp
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=https://yourdomain.com
+      - DB_HOST=mysql-master
+      - REDIS_HOST=redis-cluster
+      - SESSION_DRIVER=redis
+    volumes:
+      - ./storage/app:/var/www/html/storage/app
+    networks:
+      - laravel-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Laravel App Server 2
+  app2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel-app-2
+    environment:
+      - APP_NAME=LaravelApp
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=https://yourdomain.com
+      - DB_HOST=mysql-master
+      - REDIS_HOST=redis-cluster
+      - SESSION_DRIVER=redis
+    volumes:
+      - ./storage/app:/var/www/html/storage/app
+    networks:
+      - laravel-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Laravel App Server 3 (Backup)
+  app3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel-app-3
+    environment:
+      - APP_NAME=LaravelApp
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=https://yourdomain.com
+      - DB_HOST=mysql-master
+      - REDIS_HOST=redis-cluster
+      - SESSION_DRIVER=redis
+    volumes:
+      - ./storage/app:/var/www/html/storage/app
+    networks:
+      - laravel-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis Cluster for Sessions and Cache
+  redis-cluster:
+    image: redis:7-alpine
+    container_name: redis-cluster
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - laravel-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+
+networks:
+  laravel-network:
+    driver: bridge

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Admin\AdminActivityIndexRequest;
 use App\Models\AdminActivityLog;
 use App\Services\AdminAuditService;
 use Illuminate\Http\JsonResponse;
@@ -12,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Admin Activity Controller
- * 
+ *
  * Provides endpoints for viewing and filtering admin activity logs.
  * Access is role-based:
  * - super_admin: Can view all activity across all schools
@@ -29,9 +28,9 @@ class AdminActivityController extends Controller
 
     /**
      * List admin activity logs with filtering and pagination.
-     * 
+     *
      * GET /api/v1/admin/system/admin-activity
-     * 
+     *
      * Query Parameters:
      * - admin_user_id: Filter by specific admin
      * - action_type: Filter by action type
@@ -94,11 +93,11 @@ class AdminActivityController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->where('created_at', '>=', $request->input('date_from') . ' 00:00:00');
+            $query->where('created_at', '>=', $request->input('date_from').' 00:00:00');
         }
 
         if ($request->filled('date_to')) {
-            $query->where('created_at', '<=', $request->input('date_to') . ' 23:59:59');
+            $query->where('created_at', '<=', $request->input('date_to').' 23:59:59');
         }
 
         if ($request->filled('search')) {
@@ -149,7 +148,7 @@ class AdminActivityController extends Controller
 
     /**
      * Get a single activity log entry.
-     * 
+     *
      * GET /api/v1/admin/system/admin-activity/{id}
      */
     public function show(Request $request, int $id): JsonResponse
@@ -199,7 +198,7 @@ class AdminActivityController extends Controller
 
     /**
      * Get summary statistics for admin activity.
-     * 
+     *
      * GET /api/v1/admin/system/admin-activity/summary
      */
     public function summary(Request $request): JsonResponse
@@ -276,7 +275,7 @@ class AdminActivityController extends Controller
 
         // Daily activity trend
         $dailyTrend = (clone $baseQuery)
-            ->selectRaw("DATE(created_at) as date, COUNT(*) as count")
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
             ->groupBy('date')
             ->orderBy('date')
             ->pluck('count', 'date')
@@ -288,8 +287,8 @@ class AdminActivityController extends Controller
                 'period_days' => $days,
                 'total_actions' => $totalActions,
                 'high_risk_count' => $highRiskCount,
-                'high_risk_percentage' => $totalActions > 0 
-                    ? round(($highRiskCount / $totalActions) * 100, 1) 
+                'high_risk_percentage' => $totalActions > 0
+                    ? round(($highRiskCount / $totalActions) * 100, 1)
                     : 0,
                 'actions_by_type' => $actionsByType,
                 'most_active_admins' => $mostActiveAdmins,
@@ -301,13 +300,13 @@ class AdminActivityController extends Controller
 
     /**
      * Get available action types for filtering.
-     * 
+     *
      * GET /api/v1/admin/system/admin-activity/action-types
      */
     public function actionTypes(): JsonResponse
     {
         $types = AdminActivityLog::getAllActionTypes();
-        
+
         $formatted = collect($types)->map(function ($value, $key) {
             return [
                 'value' => $value,
@@ -324,7 +323,7 @@ class AdminActivityController extends Controller
 
     /**
      * Get activity for a specific target entity.
-     * 
+     *
      * GET /api/v1/admin/system/admin-activity/target/{type}/{id}
      */
     public function forTarget(Request $request, string $type, int $id): JsonResponse
@@ -375,7 +374,7 @@ class AdminActivityController extends Controller
 
     /**
      * Get activity for the current admin user.
-     * 
+     *
      * GET /api/v1/admin/system/admin-activity/my-activity
      */
     public function myActivity(Request $request): JsonResponse

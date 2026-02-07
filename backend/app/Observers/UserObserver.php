@@ -37,7 +37,7 @@ class UserObserver
         }
 
         // Check if account is being deactivated
-        if ($user->isDirty('is_active') && !$user->is_active) {
+        if ($user->isDirty('is_active') && ! $user->is_active) {
             $this->handleAccountDeactivation($user);
         }
     }
@@ -134,7 +134,7 @@ class UserObserver
             $logService = app(ImmutableSecurityLogService::class);
             $logService->write(
                 ImmutableSecurityLog::TYPE_ADMIN_ACTION,
-                "Account deactivated - all tokens revoked",
+                'Account deactivated - all tokens revoked',
                 $user->id,
                 $user->school_id,
                 [

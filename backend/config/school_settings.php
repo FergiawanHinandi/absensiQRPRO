@@ -27,4 +27,44 @@ return [
         'type' => 'bool',
         'default' => false,
     ],
+
+    // ================================================
+    // NEW FIELDS (User Request)
+    // ================================================
+
+    // QR Mode
+    'qr_expiry_seconds' => [
+        'type' => 'int',
+        'min' => 5,
+        'max' => 60,
+        'default' => 30,
+    ],
+    'qr_regeneration_cooldown' => [
+        'type' => 'int',
+        'min' => 0,
+        'max' => 30,
+        'default' => 5,
+    ],
+
+    // Override
+    'allow_teacher_override' => [
+        'type' => 'bool',
+        'default' => true,
+    ],
+    'require_override_reason' => [
+        'type' => 'bool',
+        'default' => true,
+    ],
+
+    // Tolerance
+    'late_tolerance_minutes' => [
+        'type' => 'int',
+        'min' => 0,
+        'max' => 120,
+        'default' => 15,
+    ],
+    'early_check_in_allowed' => [
+        'type' => 'bool',
+        'default' => true,
+    ],
 ];

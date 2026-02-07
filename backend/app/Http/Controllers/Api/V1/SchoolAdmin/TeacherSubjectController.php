@@ -3,12 +3,10 @@
 namespace App\Http\Controllers\Api\V1\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\TeacherSubject;
-use App\Models\User;
 use App\Models\Subject;
+use App\Models\TeacherSubject;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\DB;
 
 class TeacherSubjectController extends Controller
 {
@@ -18,15 +16,15 @@ class TeacherSubjectController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        
+
         $assignments = TeacherSubject::with(['teacher:id,name', 'subject:id,name,code', 'class:id,name'])
-            ->whereHas('teacher', function($q) use ($user) {
+            ->whereHas('teacher', function ($q) use ($user) {
                 $q->where('school_id', $user->school_id);
             })
-            ->when($request->teacher_id, function($q, $id) {
+            ->when($request->teacher_id, function ($q, $id) {
                 $q->where('teacher_id', $id);
             })
-            ->when($request->subject_id, function($q, $id) {
+            ->when($request->subject_id, function ($q, $id) {
                 $q->where('subject_id', $id);
             })
             ->paginate($request->get('per_page', 20));
@@ -46,30 +44,30 @@ class TeacherSubjectController extends Controller
                 'required',
                 Rule::exists('users', 'id')->where(function ($query) use ($user) {
                     $query->where('school_id', $user->school_id)
-                          ->whereIn('role_type', ['teacher', 'school_admin']); // Allow admin to teach too? Usually just teacher.
-                })
+                        ->whereIn('role_type', ['teacher', 'school_admin']); // Allow admin to teach too? Usually just teacher.
+                }),
             ],
             'subject_id' => [
                 'required',
                 Rule::exists('subjects', 'id')->where(function ($query) use ($user) {
                     $query->where('school_id', $user->school_id);
-                })
+                }),
             ],
             'class_id' => [
                 'nullable',
                 Rule::exists('classes', 'id')->where(function ($query) use ($user) {
                     $query->where('school_id', $user->school_id);
-                })
+                }),
             ],
-            'academic_year_id' => 'nullable|exists:academic_years,id'
+            'academic_year_id' => 'nullable|exists:academic_years,id',
         ]);
 
         // Check for duplicates
         $exists = TeacherSubject::where('teacher_id', $validated['teacher_id'])
             ->where('subject_id', $validated['subject_id'])
-            ->when(isset($validated['class_id']), function($q) use ($validated) {
+            ->when(isset($validated['class_id']), function ($q) use ($validated) {
                 $q->where('class_id', $validated['class_id']);
-            }, function($q) {
+            }, function ($q) {
                 $q->whereNull('class_id');
             })
             ->exists();
@@ -89,9 +87,9 @@ class TeacherSubjectController extends Controller
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
-        
+
         $assignment = TeacherSubject::where('id', $id)
-            ->whereHas('teacher', function($q) use ($user) {
+            ->whereHas('teacher', function ($q) use ($user) {
                 $q->where('school_id', $user->school_id);
             })
             ->firstOrFail();

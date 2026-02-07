@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Core\Services\Attendance\QRCodeService;
 use App\Core\Services\Attendance\TeacherAttendanceService;
 use App\Core\Services\GeofenceService;
-use App\Core\Services\SecurityEventLogger;
 use App\Models\AcademicYear;
 use App\Models\Attendance;
 use App\Models\ClassModel;
@@ -14,7 +13,6 @@ use App\Models\Schedule;
 use App\Models\School;
 use App\Models\Subject;
 use App\Models\TeacherAttendance;
-use App\Models\TeacherAttendanceAnomaly;
 use App\Models\TeacherDevice;
 use App\Models\User;
 use Carbon\Carbon;
@@ -26,7 +24,7 @@ use Tests\TestCase;
 
 /**
  * Comprehensive Attendance Integrity & Security Tests
- * 
+ *
  * Tests all security rules for both student and teacher attendance.
  * These tests focus on service-level testing for reliability.
  */
@@ -35,18 +33,31 @@ class AttendanceIntegrityTest extends TestCase
     use RefreshDatabase;
 
     protected School $school;
+
     protected User $teacherA;
+
     protected User $teacherB;
+
     protected User $student;
+
     protected User $studentOtherClass;
+
     protected ClassModel $classA;
+
     protected ClassModel $classB;
+
     protected Schedule $scheduleA;
+
     protected Schedule $scheduleB;
+
     protected AcademicYear $academicYear;
+
     protected Subject $subject;
+
     protected QRCodeService $qrCodeService;
+
     protected TeacherAttendanceService $teacherAttendanceService;
+
     protected GeofenceService $geofenceService;
 
     protected function setUp(): void

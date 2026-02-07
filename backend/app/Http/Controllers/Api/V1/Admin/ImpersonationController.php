@@ -26,13 +26,13 @@ class ImpersonationController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Impersonation started',
-                'redirect' => $targetUser->role_type === 'teacher' ? '/teacher/dashboard' : '/student/dashboard' 
+                'redirect' => $targetUser->role_type === 'teacher' ? '/teacher/dashboard' : '/student/dashboard',
             ]);
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Impersonation failed or not allowed'
+            'message' => 'Impersonation failed or not allowed',
         ], 403);
     }
 
@@ -41,13 +41,13 @@ class ImpersonationController extends Controller
         if ($this->impersonationService->stopImpersonating()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Impersonation ended'
+                'message' => 'Impersonation ended',
             ]);
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Not currently impersonating'
+            'message' => 'Not currently impersonating',
         ], 400);
     }
 }

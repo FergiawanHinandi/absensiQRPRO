@@ -12,16 +12,16 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Log Admin Action Middleware
- * 
+ *
  * Automatically captures and logs admin actions for audit purposes.
  * This middleware should be applied to admin routes to track all
  * POST, PUT, PATCH, and DELETE operations.
- * 
+ *
  * The middleware intelligently determines the action type based on:
  * - Route name patterns
  * - HTTP method
  * - Request path
- * 
+ *
  * For more specific logging, use AdminAuditService directly in controllers.
  */
 class LogAdminAction
@@ -123,13 +123,13 @@ class LogAdminAction
         $response = $next($request);
 
         // Only log state-changing operations
-        if (!in_array($request->method(), self::LOGGED_METHODS)) {
+        if (! in_array($request->method(), self::LOGGED_METHODS)) {
             return $response;
         }
 
         // Only log for authenticated admin users
         $user = Auth::user();
-        if (!$user || !$this->isAdminUser($user)) {
+        if (! $user || ! $this->isAdminUser($user)) {
             return $response;
         }
 
@@ -170,7 +170,7 @@ class LogAdminAction
      */
     protected function isExcludedRoute(?string $routeName): bool
     {
-        if (!$routeName) {
+        if (! $routeName) {
             return false;
         }
 
@@ -234,7 +234,8 @@ class LogAdminAction
         }
 
         // Convert wildcard pattern to regex
-        $regex = '/^' . str_replace(['.', '*'], ['\.', '.*'], $pattern) . '$/';
+        $regex = '/^'.str_replace(['.', '*'], ['\.', '.*'], $pattern).'$/';
+
         return (bool) preg_match($regex, $routeName);
     }
 
@@ -294,20 +295,20 @@ class LogAdminAction
     protected function resolveTarget(Request $request): array
     {
         $route = $request->route();
-        
+
         // Try to get target from route parameters
         $parameters = $route?->parameters() ?? [];
-        
+
         // Common parameter names for resource IDs
         $idParams = ['id', 'user', 'teacher', 'student', 'school', 'class', 'subject', 'schedule', 'attendance'];
-        
+
         foreach ($idParams as $param) {
             if (isset($parameters[$param])) {
                 $value = $parameters[$param];
-                $id = is_object($value) && method_exists($value, 'getKey') 
-                    ? $value->getKey() 
+                $id = is_object($value) && method_exists($value, 'getKey')
+                    ? $value->getKey()
                     : (is_numeric($value) ? (int) $value : null);
-                
+
                 return [
                     'type' => ucfirst($param === 'id' ? $this->guessResourceFromPath(explode('/', $request->path())) : $param),
                     'id' => $id,
@@ -333,7 +334,7 @@ class LogAdminAction
     {
         $method = $request->method();
         $actionDisplay = ucwords(str_replace('_', ' ', $actionType));
-        
+
         $targetDesc = '';
         if ($targetInfo['type'] && $targetInfo['id']) {
             $targetDesc = " on {$targetInfo['type']} #{$targetInfo['id']}";
@@ -358,7 +359,7 @@ class LogAdminAction
         if (in_array($request->method(), ['POST', 'PUT', 'PATCH'])) {
             $sensitiveFields = ['password', 'password_confirmation', 'current_password', 'secret', 'token', 'api_key'];
             $input = $request->except($sensitiveFields);
-            
+
             // Don't include large payloads
             $encoded = json_encode($input);
             if ($encoded !== false && strlen($encoded) < 5000) {

@@ -15,7 +15,9 @@ class QrStudentStatusValidationTest extends TestCase
     use RefreshDatabase;
 
     protected School $school;
+
     protected User $student;
+
     protected StudentQrService $qrService;
 
     protected function setUp(): void

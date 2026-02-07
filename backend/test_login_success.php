@@ -12,15 +12,15 @@ $kernel->bootstrap();
 try {
     $request = Illuminate\Http\Request::create('/api/v1/auth/login', 'POST', [
         'username' => 'superadmin',
-        'password' => 'admin123'
+        'password' => 'admin123',
     ]);
-    
+
     $response = $app->handle($request);
-    
-    echo "Status: " . $response->getStatusCode() . "\n";
-    echo "Content: " . $response->getContent() . "\n";
-    
-} catch(\Exception $e) {
-    echo "Error: " . $e->getMessage() . "\n";
-    echo "Trace: " . $e->getTraceAsString() . "\n";
+
+    echo 'Status: '.$response->getStatusCode()."\n";
+    echo 'Content: '.$response->getContent()."\n";
+
+} catch (\Exception $e) {
+    echo 'Error: '.$e->getMessage()."\n";
+    echo 'Trace: '.$e->getTraceAsString()."\n";
 }

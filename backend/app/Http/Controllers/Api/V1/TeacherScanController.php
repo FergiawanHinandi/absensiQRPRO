@@ -2,67 +2,110 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\AttendanceException;
 use App\Http\Controllers\Controller;
-use App\Services\AttendanceService;
-use Illuminate\Http\Request;
+use App\Http\Requests\Api\TeacherScanRequest;
+use App\Services\AttendanceCheckInService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
+/**
+ * TeacherScanController
+ *
+ * CLEAN ARCHITECTURE:
+ * - Controller hanya menerima FormRequest
+ * - Memanggil 1 service method
+ * - Return JSON response
+ *
+ * Authorization handled by:
+ * - FormRequest::authorize() for role check
+ * - Middleware for rate limiting
+ * - Service for business rules
+ */
 class TeacherScanController extends Controller
 {
     public function __construct(
-        private AttendanceService $attendanceService
+        private AttendanceCheckInService $checkInService
     ) {}
 
     /**
      * Teacher Scans Student QR Card
      *
-     * All business logic delegated to AttendanceService.
+     * @param TeacherScanRequest $request Validated & Authorized request
+     * @return JsonResponse
      */
-    public function scan(Request $request)
+    public function scan(TeacherScanRequest $request): JsonResponse
     {
-        $request->validate([
-            'qr_token' => 'required|string',
-            'lat' => 'nullable|numeric',
-            'lng' => 'nullable|numeric',
-            'request_id' => 'nullable|uuid',
-        ]);
-
-        $teacher = $request->user();
-
-        // 1. Verify Teacher Role (Redundant if middleware used, but safe)
-        if (! $teacher->hasRole(['teacher', 'homeroom_teacher'])) {
-            return response()->json(['message' => 'Unauthorized. Hanya guru yang bisa scan.'], 403);
-        }
-
         try {
-            $result = $this->attendanceService->recordByTeacherScan(
-                $teacher,
-                $request->input('qr_token'),
-                $request->input('lat'),
-                $request->input('lng'),
-                null, // deviceId
-                $request->input('request_id')
+            // 1. Get validated data with defaults (request_id auto-generated if missing)
+            $data = $request->validatedWithDefaults();
+
+            // 2. Delegate ALL logic to service
+            $result = $this->checkInService->teacherCheckIn(
+                teacher: $request->user(),
+                qrToken: $data['qr_token'],
+                data: [
+                    'lat' => $data['lat'] ?? null,
+                    'lng' => $data['lng'] ?? null,
+                    'device_id' => $data['device_id'] ?? null,
+                    'request_id' => $data['request_id'],
+                ],
+                request: $request
             );
 
+            // 3. Return standardized success response
             return response()->json([
-                'message' => 'Absensi berhasil dicatat.',
-                'data' => $result,
-            ], 201);
+                'success' => true,
+                'message' => $result->message,
+                'data' => [
+                    'attendance' => $result->attendance,
+                    'status' => $result->status,
+                    'is_retry' => $result->isIdempotentRetry,
+                ],
+            ], $result->isIdempotentRetry ? 200 : 201);
 
-        } catch (\App\Exceptions\AttendanceException $e) {
-            // Business logic exceptions are safe to show to users
+        } catch (AttendanceException $e) {
+            // Business logic exceptions - safe to show to user
             return response()->json([
+                'success' => false,
                 'message' => $e->getMessage(),
+                'code' => $this->getErrorCode($e),
+                'data' => null,
             ], 400);
+
         } catch (\Exception $e) {
-            // SECURITY FIX: Log unexpected errors, show generic message
-            \Illuminate\Support\Facades\Log::error('TeacherScan unexpected error', [
+            // Unexpected errors - log and return generic message
+            Log::error('TeacherScan unexpected error', [
                 'teacher_id' => $request->user()->id ?? null,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
+                'success' => false,
                 'message' => 'Terjadi kesalahan saat memproses absensi.',
+                'code' => 'INTERNAL_ERROR',
+                'data' => null,
             ], 500);
         }
+    }
+
+    /**
+     * Map exception to error code
+     */
+    private function getErrorCode(AttendanceException $e): string
+    {
+        $message = $e->getMessage();
+
+        return match (true) {
+            str_contains($message, 'sudah dicatat') => 'ALREADY_CHECKED_IN',
+            str_contains($message, 'tidak valid') => 'INVALID_QR',
+            str_contains($message, 'kadaluarsa') => 'QR_EXPIRED',
+            str_contains($message, 'jadwal') => 'NO_ACTIVE_SCHEDULE',
+            str_contains($message, 'radius') => 'OUTSIDE_GEOFENCE',
+            str_contains($message, 'waktu') => 'OUTSIDE_TIME_WINDOW',
+            str_contains($message, 'kelas') => 'STUDENT_NOT_IN_CLASS',
+            default => 'ATTENDANCE_ERROR',
+        };
     }
 }

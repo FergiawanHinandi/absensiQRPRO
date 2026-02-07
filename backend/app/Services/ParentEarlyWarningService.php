@@ -9,15 +9,15 @@ class ParentEarlyWarningService
 {
     /**
      * Trigger early warning for parents if student risk is medium or high
-     * @param User $student
-     * @param string $riskLevel ('medium'|'high')
+     *
+     * @param  string  $riskLevel  ('medium'|'high')
      */
     public function triggerEarlyWarning(User $student, string $riskLevel)
     {
-        if (!in_array($riskLevel, ['medium', 'high'])) {
+        if (! in_array($riskLevel, ['medium', 'high'])) {
             return;
         }
-        $message = "Anak Anda menunjukkan penurunan kehadiran. Mohon pantau kehadiran minggu ini.";
+        $message = 'Anak Anda menunjukkan penurunan kehadiran. Mohon pantau kehadiran minggu ini.';
         $payload = $this->buildNotificationPayload($student, $riskLevel, $message);
         $this->sendToParent($student, $payload);
     }

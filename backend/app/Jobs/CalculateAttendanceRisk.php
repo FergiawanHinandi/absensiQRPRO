@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
-use App\Models\User;
 use App\Models\Attendance;
 use App\Models\StudentAttendanceRisk;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,7 +39,7 @@ class CalculateAttendanceRisk implements ShouldQueue
             try {
                 $this->calculateRiskForStudent($student);
             } catch (\Exception $e) {
-                Log::error("Failed to calculate risk for student ID {$student->id}: " . $e->getMessage());
+                Log::error("Failed to calculate risk for student ID {$student->id}: ".$e->getMessage());
             }
         }
 
@@ -50,7 +50,7 @@ class CalculateAttendanceRisk implements ShouldQueue
     {
         // Filter attendances for score calculation (last 30 days)
         $attendances30Days = $student->attendances->where('attendance_date', '>=', Carbon::now()->subDays(30));
-        
+
         // Full 60 days for pattern analysis
         $attendances60Days = $student->attendances;
 
@@ -76,13 +76,13 @@ class CalculateAttendanceRisk implements ShouldQueue
 
         // --- Weekly Pattern Analysis (Last 60 Days) ---
         $weekdayAbsences = [
-            'Sunday' => 0, 'Monday' => 0, 'Tuesday' => 0, 'Wednesday' => 0, 'Thursday' => 0, 'Friday' => 0, 'Saturday' => 0
+            'Sunday' => 0, 'Monday' => 0, 'Tuesday' => 0, 'Wednesday' => 0, 'Thursday' => 0, 'Friday' => 0, 'Saturday' => 0,
         ];
-        
+
         $absences60Days = $attendances60Days->where('status', 'absent');
-        
+
         foreach ($absences60Days as $attendance) {
-            // attendance_date is a date string or Carbon object? 
+            // attendance_date is a date string or Carbon object?
             // If it's casted to date in model, it's Carbon. If string, need Carbon::parse.
             // Assuming casted or string.
             $date = Carbon::parse($attendance->attendance_date);
@@ -95,7 +95,7 @@ class CalculateAttendanceRisk implements ShouldQueue
         // Identify High Risk Day (Weekday with most absences in 60 days)
         $maxAbsences = 0;
         $riskyDayCandidate = null;
-        
+
         foreach ($weekdayAbsences as $day => $count) {
             if ($count > $maxAbsences) {
                 $maxAbsences = $count;
@@ -112,18 +112,18 @@ class CalculateAttendanceRisk implements ShouldQueue
                     return Carbon::parse($att->attendance_date)->format('l') === $riskyDayCandidate;
                 })
                 ->count();
-            
+
             if ($absencesOnRiskyDayLast30Days >= 3) {
                 $riskyWeekday = $riskyDayCandidate;
                 // Increase score if a pattern is detected
-                $score += 5; 
+                $score += 5;
             }
         }
 
         // Determine Level
         $level = 'low';
         if ($score >= 50) {
-            $level = 'high'; 
+            $level = 'high';
         } elseif ($score >= 30) {
             $level = 'high'; // Or medium-high? sticking to low/medium/high
         } elseif ($score >= 10) {
@@ -136,7 +136,7 @@ class CalculateAttendanceRisk implements ShouldQueue
             'lates_last_30_days' => $lateCount,
             'attendance_rate' => $totalRecords > 0 ? round(($presentCount / $totalRecords) * 100, 1) : 0,
             'total_records_analyzed' => $totalRecords,
-            'risky_weekday_detected' => $riskyWeekday
+            'risky_weekday_detected' => $riskyWeekday,
         ];
 
         // Fetch existing risk profile to compare
@@ -163,5 +163,17 @@ class CalculateAttendanceRisk implements ShouldQueue
         if ($newRank > $oldRank) {
             RiskLevelUpdated::dispatch($riskProfile);
         }
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('CalculateAttendanceRisk job failed', [
+            'job' => self::class,
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
     }
 }

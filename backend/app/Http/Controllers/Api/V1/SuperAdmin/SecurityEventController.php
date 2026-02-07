@@ -12,7 +12,7 @@ class SecurityEventController extends Controller
     {
         // 10. Security Alert Viewer
         // Replay attacks, Invalid signatures, Device mismatch
-        
+
         $query = DB::table('security_alerts')
             ->orderBy('created_at', 'desc');
 
@@ -24,7 +24,7 @@ class SecurityEventController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $events
+            'data' => $events,
         ]);
     }
 }

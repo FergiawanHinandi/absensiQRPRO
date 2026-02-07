@@ -2,16 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\Attendance;
 use Illuminate\Support\Facades\DB;
 
 class StudentArrivalConsistencyService
 {
     /**
      * Calculate arrival time variance and consistency score for a student
-     *
-     * @param int $studentId
-     * @return array
      */
     public function calculateConsistencyScore(int $studentId): array
     {
@@ -22,7 +18,8 @@ class StudentArrivalConsistencyService
             ->pluck('check_in_time')
             ->map(function ($time) {
                 [$h, $m, $s] = explode(':', $time);
-                return ((int)$h) * 60 + (int)$m + ((int)$s >= 30 ? 1 : 0); // pembulatan menit
+
+                return ((int) $h) * 60 + (int) $m + ((int) $s >= 30 ? 1 : 0); // pembulatan menit
             })
             ->toArray();
 
@@ -39,12 +36,15 @@ class StudentArrivalConsistencyService
     private function variance(array $values): float
     {
         $n = count($values);
-        if ($n <= 1) return 0.0;
+        if ($n <= 1) {
+            return 0.0;
+        }
         $mean = array_sum($values) / $n;
         $sumSq = 0.0;
         foreach ($values as $v) {
             $sumSq += pow($v - $mean, 2);
         }
+
         return $sumSq / ($n - 1);
     }
 
@@ -55,8 +55,13 @@ class StudentArrivalConsistencyService
 
     private function categoryFromScore(int $score): string
     {
-        if ($score <= 30) return 'Consistent';
-        if ($score <= 60) return 'Moderate';
+        if ($score <= 30) {
+            return 'Consistent';
+        }
+        if ($score <= 60) {
+            return 'Moderate';
+        }
+
         return 'Highly inconsistent';
     }
 }

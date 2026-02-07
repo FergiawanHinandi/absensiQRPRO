@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Request;
 
 /**
  * Immutable Security Log Service
- * 
+ *
  * Provides tamper-proof audit trail using hash chaining (blockchain-style).
  * Each log entry contains a hash of the previous entry, forming an unbreakable chain.
  */
@@ -24,14 +24,14 @@ class ImmutableSecurityLogService
 
     /**
      * Write a new entry to the immutable security log.
-     * 
-     * @param string $eventType The type of security event
-     * @param string $description Human-readable description
-     * @param int|null $userId Associated user ID
-     * @param int|null $schoolId Associated school ID
-     * @param array $metadata Additional structured data
+     *
+     * @param  string  $eventType  The type of security event
+     * @param  string  $description  Human-readable description
+     * @param  int|null  $userId  Associated user ID
+     * @param  int|null  $schoolId  Associated school ID
+     * @param  array  $metadata  Additional structured data
      * @return ImmutableSecurityLog The created log entry
-     * 
+     *
      * @throws \RuntimeException If hash chain integrity cannot be maintained
      */
     public function write(
@@ -48,7 +48,7 @@ class ImmutableSecurityLogService
                 ->orderByDesc('sequence_number')
                 ->first();
 
-            if (!$lastRecord) {
+            if (! $lastRecord) {
                 throw new \RuntimeException(
                     'Immutable security log chain not initialized. Genesis block missing.'
                 );
@@ -76,7 +76,7 @@ class ImmutableSecurityLogService
             );
 
             // Create the record
-            $record = new ImmutableSecurityLog();
+            $record = new ImmutableSecurityLog;
             $record->event_type = $eventType;
             $record->user_id = $userId;
             $record->school_id = $schoolId;
@@ -88,17 +88,17 @@ class ImmutableSecurityLogService
             $record->user_agent = $userAgent ? substr($userAgent, 0, 500) : null;
             $record->sequence_number = $sequenceNumber;
             $record->created_at = $createdAt;
-            
+
             $record->save();
 
             // Verify the record was saved correctly
-            if (!$record->verifyHash()) {
+            if (! $record->verifyHash()) {
                 Log::channel('security')->critical('Hash verification failed after insert', [
                     'sequence_number' => $sequenceNumber,
                     'expected_hash' => $currentHash,
                     'stored_hash' => $record->current_hash,
                 ]);
-                
+
                 throw new \RuntimeException('Hash verification failed after insert. Data integrity compromised.');
             }
 
@@ -135,8 +135,8 @@ class ImmutableSecurityLogService
 
     /**
      * Verify the integrity of the entire hash chain.
-     * 
-     * @param callable|null $progressCallback Optional callback for progress updates
+     *
+     * @param  callable|null  $progressCallback  Optional callback for progress updates
      * @return array Verification result with details
      */
     public function verifyChainIntegrity(?callable $progressCallback = null): array
@@ -159,7 +159,7 @@ class ImmutableSecurityLogService
         $query->chunk($chunkSize, function ($records) use (&$result, &$previousRecord, $progressCallback) {
             foreach ($records as $record) {
                 // Verify hash integrity
-                if (!$record->verifyHash()) {
+                if (! $record->verifyHash()) {
                     $result['is_valid'] = false;
                     $result['errors'][] = [
                         'type' => 'hash_mismatch',
@@ -172,7 +172,7 @@ class ImmutableSecurityLogService
                 }
 
                 // Verify chain link
-                if (!$record->verifyChainLink($previousRecord)) {
+                if (! $record->verifyChainLink($previousRecord)) {
                     $result['is_valid'] = false;
                     $result['errors'][] = [
                         'type' => 'chain_break',
@@ -208,8 +208,8 @@ class ImmutableSecurityLogService
     protected function logVerificationResult(array $result): void
     {
         try {
-            $eventType = $result['is_valid'] 
-                ? ImmutableSecurityLog::TYPE_INTEGRITY_CHECK 
+            $eventType = $result['is_valid']
+                ? ImmutableSecurityLog::TYPE_INTEGRITY_CHECK
                 : ImmutableSecurityLog::TYPE_TAMPERING_DETECTED;
 
             $description = $result['is_valid']
@@ -283,11 +283,11 @@ class ImmutableSecurityLogService
             ->where('is_active', true)
             ->get();
 
-        $message = "⚠️ SECURITY LOG TAMPERING DETECTED\n\n" .
-            "Verified: {$verificationResult['verified_records']}/{$verificationResult['total_records']} records\n" .
-            "Errors found: " . count($verificationResult['errors']) . "\n\n" .
-            "IMMEDIATE ACTION REQUIRED!\n" .
-            "The audit log chain has been compromised.";
+        $message = "⚠️ SECURITY LOG TAMPERING DETECTED\n\n".
+            "Verified: {$verificationResult['verified_records']}/{$verificationResult['total_records']} records\n".
+            'Errors found: '.count($verificationResult['errors'])."\n\n".
+            "IMMEDIATE ACTION REQUIRED!\n".
+            'The audit log chain has been compromised.';
 
         foreach ($superAdmins as $admin) {
             // Create security alert for log tampering
@@ -308,8 +308,8 @@ class ImmutableSecurityLogService
 
     /**
      * Export hashes for external backup.
-     * 
-     * @param string|null $outputPath Path to save the export
+     *
+     * @param  string|null  $outputPath  Path to save the export
      * @return array Export data with hashes
      */
     public function exportHashes(?string $outputPath = null): array
@@ -390,7 +390,7 @@ class ImmutableSecurityLogService
     ): ImmutableSecurityLog {
         return $this->write(
             ImmutableSecurityLog::TYPE_DEVICE_MISMATCH,
-            "Device mismatch detected during attendance scan",
+            'Device mismatch detected during attendance scan',
             $userId,
             $schoolId,
             array_merge([
@@ -412,7 +412,7 @@ class ImmutableSecurityLogService
     ): ImmutableSecurityLog {
         return $this->write(
             ImmutableSecurityLog::TYPE_QR_REPLAY_ATTEMPT,
-            "QR code replay attack detected",
+            'QR code replay attack detected',
             $userId,
             $schoolId,
             array_merge([

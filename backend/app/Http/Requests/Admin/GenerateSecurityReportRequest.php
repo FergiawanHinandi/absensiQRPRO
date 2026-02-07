@@ -13,7 +13,7 @@ class GenerateSecurityReportRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
-        
+
         // Only super_admin or school_admin can generate reports
         return $user && in_array($user->role_type, ['super_admin', 'admin', 'school_admin']);
     }

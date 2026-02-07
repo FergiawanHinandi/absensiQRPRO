@@ -10,13 +10,15 @@ use Illuminate\Support\Facades\File;
 class AggregateSecurityAlerts extends Command
 {
     protected $signature = 'security:aggregate-alerts';
+
     protected $description = 'Scan security logs for anomalies and create alerts';
 
     public function handle()
     {
         $logPath = storage_path('logs/security.log');
-        if (!File::exists($logPath)) {
+        if (! File::exists($logPath)) {
             $this->info('No security log found.');
+
             return;
         }
 
@@ -37,12 +39,14 @@ class AggregateSecurityAlerts extends Command
         $qrReplays = 0;
         $scanAnomalies = 0;
         $crossSchool = 0;
-        
+
         $loginIps = [];
 
-        while (!feof($handle)) {
+        while (! feof($handle)) {
             $line = fgets($handle);
-            if (!$line) continue;
+            if (! $line) {
+                continue;
+            }
 
             if (str_contains($line, 'Failed Login Attempt')) {
                 $failedLogins++;
@@ -61,7 +65,7 @@ class AggregateSecurityAlerts extends Command
             if (str_contains($line, 'Security Anomaly Detected')) { // From LocationAnomalyService
                 $scanAnomalies++;
             }
-            
+
             // Assume cross-school logs contain specific text if implemented
             if (str_contains($line, 'Cross-school') || str_contains($line, 'Unauthorized school access')) {
                 $crossSchool++;
@@ -78,9 +82,9 @@ class AggregateSecurityAlerts extends Command
         if ($failedLogins > 3) {
             $uniqueIps = array_unique($loginIps);
             $this->createAlert(
-                'login_attack', 
-                'high', 
-                "Detected {$failedLogins} failed login attempts in the last 5 minutes.", 
+                'login_attack',
+                'high',
+                "Detected {$failedLogins} failed login attempts in the last 5 minutes.",
                 ['ips' => $uniqueIps, 'count' => $failedLogins]
             );
         }
@@ -88,8 +92,8 @@ class AggregateSecurityAlerts extends Command
         // Rule 2: >5 QR Replays
         if ($qrReplays > 5) {
             $this->createAlert(
-                'qr_replay_spike', 
-                'critical', 
+                'qr_replay_spike',
+                'critical',
                 "High rate of QR replay attempts detected ({$qrReplays} attempts). Possible replay attack.",
                 ['count' => $qrReplays]
             );
@@ -98,18 +102,18 @@ class AggregateSecurityAlerts extends Command
         // Rule 3: Cross School (Any)
         if ($crossSchool > 0) {
             $this->createAlert(
-                'cross_school_access', 
-                'high', 
-                "Unauthorized cross-school access attempts detected.",
+                'cross_school_access',
+                'high',
+                'Unauthorized cross-school access attempts detected.',
                 ['count' => $crossSchool]
             );
         }
-        
+
         // Rule 4: Scan Anomalies (Location/Device) > 5 (Burst)
         if ($scanAnomalies > 5) {
-             $this->createAlert(
-                'location_anomaly_spike', 
-                'medium', 
+            $this->createAlert(
+                'location_anomaly_spike',
+                'medium',
                 "Multiple location/device anomalies detected ({$scanAnomalies}).",
                 ['count' => $scanAnomalies]
             );
@@ -120,16 +124,16 @@ class AggregateSecurityAlerts extends Command
 
     private function createAlert($type, $severity, $desc, $details)
     {
-        // Avoid duplicate active alerts for same type? 
+        // Avoid duplicate active alerts for same type?
         // Request says "Insert alerts". I'll insert new one.
-        
+
         SecurityAlert::createAlert([
             'type' => $type,
             'severity' => $severity,
             'description' => $desc,
             'ip_address' => request()->ip(),
         ]);
-        
+
         $this->warn("Alert Created: {$type}");
     }
 }

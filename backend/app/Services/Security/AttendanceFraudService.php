@@ -4,7 +4,6 @@ namespace App\Services\Security;
 
 use App\Models\Attendance;
 use App\Models\AttendanceLog;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -31,15 +30,15 @@ class AttendanceFraudService
     /**
      * Analyze a new attendance record for fraud
      *
-     * @param Attendance $attendance The newly created attendance
-     * @param string|null $deviceFingerprint SHA-256 fingerprint hash
+     * @param  Attendance  $attendance  The newly created attendance
+     * @param  string|null  $deviceFingerprint  SHA-256 fingerprint hash
      */
     public function analyze(Attendance $attendance, ?string $deviceFingerprint = null): void
     {
         $anomalies = [];
         $studentId = $attendance->student_id;
         $deviceId = $attendance->device_id_in; // Fallback if fingerprint not provided
-        
+
         // 1. Check for Joki (Device Sharing)
         if ($jokiResult = $this->detectJoki($deviceId, $deviceFingerprint, $studentId)) {
             $anomalies[] = $jokiResult;
@@ -61,15 +60,15 @@ class AttendanceFraudService
         }
 
         // Log findings
-        if (!empty($anomalies)) {
+        if (! empty($anomalies)) {
             $this->logFraud($attendance, $anomalies);
-            
+
             // Flag the attendance record (without blocking)
             // Storing in logs table to keep main table clean
             AttendanceLog::create([
                 'attendance_id' => $attendance->id,
                 'action_type' => 'fraud_flag',
-                'description' => 'Suspicious patterns detected: ' . implode(', ', array_column($anomalies, 'type')),
+                'description' => 'Suspicious patterns detected: '.implode(', ', array_column($anomalies, 'type')),
                 'metadata' => ['anomalies' => $anomalies],
                 'user_id' => null, // System event
             ]);
@@ -88,11 +87,11 @@ class AttendanceFraudService
         // Use fingerprint if available (more secure), else raw device ID
         $identifier = $fingerprint ?: "raw:{$deviceId}";
         $today = now()->toDateString();
-        $cacheKey = self::CACHE_PREFIX . "device_users:{$identifier}:{$today}";
+        $cacheKey = self::CACHE_PREFIX."device_users:{$identifier}:{$today}";
 
         $users = Cache::get($cacheKey, []);
-        
-        if (!in_array($studentId, $users)) {
+
+        if (! in_array($studentId, $users)) {
             $users[] = $studentId;
             Cache::put($cacheKey, $users, 86400); // 24 hours
         }
@@ -104,7 +103,7 @@ class AttendanceFraudService
                 'severity' => 'HIGH',
                 'details' => "Device used by {$count} distinct students today.",
                 'user_count' => $count,
-                'identifier' => $identifier
+                'identifier' => $identifier,
             ];
         }
 
@@ -116,7 +115,7 @@ class AttendanceFraudService
      */
     private function detectImpossibleTravel(Attendance $current): ?array
     {
-        if (!$current->lat_in || !$current->lng_in) {
+        if (! $current->lat_in || ! $current->lng_in) {
             return null;
         }
 
@@ -130,7 +129,7 @@ class AttendanceFraudService
             ->latest('check_in_time')
             ->first();
 
-        if (!$previous) {
+        if (! $previous) {
             return null;
         }
 
@@ -143,7 +142,7 @@ class AttendanceFraudService
         // If they moved > 1km in 10 mins (6 km/h) it's possible, but > 5km is suspicious if timestamps are very close.
         // Let's use a simpler heuristic: distinct locations > 2 in short time?
         // Or strictly velocity: Distance / Time.
-        
+
         $timeDiffSeconds = max(1, $current->check_in_time->diffInSeconds($previous->check_in_time));
         $speedMps = $distance / $timeDiffSeconds; // meters per second
 
@@ -154,11 +153,11 @@ class AttendanceFraudService
                 'type' => 'impossible_travel',
                 'severity' => 'MEDIUM',
                 'details' => sprintf(
-                    "Moved %.2f meters in %d seconds (Speed: %.2f m/s). Impossible for classroom change.",
+                    'Moved %.2f meters in %d seconds (Speed: %.2f m/s). Impossible for classroom change.',
                     $distance, $timeDiffSeconds, $speedMps
                 ),
                 'distance_meters' => $distance,
-                'previous_id' => $previous->id
+                'previous_id' => $previous->id,
             ];
         }
 
@@ -211,13 +210,13 @@ class AttendanceFraudService
         // Note: This relies on the rate limiter key used in AttendanceScanThrottle
         // Key format: "attendance:scan:user:{id}"
         $key = "attendance:scan:user:{$studentId}";
-        $attempts = Cache::get($key . ':timer'); // No direct way to inspect RateLimiter attempts easily without keys
+        $attempts = Cache::get($key.':timer'); // No direct way to inspect RateLimiter attempts easily without keys
 
         // Alternative: Check DB logs for recent failures
         // Assuming we log failures to a separate table or log channel
-        
+
         // For this task, we'll simulate checking a cache counter we increment on failure
-        $failureCount = Cache::get(self::CACHE_PREFIX . "failures:{$studentId}", 0);
+        $failureCount = Cache::get(self::CACHE_PREFIX."failures:{$studentId}", 0);
 
         if ($failureCount > 5) {
             return [
@@ -237,8 +236,11 @@ class AttendanceFraudService
     {
         $maxSeverity = 'LOW';
         foreach ($anomalies as $a) {
-            if (($a['severity'] ?? '') === 'HIGH') $maxSeverity = 'HIGH';
-            elseif (($a['severity'] ?? '') === 'MEDIUM' && $maxSeverity !== 'HIGH') $maxSeverity = 'MEDIUM';
+            if (($a['severity'] ?? '') === 'HIGH') {
+                $maxSeverity = 'HIGH';
+            } elseif (($a['severity'] ?? '') === 'MEDIUM' && $maxSeverity !== 'HIGH') {
+                $maxSeverity = 'MEDIUM';
+            }
         }
 
         $logLevel = match ($maxSeverity) {
@@ -273,7 +275,7 @@ class AttendanceFraudService
 
         $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
             cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
-            
+
         return $angle * $earthRadius;
     }
 }

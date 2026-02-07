@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\Attendance;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class StudentNotificationService
 {
@@ -16,15 +16,15 @@ class StudentNotificationService
      */
     public function sendCheckInNotification(Attendance $attendance, User $student)
     {
-        $title = "Check-in Successful";
-        $body = "You have successfully checked in for " . ($attendance->schedule->subject->name ?? 'class') . " at " . Carbon::parse($attendance->check_in_time)->format('H:i');
-        
+        $title = 'Check-in Successful';
+        $body = 'You have successfully checked in for '.($attendance->schedule->subject->name ?? 'class').' at '.Carbon::parse($attendance->check_in_time)->format('H:i');
+
         $this->sendTostudent($student, 'check_in', $title, $body, [
             'attendance_id' => $attendance->id,
             'status' => $attendance->status,
-            'time' => $attendance->check_in_time
+            'time' => $attendance->check_in_time,
         ]);
-        
+
         // Check for rate drop after this event (unlikely on success unless late counts against rate in a specific way, but usually absent does)
         // If status is LATE, we might want to check rate?
         if ($attendance->status === 'late') {
@@ -40,13 +40,13 @@ class StudentNotificationService
     public function sendLateNotification(Attendance $attendance, User $student)
     {
         $minutesLate = Carbon::parse($attendance->schedule->start_time)->diffInMinutes(Carbon::parse($attendance->check_in_time));
-        
-        $title = "Late Arrival Recorded";
-        $body = "You are marked late for " . ($attendance->schedule->subject->name ?? 'class') . " ({$minutesLate} min).";
-        
+
+        $title = 'Late Arrival Recorded';
+        $body = 'You are marked late for '.($attendance->schedule->subject->name ?? 'class')." ({$minutesLate} min).";
+
         $this->sendTostudent($student, 'late_arrival', $title, $body, [
             'attendance_id' => $attendance->id,
-            'minutes_late' => $minutesLate
+            'minutes_late' => $minutesLate,
         ]);
     }
 
@@ -56,12 +56,12 @@ class StudentNotificationService
      */
     public function sendAbsentNotification(Attendance $attendance, User $student)
     {
-        $title = "Marked Absent";
-        $body = "You are marked absent for " . ($attendance->schedule->subject->name ?? 'class') . ". Please contact your teacher if this is a mistake.";
-        
+        $title = 'Marked Absent';
+        $body = 'You are marked absent for '.($attendance->schedule->subject->name ?? 'class').'. Please contact your teacher if this is a mistake.';
+
         $this->sendTostudent($student, 'absent_recorded', $title, $body, [
             'attendance_id' => $attendance->id,
-            'date' => $attendance->attendance_date
+            'date' => $attendance->attendance_date,
         ]);
 
         $this->checkAttendanceRate($student);
@@ -86,11 +86,11 @@ class StudentNotificationService
 
         if ($stats->total > 0) {
             $rate = ($stats->present / $stats->total) * 100;
-            
+
             if ($rate < 75) {
-                $this->sendToStudent($student, 'attendance_alert', 'Critical Attendance Alert', "Your attendance rate has dropped to " . round($rate, 1) . "%. Please improve your attendance.", [
+                $this->sendToStudent($student, 'attendance_alert', 'Critical Attendance Alert', 'Your attendance rate has dropped to '.round($rate, 1).'%. Please improve your attendance.', [
                     'rate' => $rate,
-                    'threshold' => 75
+                    'threshold' => 75,
                 ]);
             }
         }
@@ -103,7 +103,7 @@ class StudentNotificationService
     {
         // In a real app, this would use FCM or OneSignal
         Log::channel('single')->info("[Notification] To: {$user->id} | Type: {$type} | {$title} - {$body}", $data);
-        
+
         // Example Payload Structure
         /*
         {

@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * CRITICAL: HMAC Signature Verification Middleware
- * 
+ *
  * FIXES:
  * - Prevents fake webhook attacks
  * - Validates Midtrans signature before processing
@@ -36,7 +36,7 @@ class VerifyWebhookSignature
                 default => throw new \InvalidArgumentException("Unsupported webhook provider: {$provider}")
             };
 
-            if (!$isValid) {
+            if (! $isValid) {
                 // CRITICAL: Log security violation
                 Log::warning('Webhook signature verification failed', [
                     'provider' => $provider,
@@ -51,7 +51,7 @@ class VerifyWebhookSignature
 
                 return response()->json([
                     'error' => 'Invalid signature',
-                    'message' => 'Webhook signature verification failed'
+                    'message' => 'Webhook signature verification failed',
                 ], 401);
             }
 
@@ -73,7 +73,7 @@ class VerifyWebhookSignature
 
             return response()->json([
                 'error' => 'Signature verification failed',
-                'message' => 'Unable to verify webhook signature'
+                'message' => 'Unable to verify webhook signature',
             ], 500);
         }
     }
@@ -90,19 +90,20 @@ class VerifyWebhookSignature
         $receivedSignature = $request->input('signature_key');
 
         // CRITICAL: Validate required fields
-        if (!$serverKey || !$orderId || !$statusCode || !$grossAmount || !$receivedSignature) {
+        if (! $serverKey || ! $orderId || ! $statusCode || ! $grossAmount || ! $receivedSignature) {
             Log::warning('Midtrans webhook missing required fields', [
-                'has_server_key' => !empty($serverKey),
-                'has_order_id' => !empty($orderId),
-                'has_status_code' => !empty($statusCode),
-                'has_gross_amount' => !empty($grossAmount),
-                'has_signature' => !empty($receivedSignature),
+                'has_server_key' => ! empty($serverKey),
+                'has_order_id' => ! empty($orderId),
+                'has_status_code' => ! empty($statusCode),
+                'has_gross_amount' => ! empty($grossAmount),
+                'has_signature' => ! empty($receivedSignature),
             ]);
+
             return false;
         }
 
         // CRITICAL: Generate expected signature using Midtrans algorithm
-        $expectedSignature = hash('sha512', $orderId . $statusCode . $grossAmount . $serverKey);
+        $expectedSignature = hash('sha512', $orderId.$statusCode.$grossAmount.$serverKey);
 
         // CRITICAL: Use hash_equals to prevent timing attacks
         return hash_equals($expectedSignature, $receivedSignature);
@@ -117,13 +118,13 @@ class VerifyWebhookSignature
         $signature = $request->header('X-Hub-Signature-256');
         $payload = $request->getContent();
 
-        if (!$secret || !$signature || !$payload) {
+        if (! $secret || ! $signature || ! $payload) {
             return false;
         }
 
         // Remove 'sha256=' prefix
         $signature = str_replace('sha256=', '', $signature);
-        
+
         // Generate expected signature
         $expectedSignature = hash_hmac('sha256', $payload, $secret);
 
@@ -141,14 +142,14 @@ class VerifyWebhookSignature
         $payload = $request->getContent();
         $timestamp = time();
 
-        if (!$secret || !$signature || !$payload) {
+        if (! $secret || ! $signature || ! $payload) {
             return false;
         }
 
         // Parse signature header
         $elements = explode(',', $signature);
         $signatureData = [];
-        
+
         foreach ($elements as $element) {
             $parts = explode('=', $element, 2);
             if (count($parts) === 2) {
@@ -156,7 +157,7 @@ class VerifyWebhookSignature
             }
         }
 
-        if (!isset($signatureData['t']) || !isset($signatureData['v1'])) {
+        if (! isset($signatureData['t']) || ! isset($signatureData['v1'])) {
             return false;
         }
 
@@ -170,11 +171,12 @@ class VerifyWebhookSignature
                 'current_timestamp' => $timestamp,
                 'difference' => abs($timestamp - $webhookTimestamp),
             ]);
+
             return false;
         }
 
         // Generate expected signature
-        $signedPayload = $webhookTimestamp . '.' . $payload;
+        $signedPayload = $webhookTimestamp.'.'.$payload;
         $expectedSignature = hash_hmac('sha256', $signedPayload, $secret);
 
         // Use hash_equals to prevent timing attacks

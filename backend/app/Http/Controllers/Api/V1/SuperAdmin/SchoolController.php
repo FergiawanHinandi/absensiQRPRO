@@ -96,18 +96,18 @@ class SchoolController extends Controller
 
     /**
      * Delete school
-     * 
+     *
      * SECURITY FIX: Added audit log for school deletion
      * CRITICAL: This action should be rare and well-documented
      */
     public function destroy($id)
     {
         $school = School::findOrFail($id);
-        
+
         // Store school info before deletion for audit log
         $schoolName = $school->name;
         $schoolId = $school->id;
-        
+
         // SECURITY: Log BEFORE deletion (in case delete fails, we still have the attempt logged)
         \App\Models\AuditLog::create([
             'user_id' => auth()->id(),
@@ -128,7 +128,7 @@ class SchoolController extends Controller
                 ],
             ]),
         ]);
-        
+
         $school->delete();
 
         return response()->json(['success' => true, 'message' => 'Sekolah berhasil dihapus.']);
@@ -142,7 +142,7 @@ class SchoolController extends Controller
         $school = School::findOrFail($id);
         $school->is_active = true;
         $school->save();
-        
+
         \App\Models\AuditLog::create([
             'user_id' => auth()->id(),
             'school_id' => $school->id,
@@ -162,7 +162,7 @@ class SchoolController extends Controller
         $school = School::findOrFail($id);
         $school->is_active = false;
         $school->save();
-        
+
         \App\Models\AuditLog::create([
             'user_id' => auth()->id(),
             'school_id' => $school->id,
@@ -179,7 +179,7 @@ class SchoolController extends Controller
 
     /**
      * Impersonate School Admin
-     * 
+     *
      * SECURITY FIX: Token now has expiry and limited abilities
      */
     public function impersonate($id)
@@ -244,6 +244,7 @@ class SchoolController extends Controller
             ],
         ]);
     }
+
     public function usage($id)
     {
         $school = School::findOrFail($id);
@@ -251,7 +252,7 @@ class SchoolController extends Controller
         $currentTeachers = User::where('school_id', $id)
             ->whereIn('role_type', ['teacher', 'homeroom_teacher'])
             ->count();
-            
+
         // Use ClassModel class
         $currentClasses = \App\Models\ClassModel::where('school_id', $id)->count();
 
@@ -262,7 +263,7 @@ class SchoolController extends Controller
                 'current_classes' => $currentClasses,
                 'max_teachers' => $school->max_teachers,
                 'max_classes' => $school->max_classes,
-            ]
+            ],
         ]);
     }
 }

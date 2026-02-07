@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Services\GroupTruancyDetectionService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class GroupTruancyController extends Controller
 {
@@ -18,8 +18,6 @@ class GroupTruancyController extends Controller
 
     /**
      * Detect possible group truancy for classes in a given month.
-     * @param Request $request
-     * @return JsonResponse
      */
     public function detect(Request $request): JsonResponse
     {
@@ -32,7 +30,7 @@ class GroupTruancyController extends Controller
         return response()->json([
             'success' => true,
             'data' => $result,
-            'message' => 'Group truancy detection completed.'
+            'message' => 'Group truancy detection completed.',
         ]);
     }
 }

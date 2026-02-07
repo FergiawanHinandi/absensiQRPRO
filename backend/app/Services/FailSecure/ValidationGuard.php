@@ -25,24 +25,33 @@ use Throwable;
 class ValidationGuard
 {
     protected FailSecureService $failSecureService;
+
     protected ?SecurityPolicyService $policyService = null;
 
     /**
      * Validation result constants
      */
     public const RESULT_PASS = 'pass';
+
     public const RESULT_FAIL = 'fail';
+
     public const RESULT_DENY = 'deny'; // Used when uncertain
 
     /**
      * Validation types for logging
      */
     public const TYPE_LOCATION = 'location';
+
     public const TYPE_DEVICE = 'device';
+
     public const TYPE_POLICY = 'policy';
+
     public const TYPE_GEOFENCE = 'geofence';
+
     public const TYPE_QR = 'qr';
+
     public const TYPE_SCHEDULE = 'schedule';
+
     public const TYPE_STUDENT = 'student';
 
     public function __construct(FailSecureService $failSecureService)
@@ -58,6 +67,7 @@ class ValidationGuard
         if ($this->policyService === null) {
             $this->policyService = app(SecurityPolicyService::class);
         }
+
         return $this->policyService;
     }
 
@@ -66,10 +76,9 @@ class ValidationGuard
      *
      * FAIL-SECURE: If GPS data is missing or malformed, DENY
      *
-     * @param float|null $latitude
-     * @param float|null $longitude
-     * @param bool $required Whether location is required
+     * @param  bool  $required  Whether location is required
      * @return array ['valid' => bool, 'message' => string, 'data' => array]
+     *
      * @throws FailSecureException
      */
     public function validateLocation(
@@ -166,7 +175,7 @@ class ValidationGuard
             // FAIL-SECURE: Any exception during validation = DENY
             $this->logValidationFailure(
                 self::TYPE_LOCATION,
-                'Exception during location validation: ' . $e->getMessage(),
+                'Exception during location validation: '.$e->getMessage(),
                 ['exception' => get_class($e)]
             );
 
@@ -184,13 +193,12 @@ class ValidationGuard
      *
      * FAIL-SECURE: If geofence check fails, DENY
      *
-     * @param float $userLat User latitude
-     * @param float $userLng User longitude
-     * @param float $schoolLat School latitude
-     * @param float $schoolLng School longitude
-     * @param int|null $schoolId For school-specific radius
-     * @param string $userType 'student' or 'teacher'
-     * @return array
+     * @param  float  $userLat  User latitude
+     * @param  float  $userLng  User longitude
+     * @param  float  $schoolLat  School latitude
+     * @param  float  $schoolLng  School longitude
+     * @param  int|null  $schoolId  For school-specific radius
+     * @param  string  $userType  'student' or 'teacher'
      */
     public function validateGeofence(
         float $userLat,
@@ -203,12 +211,12 @@ class ValidationGuard
         try {
             // First validate the location data
             $locationCheck = $this->validateLocation($userLat, $userLng, true);
-            if (!$locationCheck['valid']) {
+            if (! $locationCheck['valid']) {
                 return $locationCheck;
             }
 
             $schoolLocationCheck = $this->validateLocation($schoolLat, $schoolLng, true);
-            if (!$schoolLocationCheck['valid']) {
+            if (! $schoolLocationCheck['valid']) {
                 $this->logValidationFailure(
                     self::TYPE_GEOFENCE,
                     'School coordinates invalid',
@@ -269,7 +277,7 @@ class ValidationGuard
             // FAIL-SECURE: Exception during geofence check = DENY
             $this->logValidationFailure(
                 self::TYPE_GEOFENCE,
-                'Exception during geofence validation: ' . $e->getMessage(),
+                'Exception during geofence validation: '.$e->getMessage(),
                 ['exception' => get_class($e)]
             );
 
@@ -287,10 +295,9 @@ class ValidationGuard
      *
      * FAIL-SECURE: If device validation service fails, DENY
      *
-     * @param string|null $deviceId Device identifier
-     * @param int $userId User ID
-     * @param callable|null $deviceCheckCallback Custom device check logic
-     * @return array
+     * @param  string|null  $deviceId  Device identifier
+     * @param  int  $userId  User ID
+     * @param  callable|null  $deviceCheckCallback  Custom device check logic
      */
     public function validateDevice(
         ?string $deviceId,
@@ -319,11 +326,11 @@ class ValidationGuard
                 try {
                     $isValid = $deviceCheckCallback($deviceId, $userId);
 
-                    if (!$isValid) {
+                    if (! $isValid) {
                         $this->logValidationFailure(
                             self::TYPE_DEVICE,
                             'Device not registered/approved',
-                            ['user_id' => $userId, 'device_id' => substr($deviceId, 0, 16) . '...']
+                            ['user_id' => $userId, 'device_id' => substr($deviceId, 0, 16).'...']
                         );
 
                         return [
@@ -338,7 +345,7 @@ class ValidationGuard
                         'valid' => true,
                         'result' => self::RESULT_PASS,
                         'message' => 'Device validated',
-                        'data' => ['device_id' => substr($deviceId, 0, 16) . '...'],
+                        'data' => ['device_id' => substr($deviceId, 0, 16).'...'],
                     ];
                 } catch (Throwable $e) {
                     // FAIL-SECURE: Device service error = DENY
@@ -364,13 +371,13 @@ class ValidationGuard
                 'valid' => true,
                 'result' => self::RESULT_PASS,
                 'message' => 'Device ID present',
-                'data' => ['device_id' => substr($deviceId, 0, 16) . '...'],
+                'data' => ['device_id' => substr($deviceId, 0, 16).'...'],
             ];
         } catch (Throwable $e) {
             // FAIL-SECURE: Any exception = DENY
             $this->logValidationFailure(
                 self::TYPE_DEVICE,
-                'Exception during device validation: ' . $e->getMessage(),
+                'Exception during device validation: '.$e->getMessage(),
                 ['user_id' => $userId, 'exception' => get_class($e)]
             );
 
@@ -388,9 +395,8 @@ class ValidationGuard
      *
      * FAIL-SECURE: If QR validation fails, DENY
      *
-     * @param string|null $qrToken QR token
-     * @param callable|null $qrValidationCallback Custom QR validation logic
-     * @return array
+     * @param  string|null  $qrToken  QR token
+     * @param  callable|null  $qrValidationCallback  Custom QR validation logic
      */
     public function validateQrCode(
         ?string $qrToken,
@@ -434,7 +440,7 @@ class ValidationGuard
                 try {
                     $result = $qrValidationCallback($qrToken);
 
-                    if ($result === false || (is_array($result) && !($result['valid'] ?? true))) {
+                    if ($result === false || (is_array($result) && ! ($result['valid'] ?? true))) {
                         $this->logValidationFailure(
                             self::TYPE_QR,
                             'QR validation failed',
@@ -459,7 +465,7 @@ class ValidationGuard
                     // FAIL-SECURE: QR service error = DENY
                     $this->logValidationFailure(
                         self::TYPE_QR,
-                        'QR validation service error: ' . $e->getMessage(),
+                        'QR validation service error: '.$e->getMessage(),
                         ['exception' => get_class($e)]
                     );
 
@@ -483,7 +489,7 @@ class ValidationGuard
             // FAIL-SECURE: Any exception = DENY
             $this->logValidationFailure(
                 self::TYPE_QR,
-                'Exception during QR validation: ' . $e->getMessage(),
+                'Exception during QR validation: '.$e->getMessage(),
                 ['exception' => get_class($e)]
             );
 
@@ -499,8 +505,8 @@ class ValidationGuard
     /**
      * Validate policy access with fail-secure fallback
      *
-     * @param string $key Policy key
-     * @param int|null $schoolId School ID
+     * @param  string  $key  Policy key
+     * @param  int|null  $schoolId  School ID
      * @return mixed Policy value (uses safe defaults on failure)
      */
     public function getPolicyWithFallback(string $key, ?int $schoolId = null): mixed
@@ -600,7 +606,7 @@ class ValidationGuard
      *
      * FAIL-SECURE: If ANY validation fails, the overall result is FAIL/DENY
      *
-     * @param array $validations Array of validation results
+     * @param  array  $validations  Array of validation results
      * @return array Combined validation result
      */
     public function combineValidations(array $validations): array
@@ -610,7 +616,7 @@ class ValidationGuard
         $data = [];
 
         foreach ($validations as $name => $result) {
-            if (!($result['valid'] ?? false)) {
+            if (! ($result['valid'] ?? false)) {
                 $allValid = false;
                 $messages[] = $result['message'] ?? "Validation {$name} failed";
             }
@@ -628,9 +634,9 @@ class ValidationGuard
     /**
      * Create a fail-secure validation wrapper
      *
-     * @param callable $validation The validation to run
-     * @param string $failMessage Message if validation fails
-     * @param string $type Validation type for logging
+     * @param  callable  $validation  The validation to run
+     * @param  string  $failMessage  Message if validation fails
+     * @param  string  $type  Validation type for logging
      * @return array Validation result
      */
     public function wrapValidation(
@@ -665,7 +671,7 @@ class ValidationGuard
             // FAIL-SECURE: Exception = DENY
             $this->logValidationFailure(
                 $type,
-                'Validation exception: ' . $e->getMessage(),
+                'Validation exception: '.$e->getMessage(),
                 ['exception' => get_class($e)]
             );
 

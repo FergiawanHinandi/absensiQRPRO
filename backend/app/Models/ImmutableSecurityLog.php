@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Immutable Security Log Model
- * 
+ *
  * This model represents tamper-proof audit trail entries with hash chaining.
  * Records cannot be updated or deleted - only inserted.
- * 
+ *
  * @property int $id
  * @property string $event_type
  * @property int|null $user_id
@@ -68,26 +68,47 @@ class ImmutableSecurityLog extends Model
      * Event type constants
      */
     public const TYPE_GENESIS_BLOCK = 'GENESIS_BLOCK';
+
     public const TYPE_GEOFENCE_VIOLATION = 'GEOFENCE_VIOLATION';
+
     public const TYPE_DEVICE_MISMATCH = 'DEVICE_MISMATCH';
+
     public const TYPE_QR_REPLAY_ATTEMPT = 'QR_REPLAY_ATTEMPT';
+
     public const TYPE_UNAUTHORIZED_ACCESS = 'UNAUTHORIZED_ACCESS';
+
     public const TYPE_BEHAVIOR_ANOMALY = 'BEHAVIOR_ANOMALY';
+
     public const TYPE_INVESTIGATION_REPORT = 'INVESTIGATION_REPORT_GENERATED';
+
     public const TYPE_SECURITY_DASHBOARD_ACCESS = 'SECURITY_DASHBOARD_ACCESS';
+
     public const TYPE_LOGIN_ATTEMPT = 'LOGIN_ATTEMPT';
+
     public const TYPE_FAILED_AUTH = 'FAILED_AUTH';
+
     public const TYPE_RATE_LIMIT_BREACH = 'RATE_LIMIT_BREACH';
+
     public const TYPE_CROSS_SCHOOL_ATTEMPT = 'CROSS_SCHOOL_ATTEMPT';
+
     public const TYPE_ADMIN_ACTION = 'ADMIN_ACTION';
+
     public const TYPE_CONFIG_CHANGE = 'CONFIG_CHANGE';
+
     public const TYPE_INTEGRITY_CHECK = 'INTEGRITY_CHECK';
+
     public const TYPE_TAMPERING_DETECTED = 'TAMPERING_DETECTED';
+
     public const TYPE_SECURITY_EVENT = 'SECURITY_EVENT';
+
     public const TYPE_FAILED_ATTEMPT_SPIKE = 'FAILED_ATTEMPT_SPIKE';
+
     public const TYPE_RACE_CONDITION_BLOCKED = 'RACE_CONDITION_BLOCKED';
+
     public const TYPE_IMPOSSIBLE_TRAVEL = 'IMPOSSIBLE_TRAVEL';
+
     public const TYPE_BACKUP_FAILURE = 'BACKUP_FAILURE';
+
     public const TYPE_LOG_TAMPERING = 'LOG_TAMPERING_DETECTED';
 
     /**
@@ -103,7 +124,7 @@ class ImmutableSecurityLog extends Model
                 'record_id' => $model->id,
                 'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 10),
             ]);
-            
+
             throw new \RuntimeException(
                 'ImmutableSecurityLog records cannot be updated. This is a security violation attempt.'
             );
@@ -115,7 +136,7 @@ class ImmutableSecurityLog extends Model
                 'record_id' => $model->id,
                 'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 10),
             ]);
-            
+
             throw new \RuntimeException(
                 'ImmutableSecurityLog records cannot be deleted. This is a security violation attempt.'
             );
@@ -227,7 +248,7 @@ class ImmutableSecurityLog extends Model
             return $this->previous_hash === str_repeat('0', 64);
         }
 
-        if (!$previousRecord) {
+        if (! $previousRecord) {
             return false;
         }
 
@@ -252,6 +273,7 @@ class ImmutableSecurityLog extends Model
     public static function getNextSequenceNumber(): int
     {
         $last = static::getLastRecord();
+
         return $last ? $last->sequence_number + 1 : 0;
     }
 

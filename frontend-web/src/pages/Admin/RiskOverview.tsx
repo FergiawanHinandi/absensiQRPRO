@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/Button';
 import { apiClient } from '../../lib/api';
-import { AlertTriangle, Users, TrendingUp, Download, Eye } from 'lucide-react';
+import { AlertTriangle, Users, TrendingUp, Download } from 'lucide-react';
 
 interface RiskData {
   total_students_by_risk: {
@@ -117,7 +115,7 @@ const RiskOverview: React.FC = () => {
         format,
         include_details: true
       });
-      
+
       // Handle download
       const downloadUrl = response.data.data.download_url;
       window.open(downloadUrl, '_blank');

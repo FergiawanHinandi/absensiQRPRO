@@ -14,10 +14,10 @@ class LevelSystemTest extends TestCase
     {
         $user = new User(['total_points' => 100]);
         $this->assertEquals('Bronze', $user->level);
-        
+
         $user = new User(['total_points' => 0]);
         $this->assertEquals('Bronze', $user->level);
-        
+
         $user = new User(['total_points' => 200]);
         $this->assertEquals('Bronze', $user->level);
     }
@@ -26,7 +26,7 @@ class LevelSystemTest extends TestCase
     {
         $user = new User(['total_points' => 201]);
         $this->assertEquals('Silver', $user->level);
-        
+
         $user = new User(['total_points' => 500]);
         $this->assertEquals('Silver', $user->level);
     }
@@ -35,7 +35,7 @@ class LevelSystemTest extends TestCase
     {
         $user = new User(['total_points' => 501]);
         $this->assertEquals('Gold', $user->level);
-        
+
         $user = new User(['total_points' => 1000]);
         $this->assertEquals('Gold', $user->level);
     }
@@ -44,7 +44,7 @@ class LevelSystemTest extends TestCase
     {
         $user = new User(['total_points' => 1001]);
         $this->assertEquals('Platinum', $user->level);
-        
+
         $user = new User(['total_points' => 5000]);
         $this->assertEquals('Platinum', $user->level);
     }

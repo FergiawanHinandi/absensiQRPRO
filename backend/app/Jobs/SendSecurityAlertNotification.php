@@ -3,8 +3,6 @@
 namespace App\Jobs;
 
 use App\Models\SecurityAlert;
-use App\Models\School;
-use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -15,11 +13,11 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Send Security Alert Notification
- * 
+ *
  * Dispatches security alert notifications to:
  * - Telegram Bot API
  * - Slack Webhook
- * 
+ *
  * Only processes HIGH and CRITICAL severity alerts.
  */
 class SendSecurityAlertNotification implements ShouldQueue
@@ -68,7 +66,7 @@ class SendSecurityAlertNotification implements ShouldQueue
         // Mark as notified if at least one channel succeeded
         if ($telegramSent || $slackSent) {
             $this->alert->markNotificationSent();
-            
+
             Log::channel('security')->info('Security alert notification sent', [
                 'alert_id' => $this->alert->id,
                 'telegram' => $telegramSent,
@@ -96,12 +94,12 @@ class SendSecurityAlertNotification implements ShouldQueue
 
         // Plain text for Telegram
         $text = "{$emoji} SECURITY ALERT ({$severityLabel})\n\n";
-        $text .= "📍 School: " . ($school?->name ?? 'N/A') . "\n";
-        $text .= "👤 User: " . ($user?->name ?? 'N/A') . "\n";
+        $text .= '📍 School: '.($school?->name ?? 'N/A')."\n";
+        $text .= '👤 User: '.($user?->name ?? 'N/A')."\n";
         $text .= "⚠️ Event: {$eventTitle}\n";
         $text .= "📝 Details: {$alert->description}\n";
-        $text .= "🕐 Time: " . $alert->created_at->format('H:i d M Y') . "\n";
-        
+        $text .= '🕐 Time: '.$alert->created_at->format('H:i d M Y')."\n";
+
         if ($alert->ip_address) {
             $text .= "🌐 IP: {$alert->ip_address}\n";
         }
@@ -121,11 +119,11 @@ class SendSecurityAlertNotification implements ShouldQueue
                 'fields' => [
                     [
                         'type' => 'mrkdwn',
-                        'text' => "*School:*\n" . ($school?->name ?? 'N/A'),
+                        'text' => "*School:*\n".($school?->name ?? 'N/A'),
                     ],
                     [
                         'type' => 'mrkdwn',
-                        'text' => "*User:*\n" . ($user?->name ?? 'N/A'),
+                        'text' => "*User:*\n".($user?->name ?? 'N/A'),
                     ],
                     [
                         'type' => 'mrkdwn',
@@ -133,7 +131,7 @@ class SendSecurityAlertNotification implements ShouldQueue
                     ],
                     [
                         'type' => 'mrkdwn',
-                        'text' => "*Time:*\n" . $alert->created_at->format('H:i d M Y'),
+                        'text' => "*Time:*\n".$alert->created_at->format('H:i d M Y'),
                     ],
                 ],
             ],
@@ -169,8 +167,8 @@ class SendSecurityAlertNotification implements ShouldQueue
      */
     private function shouldSendTelegram(): bool
     {
-        return !empty(config('services.telegram.bot_token'))
-            && !empty(config('services.telegram.security_chat_id'));
+        return ! empty(config('services.telegram.bot_token'))
+            && ! empty(config('services.telegram.security_chat_id'));
     }
 
     /**
@@ -178,7 +176,7 @@ class SendSecurityAlertNotification implements ShouldQueue
      */
     private function shouldSendSlack(): bool
     {
-        return !empty(config('services.slack.security_webhook_url'));
+        return ! empty(config('services.slack.security_webhook_url'));
     }
 
     /**
@@ -212,6 +210,7 @@ class SendSecurityAlertNotification implements ShouldQueue
             Log::channel('security')->error('Telegram notification exception', [
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -244,6 +243,7 @@ class SendSecurityAlertNotification implements ShouldQueue
             Log::channel('security')->error('Slack notification exception', [
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }

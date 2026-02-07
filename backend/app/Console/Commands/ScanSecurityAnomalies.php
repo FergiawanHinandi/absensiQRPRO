@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Scheduled Anomaly Scan Command
- * 
+ *
  * Runs every 5 minutes to detect suspicious patterns:
  * - Same user login from distant locations
  * - High failed scan count in a class
@@ -84,23 +84,23 @@ class ScanSecurityAnomalies extends Command
 
         foreach ($recentAttendances as $attendance) {
             $teacherId = $attendance->teacher_id;
-            
+
             if (isset($teacherLastLocations[$teacherId])) {
                 $last = $teacherLastLocations[$teacherId];
                 $timeDiff = $attendance->created_at->diffInMinutes($last['time']);
-                
+
                 if ($timeDiff <= 30 && $timeDiff > 0) {
                     $distance = $this->calculateDistance(
                         $last['lat'], $last['lng'],
                         $attendance->lat_in, $attendance->lng_in
                     );
-                    
+
                     // If more than 5km in 30 minutes → suspicious
                     if ($distance > 5000) {
                         $count++;
                         $this->warn("    Found impossible travel: Teacher {$teacherId}, {$distance}m in {$timeDiff} min");
-                        
-                        if (!$isDryRun) {
+
+                        if (! $isDryRun) {
                             $teacher = User::find($teacherId);
                             if ($teacher) {
                                 $this->alertService->alertImpossibleTravel(
@@ -118,7 +118,7 @@ class ScanSecurityAnomalies extends Command
                     }
                 }
             }
-            
+
             $teacherLastLocations[$teacherId] = [
                 'lat' => $attendance->lat_in,
                 'lng' => $attendance->lng_in,
@@ -156,8 +156,8 @@ class ScanSecurityAnomalies extends Command
         foreach ($failedScans as $spike) {
             $count++;
             $this->warn("    Found failed scan spike: School {$spike->school_id}, {$spike->fail_count} failures");
-            
-            if (!$isDryRun) {
+
+            if (! $isDryRun) {
                 $this->alertService->alertFailedAttemptSpike(
                     null,
                     $spike->school_id,
@@ -195,9 +195,9 @@ class ScanSecurityAnomalies extends Command
             // If today's count is more than 2x the average → spike
             if ($avgAttendance > 0 && $record->today_count > ($avgAttendance * 2)) {
                 $count++;
-                $this->warn("    Found attendance spike: Schedule {$record->schedule_id}, {$record->today_count} (avg: " . round($avgAttendance) . ")");
-                
-                if (!$isDryRun) {
+                $this->warn("    Found attendance spike: Schedule {$record->schedule_id}, {$record->today_count} (avg: ".round($avgAttendance).')');
+
+                if (! $isDryRun) {
                     $this->alertService->alertAttendanceSpike(
                         $record->school_id,
                         $record->schedule_id, // Using schedule_id instead of class_id
@@ -232,8 +232,8 @@ class ScanSecurityAnomalies extends Command
             if ($checkin->distance_in > 200) { // Flag if > 200m
                 $count++;
                 $this->warn("    Found location anomaly: Teacher {$checkin->teacher_id}, {$checkin->distance_in}m from school");
-                
-                if (!$isDryRun && $checkin->teacher) {
+
+                if (! $isDryRun && $checkin->teacher) {
                     // This is already handled by real-time check, but log for pattern analysis
                     Log::channel('security')->info('Teacher location anomaly detected in scan', [
                         'teacher_id' => $checkin->teacher_id,

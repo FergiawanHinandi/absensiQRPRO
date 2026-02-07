@@ -50,7 +50,7 @@ final class AttendanceResult
      */
     private function getAttendanceData(): array
     {
-        if (!$this->attendance) {
+        if (! $this->attendance) {
             return [];
         }
 
@@ -122,7 +122,7 @@ final class AttendanceResult
      */
     public function getHttpStatusCode(): int
     {
-        if (!$this->success) {
+        if (! $this->success) {
             return 400;
         }
 

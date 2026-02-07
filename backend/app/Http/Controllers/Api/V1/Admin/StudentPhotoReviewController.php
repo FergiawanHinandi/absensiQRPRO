@@ -4,11 +4,10 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use App\Services\FaceRecognitionService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class StudentPhotoReviewController extends Controller
 {
@@ -26,7 +25,7 @@ class StudentPhotoReviewController extends Controller
             ->where('role_type', 'student')
             ->whereIn('photo_review_status', ['pending', 'rejected'])
             ->get();
-        $result = $students->map(function($s) {
+        $result = $students->map(function ($s) {
             return [
                 'student_id' => $s->id,
                 'name' => $s->name,
@@ -35,6 +34,7 @@ class StudentPhotoReviewController extends Controller
                 'review_status' => $s->photo_review_status,
             ];
         });
+
         return response()->json(['success' => true, 'data' => $result]);
     }
 
@@ -51,6 +51,7 @@ class StudentPhotoReviewController extends Controller
             'student_id' => $student->id,
             'timestamp' => now(),
         ]);
+
         return response()->json(['success' => true]);
     }
 
@@ -67,6 +68,7 @@ class StudentPhotoReviewController extends Controller
             'student_id' => $student->id,
             'timestamp' => now(),
         ]);
+
         return response()->json(['success' => true]);
     }
 
@@ -76,9 +78,12 @@ class StudentPhotoReviewController extends Controller
         $student = User::where('id', $studentId)->where('role_type', 'student')->firstOrFail();
         $request->validate(['photo' => 'required|image|mimes:jpg,jpeg,png|max:2048']);
         $file = $request->file('photo');
-        $path = 'student-photos/' . $student->id . '.jpg';
+        $path = 'student-photos/'.$student->id.'.jpg';
         $img = \Intervention\Image\ImageManagerStatic::make($file->getRealPath())
-            ->resize(400, 533, function ($c) { $c->aspectRatio(); $c->upsize(); })
+            ->resize(400, 533, function ($c) {
+                $c->aspectRatio();
+                $c->upsize();
+            })
             ->encode('jpg', 80);
         Storage::disk('public')->put($path, $img);
         $student->photo_path = $path;
@@ -104,6 +109,7 @@ class StudentPhotoReviewController extends Controller
             'student_id' => $student->id,
             'timestamp' => now(),
         ]);
+
         return response()->json(['success' => true]);
     }
 
@@ -116,7 +122,13 @@ class StudentPhotoReviewController extends Controller
         $approved = 0;
         $skipped = [];
         $now = now();
-        $students = User::whereIn('id', $ids)->where('role_type', 'student')->get();
+        
+        // CRITICAL FIX: Add school_id filter to prevent cross-school access
+        $students = User::whereIn('id', $ids)
+            ->where('role_type', 'student')
+            ->where('school_id', $request->user()->school_id)  // SECURITY: School isolation
+            ->get();
+            
         foreach ($students as $student) {
             if (
                 $student->photo_review_status !== 'pending' ||
@@ -125,8 +137,9 @@ class StudentPhotoReviewController extends Controller
             ) {
                 $skipped[] = [
                     'student_id' => $student->id,
-                    'reason' => $student->photo_review_status !== 'pending' ? 'not_pending' : (($student->photo_duplicate_flag ?? false) ? 'duplicate_face_detected' : 'no_face_detected')
+                    'reason' => $student->photo_review_status !== 'pending' ? 'not_pending' : (($student->photo_duplicate_flag ?? false) ? 'duplicate_face_detected' : 'no_face_detected'),
                 ];
+
                 continue;
             }
             $student->photo_review_status = 'approved';
@@ -141,6 +154,7 @@ class StudentPhotoReviewController extends Controller
             'count' => $approved,
             'timestamp' => $now,
         ]);
+
         return response()->json([
             'approved_count' => $approved,
             'rejected_count' => 0,
@@ -156,7 +170,13 @@ class StudentPhotoReviewController extends Controller
         $adminId = $request->user()->id;
         $rejected = 0;
         $now = now();
-        $students = User::whereIn('id', $ids)->where('role_type', 'student')->get();
+        
+        // CRITICAL FIX: Add school_id filter to prevent cross-school access
+        $students = User::whereIn('id', $ids)
+            ->where('role_type', 'student')
+            ->where('school_id', $request->user()->school_id)  // SECURITY: School isolation
+            ->get();
+            
         foreach ($students as $student) {
             $student->photo_review_status = 'rejected';
             $student->photo_reviewed_at = $now;
@@ -170,6 +190,7 @@ class StudentPhotoReviewController extends Controller
             'count' => $rejected,
             'timestamp' => $now,
         ]);
+
         return response()->json([
             'approved_count' => 0,
             'rejected_count' => $rejected,

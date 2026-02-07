@@ -203,13 +203,13 @@ class SchoolController extends Controller
     {
         $user = $request->user();
         $schoolId = $user->school_id;
-        
+
         // First check existence without lock
         $year = DB::table('academic_years')->where('school_id', $schoolId)->where('id', $id)->first();
         if (! $year) {
             return response()->json(['success' => false, 'message' => 'Tahun ajaran tidak ditemukan'], 404);
         }
-        
+
         DB::beginTransaction();
         try {
             // SECURITY FIX: Use row-level locking to prevent race conditions
@@ -218,7 +218,7 @@ class SchoolController extends Controller
                 ->where('school_id', $schoolId)
                 ->lockForUpdate()
                 ->get();
-            
+
             // Now safely deactivate all and activate the selected one
             DB::table('academic_years')->where('school_id', $schoolId)->update(['is_active' => false]);
             DB::table('academic_years')->where('id', $id)->update(['is_active' => true, 'updated_at' => now()]);

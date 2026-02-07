@@ -3,11 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\SecurityAlert;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 /**
  * TEMPORARY FIX: Disable security alerts to prevent login errors
@@ -42,7 +39,7 @@ class SecurityDashboardController extends Controller
     {
         $range = $request->get('range', '7d');
         $days = $this->parseDays($range);
-        
+
         $filledData = [];
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = now()->subDays($i)->format('Y-m-d');

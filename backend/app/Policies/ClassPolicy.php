@@ -36,7 +36,7 @@ class ClassPolicy
         return in_array($user->role_type, [
             'admin',
             'school_admin',
-            'principal'
+            'principal',
         ]);
     }
 
@@ -49,7 +49,7 @@ class ClassPolicy
             'admin',
             'school_admin',
             'principal',
-            'super_admin'
+            'super_admin',
         ]);
     }
 
@@ -72,7 +72,7 @@ class ClassPolicy
         return in_array($user->role_type, [
             'admin',
             'school_admin',
-            'principal'
+            'principal',
         ]);
     }
 
@@ -95,7 +95,7 @@ class ClassPolicy
         return in_array($user->role_type, [
             'admin',
             'school_admin',
-            'super_admin'
+            'super_admin',
         ]);
     }
 
@@ -111,7 +111,7 @@ class ClassPolicy
             'admin',
             'school_admin',
             'principal',
-            'super_admin'
+            'super_admin',
         ]);
     }
 
@@ -121,7 +121,7 @@ class ClassPolicy
     private function isSuperAdmin(User $user): bool
     {
         $superAdminRole = config('permission.super_admin_role', 'super_admin');
-        
+
         if (method_exists($user, 'hasRole') && $user->hasRole($superAdminRole)) {
             return true;
         }

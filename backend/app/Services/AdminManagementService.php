@@ -541,7 +541,7 @@ final class AdminManagementService
     public function deleteTeacherAssignment(User $user, int $assignmentId): void
     {
         $schoolId = $user->school_id;
-        
+
         // SECURITY: Atomic delete with school_id validation to prevent TOCTOU vulnerability
         $deleted = DB::table('teacher_subjects')
             ->join('classes', 'teacher_subjects.class_id', '=', 'classes.id')

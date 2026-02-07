@@ -56,6 +56,7 @@ class SchoolScope implements Scope
         // BYPASS 1: Scope explicitly disabled
         if (self::$disabled) {
             $this->logBypass($model, 'scope_disabled');
+
             return;
         }
 
@@ -63,22 +64,25 @@ class SchoolScope implements Scope
         if ($this->isCliContext()) {
             // In CLI, we may have explicit school context set
             if (self::$explicitSchoolId !== null) {
-                $builder->where($model->getTable() . '.school_id', self::$explicitSchoolId);
+                $builder->where($model->getTable().'.school_id', self::$explicitSchoolId);
+
                 return;
             }
-            
+
             $this->logBypass($model, 'cli_context');
+
             return;
         }
 
         // BYPASS 3: Explicit school context set (for cross-school operations)
         if (self::$explicitSchoolId !== null) {
-            $builder->where($model->getTable() . '.school_id', self::$explicitSchoolId);
+            $builder->where($model->getTable().'.school_id', self::$explicitSchoolId);
+
             return;
         }
 
         // BYPASS 4: No authenticated user
-        if (!Auth::hasUser()) {
+        if (! Auth::hasUser()) {
             // For unauthenticated requests, don't apply scope
             // (route middleware should handle authentication)
             return;
@@ -92,12 +96,13 @@ class SchoolScope implements Scope
                 'user_id' => $user->id,
                 'email' => $user->email ?? 'unknown',
             ]);
+
             return;
         }
 
         // APPLY SCOPE: Filter by user's school_id
         if ($user->school_id) {
-            $builder->where($model->getTable() . '.school_id', $user->school_id);
+            $builder->where($model->getTable().'.school_id', $user->school_id);
         } else {
             // User has no school_id - this shouldn't happen for normal users
             // Log warning and return empty result for safety
@@ -106,7 +111,7 @@ class SchoolScope implements Scope
                 'model' => get_class($model),
                 'role_type' => $user->role_type ?? 'unknown',
             ]);
-            
+
             // Force empty result by impossible condition
             $builder->whereRaw('1 = 0');
         }
@@ -157,7 +162,7 @@ class SchoolScope implements Scope
     private function logBypass(Model $model, string $reason, array $context = []): void
     {
         // Only log in production for performance
-        if (!app()->isProduction()) {
+        if (! app()->isProduction()) {
             return;
         }
 
@@ -183,7 +188,7 @@ class SchoolScope implements Scope
      *   $attendances = Attendance::where('status', 'present')->get();
      *   SchoolScope::clearSchool();
      *
-     * @param int $schoolId School ID to filter by
+     * @param  int  $schoolId  School ID to filter by
      */
     public static function forSchool(int $schoolId): void
     {
@@ -206,16 +211,17 @@ class SchoolScope implements Scope
      *       return Attendance::count();
      *   });
      *
-     * @param int $schoolId School ID
-     * @param callable $callback Code to execute
+     * @param  int  $schoolId  School ID
+     * @param  callable  $callback  Code to execute
      * @return mixed Result of callback
      */
     public static function withSchool(int $schoolId, callable $callback): mixed
     {
         $previousSchoolId = self::$explicitSchoolId;
-        
+
         try {
             self::$explicitSchoolId = $schoolId;
+
             return $callback();
         } finally {
             self::$explicitSchoolId = $previousSchoolId;
@@ -230,18 +236,19 @@ class SchoolScope implements Scope
      * - System-wide analytics
      * - Emergency debugging
      *
-     * @param callable $callback Code to execute without scope
+     * @param  callable  $callback  Code to execute without scope
      * @return mixed Result of callback
      */
     public static function withoutScope(callable $callback): mixed
     {
         $previousState = self::$disabled;
-        
+
         try {
             self::$disabled = true;
             Log::channel('security_json')->warning('SchoolScope COMPLETELY DISABLED', [
                 'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3),
             ]);
+
             return $callback();
         } finally {
             self::$disabled = $previousState;
@@ -256,4 +263,3 @@ class SchoolScope implements Scope
         return self::$explicitSchoolId;
     }
 }
-

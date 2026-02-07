@@ -99,4 +99,17 @@ class CalculateAttendanceSummary implements ShouldQueue
             array_merge($data, ['class_id' => $classId])
         );
     }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('CalculateAttendanceSummary job failed', [
+            'job' => self::class,
+            'target_date' => $this->targetDate->toDateString(),
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString(),
+        ]);
+    }
 }

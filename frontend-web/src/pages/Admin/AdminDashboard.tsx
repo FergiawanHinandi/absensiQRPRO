@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import Loading from '../../components/common/Loading';
-import ErrorMessage from '../../components/common/ErrorMessage';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion, type Variants } from 'framer-motion';
 import {
     Users,
     CheckCircle2,
@@ -10,16 +10,21 @@ import {
     FileEdit,
     UserX,
     TrendingUp,
-    Shield
+    Shield,
+    AlertCircle,
+    Calendar,
+    ArrowRight
 } from 'lucide-react';
 import {
     useDailyReport,
     useClassAttendanceSummary,
     useTeacherAbsence,
     useLateAlpha,
-    useAttendanceAnomalies,
 } from '../../modules/admin/hooks';
+import { useRiskOverview } from '../../modules/admin/hooks/useAdminService';
 import { AnnouncementWidget } from '../../components/AnnouncementWidget';
+import Loading from '../../components/common/Loading';
+import ErrorMessage from '../../components/common/ErrorMessage';
 import {
     BarChart,
     Bar,
@@ -33,33 +38,39 @@ import {
     Cell,
     Legend
 } from 'recharts';
-import { useNavigate } from 'react-router-dom';
 
 const AdminDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const selectedDate = new Date().toISOString().split('T')[0];
+    const [loading, setLoading] = useState(true);
 
     // Fetch Data Hooks
-    const { data: stats, isLoading, error, refetch } = useDailyReport(selectedDate);
+    const { data: stats, isLoading: statsLoading, error, refetch } = useDailyReport(selectedDate);
     const { data: classSummary } = useClassAttendanceSummary(selectedDate);
     const { data: teacherAbsent } = useTeacherAbsence(selectedDate);
     const { data: lateAlpha } = useLateAlpha(selectedDate);
-    const { data: anomalies } = useAttendanceAnomalies(selectedDate);
+    const { data: riskData } = useRiskOverview();
+
+    useEffect(() => {
+        if (!statsLoading) {
+            const timer = setTimeout(() => setLoading(false), 800);
+            return () => clearTimeout(timer);
+        }
+    }, [statsLoading]);
 
     // Prepare Charts Data
     const attendancePieData = stats ? [
-        { name: 'Hadir', value: stats.present, color: '#22c55e' }, // Green
-        { name: 'Terlambat', value: stats.late, color: '#eab308' }, // Yellow
-        { name: 'Sakit/Izin', value: (stats.sick + stats.permission), color: '#3b82f6' }, // Blue
-        { name: 'Alpa', value: stats.alpha, color: '#ef4444' }, // Red
+        { name: 'Hadir', value: stats.present, color: '#10B981' }, // Emerald-500
+        { name: 'Terlambat', value: stats.late, color: '#F59E0B' }, // Amber-500
+        { name: 'Sakit/Izin', value: (stats.sick + stats.permission), color: '#3B82F6' }, // Blue-500
+        { name: 'Alpa', value: stats.alpha, color: '#EF4444' }, // Red-500
     ] : [];
 
-    // Filter class data for chart (Top 10 classes with lowest attendance maybe? Or just all if few)
-    // For visualization let's show top 10 lowest presence to alert admin
+    // Filter class data for chart
     const classChartData = classSummary?.classes
-        ?.slice() // Copy array before sorting
-        .sort((a, b) => (parseInt(a?.present?.toString() || '0') - parseInt(b?.present?.toString() || '0'))) // Safe Sort
-        .slice(0, 10)
+        ?.slice()
+        .sort((a, b) => (parseInt(a?.present?.toString() || '0') - parseInt(b?.present?.toString() || '0')))
+        .slice(0, 7)
         .map(c => ({
             name: c.class_name,
             Hadir: parseInt(c.present?.toString() || '0'),
@@ -67,7 +78,7 @@ const AdminDashboard: React.FC = () => {
             Terlambat: parseInt(c.late?.toString() || '0')
         })) || [];
 
-    if (isLoading && !stats) return <Loading text="Menyiapkan Dashboard Sekolah..." />;
+    if (loading || (statsLoading && !stats)) return <Loading text="Memuat Dashboard..." />;
 
     if (error) {
         return (
@@ -77,243 +88,281 @@ const AdminDashboard: React.FC = () => {
         );
     }
 
-    return (
-        <div className="min-h-screen bg-slate-50 pb-12 font-sans text-slate-900">
-            {/* Header Section */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm backdrop-blur-md bg-white/90">
-                <div className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Dashboard Sekolah</h1>
-                        <p className="text-sm text-slate-500">Ringkasan aktivitas akademik hari ini.</p>
-                    </div>
+    const containerVariants: Variants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
 
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => navigate('/admin/school-profile')} className="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100">Profil Sekolah</button>
-                        <button onClick={() => navigate('/admin/active-academic-year')} className="px-4 py-2 rounded-lg bg-green-50 text-green-700 font-semibold hover:bg-green-100">Tahun Ajaran Aktif</button>
-                    </div>
+    const itemVariants: Variants = {
+        hidden: { y: 20, opacity: 0 },
+        visible: {
+            y: 0,
+            opacity: 1,
+            transition: {
+                type: "spring",
+                stiffness: 100
+            }
+        }
+    };
+
+    return (
+        <motion.div
+            className="pb-12 font-sans text-slate-900"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+        >
+            {/* Header Section */}
+            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                        Dashboard Sekolah
+                        <span className="px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-bold shadow-sm shadow-blue-500/30">
+                            ADMIN PANEL
+                        </span>
+                    </h1>
+                    <p className="text-slate-500 mt-2 text-lg">Ringkasan aktivitas akademik & operasional hari ini.</p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button onClick={() => navigate('/admin/school-profile')}
+                        className="px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all flex items-center gap-2">
+                        <Shield size={18} /> Profil Sekolah
+                    </button>
+                    <button onClick={() => navigate('/admin/active-academic-year')}
+                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:shadow-lg hover:shadow-blue-500/30 transition-all flex items-center gap-2">
+                        <Calendar size={18} /> Tahun Ajaran Aktif
+                    </button>
                 </div>
             </div>
 
-            <div className="p-6 max-w-[1600px] mx-auto space-y-6">
-
-                {/* 1. Quick Stats (Hero Cards) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                <Users className="w-6 h-6" />
-                            </div>
-                            <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-1 rounded-full">Total</span>
-                        </div>
-                        <div className="flex items-end justify-between">
-                            <div>
-                                <h3 className="text-3xl font-bold text-slate-900">{stats?.total_students}</h3>
-                                <p className="text-sm text-slate-500 font-medium">Siswa Terdaftar</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
-                        <div className="flex items-center justify-between mb-4 relative z-10">
-                            <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-                                <CheckCircle2 className="w-6 h-6" />
-                            </div>
-                            <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                                {stats?.total_students ? Math.round((stats.present / stats.total_students) * 100) : 0}% Rate
-                            </span>
+            {/* 1. Quick Stats (Hero Cards) */}
+            <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8" variants={itemVariants}>
+                {[
+                    { title: "Siswa Terdaftar", value: stats?.total_students, bg: "from-blue-500 to-blue-600", icon: Users, shadow: "shadow-blue-200" },
+                    { title: "Presentase Hadir", value: `${stats?.total_students ? Math.round((stats.present / stats.total_students) * 100) : 0}%`, bg: "from-emerald-500 to-emerald-600", icon: CheckCircle2, shadow: "shadow-emerald-200" },
+                    { title: "Siswa Terlambat", value: stats?.late, bg: "from-amber-400 to-amber-500", icon: Clock, shadow: "shadow-amber-200" },
+                    { title: "Tanpa Keterangan", value: stats?.alpha, bg: "from-red-500 to-red-600", icon: AlertTriangle, shadow: "shadow-red-200" },
+                    { title: "Risiko Tinggi", value: riskData?.high_risk_count || 0, bg: "from-orange-500 to-orange-600", icon: AlertCircle, shadow: "shadow-orange-200", onClick: () => navigate('/admin/risk-overview') }
+                ].map((stat, idx) => (
+                    <motion.div
+                        key={idx}
+                        whileHover={{ y: -5 }}
+                        onClick={stat.onClick}
+                        className={`relative overflow-hidden rounded-2xl bg-white p-6 shadow-lg border border-slate-100 ${stat.onClick ? 'cursor-pointer' : ''}`}
+                    >
+                        <div className={`absolute top-0 right-0 p-3 opacity-10 bg-gradient-to-br ${stat.bg} rounded-bl-3xl`}>
+                            <stat.icon size={48} />
                         </div>
                         <div className="relative z-10">
-                            <h3 className="text-3xl font-bold text-slate-900">{stats?.present}</h3>
-                            <p className="text-sm text-slate-500 font-medium">Siswa Hadir</p>
-                        </div>
-                        {/* Background Decoration */}
-                        <div className="absolute right-0 bottom-0 opacity-5 transform translate-x-4 translate-y-4">
-                            <CheckCircle2 className="w-32 h-32 text-green-600" />
-                        </div>
-                    </div>
-
-                    <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                                <Clock className="w-6 h-6" />
+                            <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.bg} flex items-center justify-center text-white shadow-xl ${stat.shadow} mb-4`}>
+                                <stat.icon size={24} />
                             </div>
-                            <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-1 rounded-full">Terlambat</span>
+                            <h3 className="text-3xl font-bold text-slate-800">{stat.value}</h3>
+                            <p className="text-sm font-medium text-slate-500 mt-1">{stat.title}</p>
                         </div>
-                        <div>
-                            <h3 className="text-3xl font-bold text-slate-900">{stats?.late}</h3>
-                            <p className="text-sm text-slate-500 font-medium">Siswa Terlambat</p>
-                        </div>
-                    </div>
+                    </motion.div>
+                ))}
+            </motion.div>
 
-                    <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="p-2 bg-red-50 text-red-600 rounded-lg">
-                                <AlertTriangle className="w-6 h-6" />
-                            </div>
-                            <span className="text-xs font-semibold bg-red-100 text-red-700 px-2 py-1 rounded-full">Perlu Tindakan</span>
-                        </div>
-                        <div>
-                            <h3 className="text-3xl font-bold text-slate-900">{stats?.alpha}</h3>
-                            <p className="text-sm text-slate-500 font-medium">Tanpa Keterangan (Alpha)</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. Quick Actions & Anomalies */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    {/* Quick Actions Panel */}
-                    <div className="lg:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <button onClick={() => navigate('/admin/attendance/override')}
-                            className="flex flex-col items-center justify-center p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-blue-300 transition-all group">
-                            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <FileEdit className="w-5 h-5" />
-                            </div>
-                            <span className="text-sm font-semibold text-slate-700">Input Izin Manual</span>
-                        </button>
-                        <button onClick={() => navigate('/admin/dashboard/teacher-absent')}
-                            className="flex flex-col items-center justify-center p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-red-300 transition-all group">
-                            <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <UserX className="w-5 h-5" />
-                            </div>
-                            <span className="text-sm font-semibold text-slate-700">Guru Tidak Hadir</span>
-                        </button>
-                        <button onClick={() => navigate('/admin/reports/class')}
-                            className="flex flex-col items-center justify-center p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-purple-300 transition-all group">
-                            <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <Activity className="w-5 h-5" />
-                            </div>
-                            <span className="text-sm font-semibold text-slate-700">Laporan Harian</span>
-                        </button>
-                        <button onClick={() => navigate('/admin/settings')}
-                            className="flex flex-col items-center justify-center p-4 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-slate-300 transition-all group">
-                            <div className="w-10 h-10 rounded-full bg-slate-50 text-slate-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <Shield className="w-5 h-5" />
-                            </div>
-                            <span className="text-sm font-semibold text-slate-700">Pengaturan Sekolah</span>
-                        </button>
-                    </div>
-
-                    {/* Announcements Wrapper */}
-                    <div className="lg:col-span-1">
-                        <AnnouncementWidget />
-                    </div>
-                </div>
-
-                {/* 3. Main Charts Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Class Performance Chart */}
-                    <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                        <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5 text-blue-600" />
-                            Performa Kehadiran Kelas (Bottom 10)
-                        </h3>
-                        <div className="h-[300px] w-full">
-                            {classChartData.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={classChartData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                        <YAxis axisLine={false} tickLine={false} />
-                                        <Tooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                        <Legend />
-                                        <Bar dataKey="Hadir" fill="#22c55e" radius={[4, 4, 0, 0]} stackId="a" />
-                                        <Bar dataKey="Terlambat" fill="#eab308" radius={[4, 4, 0, 0]} stackId="a" />
-                                        <Bar dataKey="Alpa" fill="#ef4444" radius={[4, 4, 0, 0]} stackId="a" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="h-full flex items-center justify-center text-slate-400">Belum ada data kelas.</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Attendance Distribution Pie */}
-                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                        <h3 className="text-lg font-bold text-slate-900 mb-2">Distribusi Kehadiran</h3>
-                        <div className="h-[300px] relative">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={attendancePieData}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {attendancePieData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip />
-                                    <Legend verticalAlign="bottom" height={36} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                            {/* Center Text */}
-                            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center -mt-6">
-                                <span className="block text-3xl font-bold text-slate-800">{stats?.total_students}</span>
-                                <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 4. Critical Alerts Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Teacher Absence - Critical */}
-                    <div className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-red-100 bg-red-50/50 flex justify-between items-center">
-                            <h3 className="font-bold text-red-700 flex items-center gap-2">
-                                <AlertTriangle className="w-5 h-5" /> Guru Tidak Hadir
-                            </h3>
-                            <button onClick={() => navigate('/admin/dashboard/teacher-absent')} className="text-xs font-medium text-red-600 hover:underline">Lihat Detail</button>
-                        </div>
-                        <div className="divide-y divide-red-50">
-                            {teacherAbsent?.teachers?.length ? (
-                                teacherAbsent.teachers.map((t) => (
-                                    <div key={t.teacher_id} className="p-4 flex items-center justify-between hover:bg-red-50 transition-colors">
-                                        <div>
-                                            <p className="font-semibold text-slate-900">{t.teacher_name}</p>
-                                            <p className="text-xs text-slate-500">Kurang {t.missing_qr} Kode QR</p>
-                                        </div>
-                                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-medium">Alpha</span>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="p-6 text-center text-slate-500 text-sm">Semua guru hadir atau belum ada jadwal.</div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Late Students List */}
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                <Clock className="w-5 h-5 text-amber-500" /> Siswa Terlambat Terbaru
-                            </h3>
-                            <button onClick={() => navigate('/admin/dashboard/late-absent')} className="text-xs font-medium text-blue-600 hover:underline">Lihat Semua</button>
-                        </div>
-                        <div className="divide-y divide-slate-100">
-                            {lateAlpha?.late?.students?.slice(0, 5).map((s) => (
-                                <div key={`${s.student_id}`} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 text-xs font-bold border border-amber-100">
-                                            {s.student_name.substring(0, 2)}
-                                        </div>
-                                        <div>
-                                            <p className="font-medium text-slate-900 text-sm">{s.student_name}</p>
-                                            <p className="text-xs text-slate-500">{s.class_name}</p>
-                                        </div>
-                                    </div>
-                                    <span className="text-xs text-amber-600 font-medium">{s.time || 'Terlambat'}</span>
+            {/* 2. Quick Actions & Anomalies */}
+            <motion.div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8" variants={itemVariants}>
+                {/* Quick Actions Panel */}
+                <div className="lg:col-span-3 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <Activity className="text-blue-500" /> Akses Cepat
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                            { label: "Input Izin Manual", icon: FileEdit, color: "text-blue-600", bg: "bg-blue-50", to: '/admin/attendance/override' },
+                            { label: "Guru Tidak Hadir", icon: UserX, color: "text-red-600", bg: "bg-red-50", to: '/admin/dashboard/teacher-absent' },
+                            { label: "Laporan Harian", icon: Activity, color: "text-purple-600", bg: "bg-purple-50", to: '/admin/reports/class' },
+                            { label: "Pengaturan Sekolah", icon: Shield, color: "text-indigo-600", bg: "bg-indigo-50", to: '/admin/settings' }
+                        ].map((action, idx) => (
+                            <motion.button
+                                key={idx}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => navigate(action.to)}
+                                className="flex flex-col items-center justify-center p-6 border border-slate-100 rounded-2xl hover:border-slate-200 hover:shadow-md transition-all group"
+                            >
+                                <div className={`w-14 h-14 ${action.bg} ${action.color} rounded-2xl flex items-center justify-center mb-3 group-hover:scale-110 transition-transform shadow-sm`}>
+                                    <action.icon size={28} />
                                 </div>
-                            )) || <div className="p-6 text-center text-slate-500 text-sm">Tidak ada keterlambatan hari ini.</div>}
+                                <span className="font-semibold text-slate-700 text-sm group-hover:text-slate-900 text-center">{action.label}</span>
+                            </motion.button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Announcements Wrapper */}
+                <div className="lg:col-span-1">
+                    <AnnouncementWidget />
+                </div>
+            </motion.div>
+
+            {/* 3. Main Charts Section */}
+            <motion.div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8" variants={itemVariants}>
+                {/* Class Performance Chart */}
+                <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-lg shadow-slate-200/50">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <TrendingUp className="text-emerald-500" />
+                            Performa Kehadiran (Terbawah)
+                        </h3>
+                        <button className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                            Lihat Semua <ArrowRight size={14} />
+                        </button>
+                    </div>
+                    <div className="h-[350px] w-full">
+                        {classChartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={classChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} dy={10} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 12 }} />
+                                    <Tooltip
+                                        cursor={{ fill: '#F8FAFC' }}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }}
+                                    />
+                                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                    <Bar dataKey="Hadir" fill="#10B981" radius={[6, 6, 0, 0]} barSize={32} />
+                                    <Bar dataKey="Terlambat" fill="#F59E0B" radius={[6, 6, 0, 0]} barSize={32} />
+                                    <Bar dataKey="Alpa" fill="#EF4444" radius={[6, 6, 0, 0]} barSize={32} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-3">
+                                <Activity size={48} className="opacity-20" />
+                                <span>Belum ada data visualisasi kelas.</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Attendance Distribution Pie */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-lg shadow-slate-200/50 flex flex-col">
+                    <h3 className="text-lg font-bold text-slate-800 mb-6">Distribusi Kehadiran</h3>
+                    <div className="flex-1 min-h-[300px] relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={attendancePieData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={70}
+                                    outerRadius={100}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                    cornerRadius={8}
+                                >
+                                    {attendancePieData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
+                                    ))}
+                                </Pie>
+                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                                <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                            </PieChart>
+                        </ResponsiveContainer>
+                        {/* Center Text */}
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center -mt-8">
+                            <span className="block text-4xl font-extrabold text-slate-800 tracking-tight">{stats?.total_students || 0}</span>
+                            <span className="text-xs text-slate-400 font-bold uppercase tracking-widest">Total Siswa</span>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </motion.div>
+
+            {/* 4. Critical Alerts Section */}
+            <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6" variants={itemVariants}>
+                {/* Teacher Absence - Critical */}
+                <div className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden group hover:shadow-md transition-all">
+                    <div className="px-6 py-5 border-b border-red-50 bg-red-50/30 flex justify-between items-center">
+                        <h3 className="font-bold text-red-700 flex items-center gap-3">
+                            <div className="p-2 bg-red-100 rounded-lg">
+                                <AlertTriangle className="w-5 h-5" />
+                            </div>
+                            Guru Tidak Hadir
+                        </h3>
+                        <button onClick={() => navigate('/admin/dashboard/teacher-absent')} className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-red-100 shadow-sm">
+                            Lihat Detail <ArrowRight size={12} />
+                        </button>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                        {teacherAbsent?.teachers?.length ? (
+                            teacherAbsent.teachers.map((t) => (
+                                <div key={t.teacher_id} className="p-5 flex items-center justify-between hover:bg-red-50/20 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-sm">
+                                            {t.teacher_name.substring(0, 2)}
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-800">{t.teacher_name}</p>
+                                            <p className="text-xs text-slate-500 font-medium">Missing: <span className="text-red-600">{t.missing_qr} Kode QR</span></p>
+                                        </div>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-bold shadow-sm">ALPHA</span>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-8 flex flex-col items-center justify-center text-center">
+                                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mb-3">
+                                    <CheckCircle2 size={32} className="text-green-500" />
+                                </div>
+                                <p className="text-slate-900 font-medium">Semua Guru Hadir</p>
+                                <p className="text-slate-500 text-sm">Tidak ada absensi guru yang kosong.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Late Students List */}
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden group hover:shadow-md transition-all">
+                    <div className="px-6 py-5 border-b border-slate-50 bg-slate-50/50 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-3">
+                            <div className="p-2 bg-amber-100 rounded-lg">
+                                <Clock className="w-5 h-5 text-amber-600" />
+                            </div>
+                            Siswa Terlambat Terbaru
+                        </h3>
+                        <button onClick={() => navigate('/admin/dashboard/late-absent')} className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm">
+                            Lihat Semua <ArrowRight size={12} />
+                        </button>
+                    </div>
+                    <div className="divide-y divide-slate-50">
+                        {lateAlpha?.late?.students?.slice(0, 5).map((s) => (
+                            <div key={`${s.student_id}`} className="p-5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center text-amber-700 text-xs font-bold shadow-sm border border-amber-200">
+                                        {s.student_name.substring(0, 2)}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900 text-sm">{s.student_name}</p>
+                                        <p className="text-xs text-slate-500 font-medium">{s.class_name}</p>
+                                    </div>
+                                </div>
+                                <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-100">
+                                    {s.time || 'Terlambat'}
+                                </span>
+                            </div>
+                        )) || (
+                                <div className="p-8 flex flex-col items-center justify-center text-center">
+                                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-3">
+                                        <Activity size={32} className="text-blue-500" />
+                                    </div>
+                                    <p className="text-slate-900 font-medium">Tidak Ada Keterlambatan</p>
+                                    <p className="text-slate-500 text-sm">Semua siswa hadir tepat waktu hari ini.</p>
+                                </div>
+                            )}
+                    </div>
+                </div>
+            </motion.div>
+        </motion.div>
     );
 };
 

@@ -26,7 +26,7 @@ final class StudentQrService
     public function verify(string $qrToken): array
     {
         // CHECK FOR NEW SECURE CARD FORMAT (card_id|token)
-        if (str_contains($qrToken, '|') && !str_contains($qrToken, '.')) {
+        if (str_contains($qrToken, '|') && ! str_contains($qrToken, '.')) {
             return $this->verifySecureCard($qrToken);
         }
 
@@ -94,16 +94,18 @@ final class StudentQrService
 
             $card = StudentCard::find($cardId);
 
-            if (!$card) {
+            if (! $card) {
                 throw new InvalidQrException('Kartu tidak ditemukan.');
             }
 
-            if (!$card->is_active) {
+            if (! $card->is_active) {
                 throw new InvalidQrException('Kartu ini sudah dinonaktifkan.');
             }
 
-            // Verify Hash
-            if (!Hash::check($token, $card->qr_hash)) {
+            // Verify Hash using HMAC sha256 with APP_KEY as seed
+            $expectedHash = hash_hmac('sha256', $token, config('app.key'));
+
+            if (! hash_equals($card->qr_hash, $expectedHash)) {
                 $this->logSecurityAnomaly('invalid_card_hash', [
                     'card_id' => $cardId,
                     'reason' => 'Hash mismatch for valid card ID',
@@ -130,7 +132,7 @@ final class StudentQrService
      *
      * @param  array  $payload  Verified QR payload
      * @param  int  $expectedSchoolId  Expected school ID to match
-     * @return \App\Models\User  The validated student
+     * @return \App\Models\User The validated student
      *
      * @throws \Exception If student status is invalid
      */

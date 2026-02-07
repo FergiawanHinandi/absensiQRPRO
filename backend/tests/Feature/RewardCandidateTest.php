@@ -34,7 +34,7 @@ class RewardCandidateTest extends TestCase
 
         // Create Class (using DB directly if Factory missing or assuming 'classes' table)
         // Check if ClassModel exists or Classes. TeacherRole used 'Classes' in belongsTo hint but usually it's ClassModel in Laravel to avoid keyword conflict?
-        // Let's use DB insert for safety or ClassModel if I can find it. 
+        // Let's use DB insert for safety or ClassModel if I can find it.
         // I'll check ClassModelFactory usage in other tests if I could, but let's assume ClassModel exists based on file list.
         $class = \App\Models\ClassModel::factory()->create([
             'school_id' => $school->id,
@@ -46,7 +46,7 @@ class RewardCandidateTest extends TestCase
             'school_id' => $school->id,
             'role_type' => 'teacher',
         ]);
-        
+
         TeacherRole::create([
             'teacher_id' => $teacher->id,
             'academic_year_id' => $academicYear->id,
@@ -63,7 +63,7 @@ class RewardCandidateTest extends TestCase
             'total_points' => 198,
             'current_streak' => 0,
         ]);
-        
+
         // B. Close to Gold (495 points)
         $studentGold = User::factory()->create([
             'school_id' => $school->id,
@@ -111,20 +111,20 @@ class RewardCandidateTest extends TestCase
                 'success',
                 'data' => [
                     'close_to_level_up' => [
-                        '*' => ['id', 'name', 'current_points', 'next_level', 'points_needed']
+                        '*' => ['id', 'name', 'current_points', 'next_level', 'points_needed'],
                     ],
                     'close_to_streak_reward' => [
-                        '*' => ['id', 'name', 'current_streak', 'days_needed']
-                    ]
-                ]
+                        '*' => ['id', 'name', 'current_streak', 'days_needed'],
+                    ],
+                ],
             ]);
 
         // Verify Data Content
         $data = $response->json('data');
-        
+
         // Verify Level Up Candidates
         $this->assertCount(2, $data['close_to_level_up']);
-        
+
         $silverCandidate = collect($data['close_to_level_up'])->firstWhere('id', $studentSilver->id);
         $this->assertNotNull($silverCandidate);
         $this->assertEquals('Silver', $silverCandidate['next_level']);
@@ -151,12 +151,12 @@ class RewardCandidateTest extends TestCase
             'school_id' => $school->id,
             'is_active' => true,
         ]);
-        
+
         $teacher = User::factory()->create([
             'school_id' => $school->id,
             'role_type' => 'teacher',
         ]);
-        
+
         // No TeacherRole or is_homeroom_teacher = false
 
         Sanctum::actingAs($teacher);
@@ -165,7 +165,7 @@ class RewardCandidateTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'data' => []
+                'data' => [],
             ]);
     }
 }

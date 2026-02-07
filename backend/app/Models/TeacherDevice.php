@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Teacher Device Binding Model
- * 
+ *
  * Tracks which devices teachers are allowed to use for attendance.
  * New devices must be approved by school admin before they can record attendance.
  */
@@ -181,7 +181,7 @@ class TeacherDevice extends Model
 
     /**
      * Register or get existing device for teacher
-     * 
+     *
      * @return array{device: TeacherDevice, is_new: bool}
      */
     public static function registerDevice(
@@ -226,7 +226,7 @@ class TeacherDevice extends Model
 
     /**
      * Get teacher's device status
-     * 
+     *
      * @return string 'approved'|'pending'|'revoked'|'unknown'
      */
     public static function getDeviceStatus(int $teacherId, string $deviceId): string
@@ -235,7 +235,7 @@ class TeacherDevice extends Model
             ->where('device_id', $deviceId)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return 'unknown';
         }
 

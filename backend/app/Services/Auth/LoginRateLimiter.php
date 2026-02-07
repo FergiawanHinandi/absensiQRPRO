@@ -22,9 +22,12 @@ class LoginRateLimiter
 
     // Rate limiting thresholds
     protected const MAX_ATTEMPTS = 5;           // Max attempts before progressive delay
+
     protected const LOCKOUT_ATTEMPTS = 10;      // Attempts before account lockout
+
     protected const LOCKOUT_DURATION = 10;      // Minutes for account lockout
-    protected const DECAY_MINUTES = 10;         // Time window for counting attempts
+
+    protected const DECAY_MINUTES = 1;          // Time window for counting attempts
 
     public function __construct(RateLimiter $limiter)
     {
@@ -89,13 +92,21 @@ class LoginRateLimiter
     }
 
     /**
-     * Check if account should be locked
+     * Check if account should be locked (Cache based - for rate limiting)
      */
     public function shouldLockAccount(Request $request, string $email): bool
     {
         $attempts = $this->attempts($request, $email);
 
         return $attempts >= self::LOCKOUT_ATTEMPTS;
+    }
+
+    /**
+     * Check if user should be locked (DB based - for persistent failures)
+     */
+    public function shouldLockUser(\App\Models\User $user): bool
+    {
+        return $user->failed_login_attempts >= self::LOCKOUT_ATTEMPTS;
     }
 
     /**
@@ -178,7 +189,7 @@ class LoginRateLimiter
     protected function throttleKey(Request $request, string $email): string
     {
         return Str::transliterate(
-            Str::lower($email).'|'.$request->ip()
+            Str::lower($email) . '|' . $request->ip()
         );
     }
 

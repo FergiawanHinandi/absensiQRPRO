@@ -1,0 +1,247 @@
+##############################################################################
+# Prometheus Alerting Rules for AbsensiQRPro
+# Save as: /etc/prometheus/rules/absensi_alerts.yml
+##############################################################################
+
+groups:
+  - name: absensi_api_alerts
+    interval: 30s
+    rules:
+      ##########################################################################
+      # API Latency Alerts
+      ##########################################################################
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(absensi_http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile latency is {{ $value | humanizeDuration }} for endpoint {{ $labels.endpoint }}"
+          runbook: "https://docs.internal/runbooks/high-latency"
+          dashboard: "https://grafana.internal/d/api-performance"
+
+      - alert: CriticalAPILatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(absensi_http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 2
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Critical API latency - immediate action required"
+          description: "95th percentile latency is {{ $value | humanizeDuration }}"
+
+      ##########################################################################
+      # Error Rate Alerts
+      ##########################################################################
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(absensi_http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(absensi_http_requests_total[5m]))
+          ) * 100 > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | printf \"%.2f\" }}% (threshold: 2%)"
+
+      - alert: CriticalErrorRate
+        expr: |
+          (
+            sum(rate(absensi_http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(absensi_http_requests_total[5m]))
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+          pagerduty: trigger
+        annotations:
+          summary: "Critical error rate - service degraded"
+          description: "Error rate is {{ $value | printf \"%.2f\" }}% (threshold: 5%)"
+
+      ##########################################################################
+      # Database Alerts
+      ##########################################################################
+      - alert: SlowDatabaseQueries
+        expr: absensi_db_query_duration_seconds_avg > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Database queries are slow"
+          description: "Average query time is {{ $value | humanizeDuration }} (threshold: 300ms)"
+
+      - alert: CriticalDatabaseLatency
+        expr: absensi_db_query_duration_seconds_avg > 1
+        for: 2m
+        labels:
+          severity: critical
+          team: database
+        annotations:
+          summary: "Critical database latency"
+          description: "Average query time is {{ $value | humanizeDuration }}"
+
+      - alert: HighDatabaseConnections
+        expr: absensi_db_connections_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: database
+        annotations:
+          summary: "High database connection usage"
+          description: "Connection pool usage is {{ $value }}% (threshold: 80%)"
+
+      - alert: CriticalDatabaseConnections
+        expr: absensi_db_connections_usage_percent > 90
+        for: 2m
+        labels:
+          severity: critical
+          team: database
+          pagerduty: trigger
+        annotations:
+          summary: "Critical database connection pool exhaustion imminent"
+          description: "Connection pool usage is {{ $value }}%"
+
+      - alert: DatabaseDown
+        expr: absensi_db_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: database
+          pagerduty: trigger
+        annotations:
+          summary: "Database is unreachable"
+          description: "Database connectivity check failed"
+
+      ##########################################################################
+      # Redis Alerts
+      ##########################################################################
+      - alert: HighRedisMemory
+        expr: absensi_redis_memory_usage_percent > 75
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "High Redis memory usage"
+          description: "Redis memory usage is {{ $value }}% (threshold: 75%)"
+
+      - alert: CriticalRedisMemory
+        expr: absensi_redis_memory_usage_percent > 90
+        for: 5m
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Critical Redis memory - evictions likely"
+          description: "Redis memory usage is {{ $value }}%"
+
+      - alert: RedisDown
+        expr: absensi_redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: infrastructure
+          pagerduty: trigger
+        annotations:
+          summary: "Redis is unreachable"
+          description: "Redis connectivity check failed - sessions and cache affected"
+
+      - alert: LowRedisCacheHitRate
+        expr: absensi_redis_hit_rate_percent < 80
+        for: 15m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Low Redis cache hit rate"
+          description: "Cache hit rate is {{ $value }}% - check cache keys/TTLs"
+
+      ##########################################################################
+      # Queue Alerts
+      ##########################################################################
+      - alert: HighQueueBacklog
+        expr: absensi_queue_jobs_pending_total > 500
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High queue backlog"
+          description: "{{ $value }} jobs pending (threshold: 500)"
+
+      - alert: CriticalQueueBacklog
+        expr: absensi_queue_jobs_pending_total > 1000
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Critical queue backlog - scaling needed"
+          description: "{{ $value }} jobs pending (threshold: 1000)"
+
+      - alert: HighFailedJobs
+        expr: absensi_queue_jobs_failed_last_hour > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High number of failed jobs"
+          description: "{{ $value }} jobs failed in the last hour"
+
+      - alert: CriticalFailedJobs
+        expr: absensi_queue_jobs_failed_last_hour > 50
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Critical job failure rate"
+          description: "{{ $value }} jobs failed in the last hour - investigate immediately"
+
+      ##########################################################################
+      # Business Metrics (Attendance)
+      ##########################################################################
+      - alert: NoAttendanceScans
+        expr: |
+          absensi_attendance_scan_rate == 0 
+          and hour() >= 7 
+          and hour() <= 9 
+          and day_of_week() >= 1 
+          and day_of_week() <= 5
+        for: 10m
+        labels:
+          severity: warning
+          team: support
+        annotations:
+          summary: "No attendance scans during school hours"
+          description: "No attendance scans detected during peak hours (7-9 AM weekdays)"
+
+      - alert: UnusuallyLowAttendance
+        expr: |
+          absensi_attendance_scans_today < 100 
+          and hour() >= 10 
+          and day_of_week() >= 1 
+          and day_of_week() <= 5
+        for: 30m
+        labels:
+          severity: info
+          team: support
+        annotations:
+          summary: "Unusually low attendance count"
+          description: "Only {{ $value }} scans recorded today by 10 AM"

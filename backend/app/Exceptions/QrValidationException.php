@@ -6,7 +6,7 @@ use Exception;
 
 /**
  * Exception for QR code validation errors
- * 
+ *
  * Messages from this exception are safe to show to end users.
  * Use this for QR validation failures, signature mismatches, etc.
  */

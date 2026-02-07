@@ -40,24 +40,25 @@ class BackupSecurityLogHashes extends Command
         // Optional: Verify before backup
         if ($this->option('verify')) {
             $this->info('Step 1: Verifying chain integrity...');
-            
+
             $result = $this->logService->verifyChainIntegrity();
-            
-            if (!$result['is_valid']) {
+
+            if (! $result['is_valid']) {
                 $this->error('❌ Chain integrity verification failed! Cannot backup compromised data.');
                 $this->error('Run `php artisan security:verify-log-integrity --alert` for details.');
+
                 return Command::FAILURE;
             }
-            
+
             $this->info('✅ Chain integrity verified.');
             $this->newLine();
         }
 
         // Determine output path
         $basePath = $this->option('path') ?: storage_path('app/security-backups');
-        
+
         // Ensure directory exists
-        if (!is_dir($basePath)) {
+        if (! is_dir($basePath)) {
             mkdir($basePath, 0755, true);
         }
 
@@ -72,6 +73,7 @@ class BackupSecurityLogHashes extends Command
             $result = $this->logService->exportHashes($outputPath);
         } catch (\Exception $e) {
             $this->error("❌ Export failed: {$e->getMessage()}");
+
             return Command::FAILURE;
         }
 
@@ -83,17 +85,17 @@ class BackupSecurityLogHashes extends Command
         // Optional: Upload to S3
         if ($this->option('s3')) {
             $this->info('Step 3: Uploading to S3...');
-            
+
             try {
                 $s3Path = "security-backups/{$filename}";
                 Storage::disk('s3')->put($s3Path, file_get_contents($outputPath));
-                
+
                 // Also upload the checksum file
                 $checksumFile = "{$outputPath}.sha256";
                 if (file_exists($checksumFile)) {
                     Storage::disk('s3')->put("{$s3Path}.sha256", file_get_contents($checksumFile));
                 }
-                
+
                 $this->info("✅ Uploaded to S3: {$s3Path}");
             } catch (\Exception $e) {
                 $this->warn("⚠️  S3 upload failed: {$e->getMessage()}");
@@ -103,10 +105,10 @@ class BackupSecurityLogHashes extends Command
 
         // Display summary
         $this->newLine();
-        
+
         $firstSeq = $result['chain'][0]['seq'] ?? 0;
         $lastSeq = end($result['chain'])['seq'] ?? 0;
-        
+
         $this->table(
             ['Metric', 'Value'],
             [
@@ -114,7 +116,7 @@ class BackupSecurityLogHashes extends Command
                 ['First Sequence', $firstSeq],
                 ['Last Sequence', $lastSeq],
                 ['Local Path', $outputPath],
-                ['Checksum', substr($result['export_checksum'], 0, 16) . '...'],
+                ['Checksum', substr($result['export_checksum'], 0, 16).'...'],
             ]
         );
 
@@ -136,13 +138,13 @@ class BackupSecurityLogHashes extends Command
         foreach ($files as $file) {
             if (filemtime($file) < $thirtyDaysAgo) {
                 unlink($file);
-                
+
                 // Also remove checksum file if exists
                 $checksumFile = "{$file}.sha256";
                 if (file_exists($checksumFile)) {
                     unlink($checksumFile);
                 }
-                
+
                 $cleaned++;
             }
         }

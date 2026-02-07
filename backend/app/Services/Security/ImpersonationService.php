@@ -12,21 +12,20 @@ class ImpersonationService
     /**
      * Start impersonating a user.
      *
-     * @param User $impersonator The admin user
-     * @param User $targetUser The user to impersonate
-     * @return bool
+     * @param  User  $impersonator  The admin user
+     * @param  User  $targetUser  The user to impersonate
      */
     public function impersonate(User $impersonator, User $targetUser): bool
     {
         // Prevent recursive impersonation
         if (Session::has('impersonator_id')) {
-            return false; 
+            return false;
         }
 
-        // Only Super Admin can impersonate (or maybe School Admin for their teachers?) 
+        // Only Super Admin can impersonate (or maybe School Admin for their teachers?)
         // Requirement says "Super Admin has highest privileges... can impersonate school admins or teachers"
-        if (!$impersonator->hasRole('super_admin')) {
-             // For now restrict to super admin based on prompt scope
+        if (! $impersonator->hasRole('super_admin')) {
+            // For now restrict to super admin based on prompt scope
             return false;
         }
 
@@ -39,7 +38,7 @@ class ImpersonationService
         Log::channel('superadmin')->info('Impersonation Started', [
             'impersonator_id' => $impersonator->id,
             'target_user_id' => $targetUser->id,
-            'timestamp' => now()
+            'timestamp' => now(),
         ]);
 
         // Login as the user
@@ -54,12 +53,10 @@ class ImpersonationService
 
     /**
      * Stop impersonating.
-     *
-     * @return bool
      */
     public function stopImpersonating(): bool
     {
-        if (!Session::has('impersonator_id')) {
+        if (! Session::has('impersonator_id')) {
             return false;
         }
 
@@ -71,7 +68,7 @@ class ImpersonationService
             'impersonator_id' => $impersonatorId,
             'impersonated_user_id' => Auth::id(), // The user we were just pretending to be
             'duration' => now()->diffInSeconds(Session::get('impersonation_start')),
-            'timestamp' => now()
+            'timestamp' => now(),
         ]);
 
         // Flush session keys
@@ -80,11 +77,13 @@ class ImpersonationService
         // Login back as admin
         if ($impersonator) {
             Auth::login($impersonator);
+
             return true;
         }
 
         // Fallback if admin user deleted?
         Auth::logout();
+
         return false;
     }
 

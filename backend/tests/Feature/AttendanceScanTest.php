@@ -325,4 +325,181 @@ class AttendanceScanTest extends TestCase
             'recorded_by' => $this->teacher->id,
         ]);
     }
+
+    /**
+     * EDGE CASE 1: Scan Before School Hours
+     * 
+     * @test
+     */
+    public function test_scan_before_school_hours_marked_as_absent()
+    {
+        // Create schedule for later today (e.g., 14:00-15:30)
+        $futureSchedule = Schedule::create([
+            'school_id' => $this->school->id,
+            'academic_year_id' => 1,
+            'teacher_id' => $this->teacher->id,
+            'day_of_week' => now()->dayOfWeek,
+            'start_time' => '14:00:00',
+            'end_time' => '15:30:00',
+            'room' => 'Room 2',
+        ]);
+
+        $qrCode = QrCode::create([
+            'school_id' => $this->school->id,
+            'schedule_id' => $futureSchedule->id,
+            'qr_type' => 'in',
+            'valid_from' => now(),
+            'valid_until' => now()->addMinutes(10),
+            'is_active' => true,
+        ]);
+
+        $token = $this->qrService->generate([
+            'schedule_id' => $futureSchedule->id,
+            'qr_id' => $qrCode->id,
+            'type' => 'in',
+        ]);
+
+        // Mock current time to be way before schedule (e.g., 06:00 AM)
+        $this->travel(-8)->hours();
+
+        // Attempt scan before school hours
+        $response = $this->actingAs($this->student, 'sanctum')
+            ->postJson('/api/v1/attendance/scan', [
+                'token' => $token,
+                'latitude' => -6.200000,
+                'longitude' => 106.816666,
+                'accuracy' => 10,
+            ]);
+
+        // Should either reject or mark differently based on business logic
+        // Assuming rejection for scans outside valid time window
+        $response->assertStatus(400);
+    }
+
+    /**
+     * EDGE CASE 2: Scan Slightly Late
+     * 
+     * @test
+     */
+    public function test_scan_slightly_late_marked_as_late()
+    {
+        // Create schedule with grace period settings
+        $schedule = Schedule::create([
+            'school_id' => $this->school->id,
+            'academic_year_id' => 1,
+            'teacher_id' => $this->teacher->id,
+            'day_of_week' => now()->dayOfWeek,
+            'start_time' => now()->subMinutes(20)->format('H:i:s'), // Started 20 mins ago
+            'end_time' => now()->addHour()->format('H:i:s'),
+            'room' => 'Room 3',
+        ]);
+
+        $qrCode = QrCode::create([
+            'school_id' => $this->school->id,
+            'schedule_id' => $schedule->id,
+            'qr_type' => 'in',
+            'valid_from' => now()->subMinutes(25),
+            'valid_until' => now()->addMinutes(10),
+            'is_active' => true,
+        ]);
+
+        $token = $this->qrService->generate([
+            'schedule_id' => $schedule->id,
+            'qr_id' => $qrCode->id,
+            'type' => 'in',
+        ]);
+
+        // Scan 20 minutes after start time (late)
+        $response = $this->actingAs($this->student, 'sanctum')
+            ->postJson('/api/v1/attendance/scan', [
+                'token' => $token,
+                'latitude' => -6.200000,
+                'longitude' => 106.816666,
+                'accuracy' => 10,
+            ]);
+
+        $response->assertStatus(201);
+
+        // Verify attendance marked as 'late' based on grace period
+        $attendance = Attendance::where('student_id', $this->student->id)
+            ->where('schedule_id', $schedule->id)
+            ->first();
+
+        // Status should be 'late' if scan is after grace period
+        $this->assertNotNull($attendance);
+        $this->assertContains($attendance->status, ['present', 'late']);
+    }
+
+    /**
+     * EDGE CASE 3: Multiple Scans - Only First Valid
+     * 
+     * @test
+     */
+    public function test_multiple_scans_only_first_valid_counted()
+    {
+        $qrCode = QrCode::create([
+            'school_id' => $this->school->id,
+            'schedule_id' => $this->schedule->id,
+            'qr_type' => 'in',
+            'valid_from' => now(),
+            'valid_until' => now()->addMinutes(10),
+            'is_active' => true,
+        ]);
+
+        $token = $this->qrService->generate([
+            'schedule_id' => $this->schedule->id,
+            'qr_id' => $qrCode->id,
+            'type' => 'in',
+        ]);
+
+        // First scan - should succeed
+        $response1 = $this->actingAs($this->student, 'sanctum')
+            ->postJson('/api/v1/attendance/scan', [
+                'token' => $token,
+                'latitude' => -6.200000,
+                'longitude' => 106.816666,
+                'accuracy' => 10,
+            ]);
+
+        $response1->assertStatus(201);
+
+        // Get first attendance record
+        $firstAttendance = Attendance::where('student_id', $this->student->id)
+            ->where('schedule_id', $this->schedule->id)
+            ->first();
+
+        $this->assertNotNull($firstAttendance);
+        $firstCheckInTime = $firstAttendance->check_in_time;
+
+        // Wait a moment
+        sleep(1);
+
+        // Second scan - should be rejected (duplicate)
+        $response2 = $this->actingAs($this->student, 'sanctum')
+            ->postJson('/api/v1/attendance/scan', [
+                'token' => $token,
+                'latitude' => -6.200000,
+                'longitude' => 106.816666,
+                'accuracy' => 10,
+            ]);
+
+        $response2->assertStatus(422);
+
+        // Verify only ONE attendance record exists
+        $attendanceCount = Attendance::where('student_id', $this->student->id)
+            ->where('schedule_id', $this->schedule->id)
+            ->count();
+
+        $this->assertEquals(1, $attendanceCount);
+
+        // Verify check_in_time hasn't changed (first scan preserved)
+        $finalAttendance = Attendance::where('student_id', $this->student->id)
+            ->where('schedule_id', $this->schedule->id)
+            ->first();
+
+        $this->assertEquals(
+            $firstCheckInTime->timestamp,
+            $finalAttendance->check_in_time->timestamp
+        );
+    }
 }

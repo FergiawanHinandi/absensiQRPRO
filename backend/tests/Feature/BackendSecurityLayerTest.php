@@ -10,10 +10,10 @@ use Tests\TestCase;
 
 /**
  * Backend Security Layer Tests
- * 
+ *
  * Memverifikasi bahwa SEMUA security ada di backend,
  * bukan di frontend. Frontend route guards HANYA untuk UX.
- * 
+ *
  * Test ini mensimulasikan attacker yang bypass frontend
  * dan langsung panggil API.
  */
@@ -22,12 +22,19 @@ class BackendSecurityLayerTest extends TestCase
     use RefreshDatabase;
 
     private School $schoolA;
+
     private School $schoolB;
+
     private User $superAdmin;
+
     private User $adminA;
+
     private User $adminB;
+
     private User $teacherA;
+
     private User $studentA;
+
     private User $studentB;
 
     protected function setUp(): void
@@ -338,8 +345,8 @@ class BackendSecurityLayerTest extends TestCase
 
         // All students should be from School A only
         $students = $response->json('data');
-        
-        if (!empty($students)) {
+
+        if (! empty($students)) {
             foreach ($students as $student) {
                 $this->assertEquals(
                     $this->schoolA->id,
@@ -401,7 +408,7 @@ class BackendSecurityLayerTest extends TestCase
 
         // Simulate: XSS attempt
         $xssPayload = '<script>alert("XSS")</script>';
-        
+
         $response = $this->putJson("/api/v1/admin/students/{$this->studentA->id}", [
             'name' => $xssPayload,
         ]);
@@ -409,7 +416,7 @@ class BackendSecurityLayerTest extends TestCase
         if ($response->status() === 200) {
             // If accepted, verify it's stored safely
             $student = User::find($this->studentA->id);
-            
+
             // Laravel should escape this when rendering
             // But we can verify it's stored as-is (escaping happens on output)
             $this->assertEquals($xssPayload, $student->name);

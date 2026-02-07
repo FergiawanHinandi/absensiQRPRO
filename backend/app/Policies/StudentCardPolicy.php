@@ -7,7 +7,7 @@ use Illuminate\Auth\Access\HandlesAuthorization;
 
 /**
  * Student Card Policy - Strict Role-Based Access Control
- * 
+ *
  * BUSINESS RULE: Only School Admin can manage student QR cards
  * Teachers must NEVER have access to this functionality
  */
@@ -17,7 +17,7 @@ class StudentCardPolicy
 
     /**
      * Determine if the user can generate student QR cards
-     * 
+     *
      * RULE: Only school_admin role allowed
      */
     public function generate(User $user): bool
@@ -31,15 +31,17 @@ class StudentCardPolicy
                 'action' => 'generate',
                 'ip' => request()->ip(),
             ]);
+
             return false;
         }
 
         // Additional check: User must be active
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             \Log::warning('Inactive user attempted card generation', [
                 'user_id' => $user->id,
                 'school_id' => $user->school_id,
             ]);
+
             return false;
         }
 
@@ -48,7 +50,7 @@ class StudentCardPolicy
 
     /**
      * Determine if the user can regenerate student QR cards
-     * 
+     *
      * RULE: Only school_admin role allowed
      */
     public function regenerate(User $user): bool
@@ -62,15 +64,17 @@ class StudentCardPolicy
                 'action' => 'regenerate',
                 'ip' => request()->ip(),
             ]);
+
             return false;
         }
 
         // Additional check: User must be active
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             \Log::warning('Inactive user attempted card regeneration', [
                 'user_id' => $user->id,
                 'school_id' => $user->school_id,
             ]);
+
             return false;
         }
 
@@ -79,7 +83,7 @@ class StudentCardPolicy
 
     /**
      * Determine if the user can deactivate student QR cards
-     * 
+     *
      * RULE: Only school_admin role allowed
      */
     public function deactivate(User $user): bool
@@ -93,15 +97,17 @@ class StudentCardPolicy
                 'action' => 'deactivate',
                 'ip' => request()->ip(),
             ]);
+
             return false;
         }
 
         // Additional check: User must be active
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             \Log::warning('Inactive user attempted card deactivation', [
                 'user_id' => $user->id,
                 'school_id' => $user->school_id,
             ]);
+
             return false;
         }
 
@@ -109,8 +115,16 @@ class StudentCardPolicy
     }
 
     /**
+     * Determine if the user can mark cards as distributed
+     */
+    public function distribute(User $user): bool
+    {
+        return $user->role_type === 'school_admin' && $user->is_active;
+    }
+
+    /**
      * Determine if the user can view student cards
-     * 
+     *
      * RULE: Only school_admin and principal can view
      */
     public function view(User $user): bool
@@ -120,7 +134,7 @@ class StudentCardPolicy
 
     /**
      * Determine if the user can view any student cards
-     * 
+     *
      * RULE: Only school_admin and principal can view
      */
     public function viewAny(User $user): bool
@@ -135,7 +149,7 @@ class StudentCardPolicy
     public function __call($method, $parameters)
     {
         $user = $parameters[0] ?? null;
-        
+
         if ($user && in_array($user->role_type, ['teacher', 'homeroom_teacher'])) {
             \Log::critical('Teacher attempted to access student card functionality', [
                 'user_id' => $user->id,
@@ -145,7 +159,7 @@ class StudentCardPolicy
                 'ip' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ]);
-            
+
             // This is a security violation - teachers should never access this
             return false;
         }

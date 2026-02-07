@@ -12,7 +12,7 @@ use Tests\TestCase;
 
 /**
  * Cross-Tenant Access Prevention Tests
- * 
+ *
  * These tests simulate ID tampering attacks where users try to access
  * resources from other schools by manipulating IDs in API requests.
  */
@@ -21,9 +21,13 @@ class CrossTenantAccessTest extends TestCase
     use RefreshDatabase;
 
     private School $schoolA;
+
     private School $schoolB;
+
     private User $adminA;
+
     private User $studentA;
+
     private User $studentB;
 
     protected function setUp(): void
@@ -107,7 +111,7 @@ class CrossTenantAccessTest extends TestCase
 
         $this->assertTrue(
             in_array($response->status(), [403, 404, 422]),
-            "Should block cross-school student update"
+            'Should block cross-school student update'
         );
 
         // Verify student B was not modified
@@ -144,7 +148,7 @@ class CrossTenantAccessTest extends TestCase
         // Should not return attendance from School B
         if ($response->status() === 200) {
             $data = $response->json('data');
-            
+
             // If data is returned, it should be empty or not contain School B data
             if (is_array($data)) {
                 foreach ($data as $record) {
@@ -195,7 +199,7 @@ class CrossTenantAccessTest extends TestCase
         $qrCodeB = \App\Models\QrCode::create([
             'school_id' => $this->schoolB->id,
             'schedule_id' => 1,
-            'code' => 'QR_SCHOOL_B_' . uniqid(),
+            'code' => 'QR_SCHOOL_B_'.uniqid(),
             'valid_from' => now()->subMinutes(10),
             'valid_until' => now()->addMinutes(50),
             'is_locked' => false,
@@ -209,7 +213,7 @@ class CrossTenantAccessTest extends TestCase
         // Should fail - either 403, 404, or 422
         $this->assertTrue(
             in_array($response->status(), [403, 404, 422]),
-            "Should block scanning QR code from different school"
+            'Should block scanning QR code from different school'
         );
     }
 
@@ -245,7 +249,7 @@ class CrossTenantAccessTest extends TestCase
 
             // Should only contain students from School A
             $studentIds = array_column($students, 'id');
-            
+
             $this->assertContains($this->studentA->id, $studentIds, 'Should contain Student A');
             $this->assertContains($studentA2->id, $studentIds, 'Should contain Student A2');
             $this->assertNotContains($this->studentB->id, $studentIds, 'Should NOT contain Student B');

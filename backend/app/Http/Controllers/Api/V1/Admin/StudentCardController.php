@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\StudentCard;
+use App\Models\User;
 use App\Services\StudentCardService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 
 class StudentCardController extends Controller
 {
@@ -24,6 +23,7 @@ class StudentCardController extends Controller
         $student = User::where('id', $studentId)->where('role_type', 'student')->firstOrFail();
         $admin = $request->user();
         $card = $this->service->generateCard($student, $admin);
+
         return response()->json(['success' => true, 'data' => $card]);
     }
 
@@ -33,6 +33,7 @@ class StudentCardController extends Controller
         $card = StudentCard::findOrFail($cardId);
         $admin = $request->user();
         $card = $this->service->markDistributed($card, $admin);
+
         return response()->json(['success' => true, 'data' => $card]);
     }
 
@@ -43,6 +44,7 @@ class StudentCardController extends Controller
         $student = User::where('id', $studentId)->where('role_type', 'student')->firstOrFail();
         $admin = $request->user();
         $card = $this->service->regenerateCard($student, $admin, $request->input('reason'));
+
         return response()->json(['success' => true, 'data' => $card]);
     }
 
@@ -51,6 +53,7 @@ class StudentCardController extends Controller
         $this->authorize('viewAny', StudentCard::class);
         $student = User::where('id', $studentId)->where('role_type', 'student')->firstOrFail();
         $history = $this->service->getCardHistory($student);
+
         return response()->json(['success' => true, 'data' => $history]);
     }
 
@@ -68,17 +71,17 @@ class StudentCardController extends Controller
             ->where('role_type', 'student')
             ->where('school_id', $admin->school_id);
         if ($filters['class_id']) {
-            $query->whereHas('classStudents', function($q) use ($filters) {
+            $query->whereHas('classStudents', function ($q) use ($filters) {
                 $q->where('class_id', $filters['class_id']);
             });
         }
         if ($filters['grade_level']) {
-            $query->whereHas('classStudents.class', function($q) use ($filters) {
+            $query->whereHas('classStudents.class', function ($q) use ($filters) {
                 $q->where('grade_level', $filters['grade_level']);
             });
         }
         if ($filters['academic_year']) {
-            $query->whereHas('classStudents.class', function($q) use ($filters) {
+            $query->whereHas('classStudents.class', function ($q) use ($filters) {
                 $q->where('academic_year_id', $filters['academic_year']);
             });
         }
@@ -95,18 +98,46 @@ class StudentCardController extends Controller
         if ($students->count() > 300) {
             // Dispatch queue job
             \App\Jobs\BulkGenerateStudentCards::dispatch($students->pluck('id')->all(), $admin->id, $filters, $forceRegenerate);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Proses bulk card generation sedang dijalankan di background. Anda akan diberi notifikasi jika sudah selesai.',
                 'total_students' => $students->count(),
             ]);
         }
+        // Generate PDFs and Zip
         $summary = $this->service->bulkGenerateCards($students, $admin, $forceRegenerate, $filters);
-        // TODO: Generate PDFs, zip, and return download link (implement as needed)
+
+        // Check if ZIP path exists in summary and download it
+        if (isset($summary['zip_path'])) {
+            $relativePath = 'temp/' . $summary['zip_path'];
+            if (\Illuminate\Support\Facades\Storage::exists($relativePath)) {
+                return response()->download(storage_path('app/' . $relativePath))->deleteFileAfterSend();
+            }
+        }
+
         return response()->json([
             'success' => true,
             'summary' => $summary,
             'message' => 'Bulk card generation selesai.',
         ]);
+    }
+
+    public function download(Request $request)
+    {
+        $filename = $request->query('path');
+        
+        // Security: Validate filename format
+        if (!$filename || !preg_match('/^student_cards_batch_.*\.zip$/', $filename)) {
+            abort(403, 'Invalid filename');
+        }
+
+        $relativePath = 'temp/' . $filename;
+        
+        if (!\Illuminate\Support\Facades\Storage::exists($relativePath)) {
+            abort(404, 'File expired or not found');
+        }
+
+        return response()->download(storage_path('app/' . $relativePath))->deleteFileAfterSend();
     }
 }

@@ -6,7 +6,7 @@ use App\Models\User;
 
 /**
  * TeacherPolicy - Tenant Isolation for Teachers
- * 
+ *
  * Ensures users can only access teacher records within their school.
  * Teachers represented as User model with role_type='teacher' or 'homeroom_teacher'.
  */
@@ -23,7 +23,7 @@ class TeacherPolicy
             'admin',
             'school_admin',
             'principal',
-            'super_admin'
+            'super_admin',
         ]);
     }
 
@@ -48,6 +48,7 @@ class TeacherPolicy
             if ($user->id === $teacher->id) {
                 return true;
             }
+
             // Teachers can view other teachers in their school (for collaboration)
             return true;
         }

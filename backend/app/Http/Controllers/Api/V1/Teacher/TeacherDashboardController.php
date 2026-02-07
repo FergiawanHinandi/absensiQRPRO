@@ -220,7 +220,7 @@ class TeacherDashboardController extends Controller
             $sick = $attendanceCounts['sick'] ?? 0;
             $permission = $attendanceCounts['permit'] ?? 0;
             $alpha = $attendanceCounts['alpha'] ?? 0;
-            
+
             $totalAttendanceRecords = $present + $late + $sick + $permission + $alpha;
             $notCheckedIn = max(0, $totalStudents - $totalAttendanceRecords);
 
@@ -240,9 +240,9 @@ class TeacherDashboardController extends Controller
                 ->orderBy('date')
                 ->get()
                 ->mapWithKeys(function ($item) {
-                     return [$item->date => $item->present_count];
+                    return [$item->date => $item->present_count];
                 });
-            
+
             // Fill missing days with 0
             $chartData = [];
             for ($i = 6; $i >= 0; $i--) {
@@ -252,7 +252,7 @@ class TeacherDashboardController extends Controller
                     'date' => $d,
                     'label' => Carbon::parse($d)->isoFormat('dd'), // Sen, Sel...
                     'present_count' => $count,
-                    'rate' => $totalStudents > 0 ? round(($count / $totalStudents) * 100, 1) : 0
+                    'rate' => $totalStudents > 0 ? round(($count / $totalStudents) * 100, 1) : 0,
                 ];
             }
 
@@ -274,7 +274,7 @@ class TeacherDashboardController extends Controller
                     'permission' => $permission,
                     'alpha' => $alpha,
                 ],
-                'trends' => $chartData
+                'trends' => $chartData,
             ];
         });
 
@@ -307,70 +307,61 @@ class TeacherDashboardController extends Controller
         if (! $teacherRole || ! $teacherRole->is_homeroom_teacher) {
             return response()->json(['success' => true, 'data' => []]);
         }
-        
+
         $classId = $teacherRole->homeroom_class_id;
 
-        // 2. Fetch Students
+        // 2. Fetch Students with eager loading to prevent N+1
         $students = User::whereHas('classStudents', function ($query) use ($classId) {
             $query->where('class_id', $classId)->where('status', 'active');
         })
-        ->where('role_type', 'student')
-        ->where('is_active', true)
-        ->select('id', 'name', 'username as nis', 'device_id') // Added device_id to check if registered
-        ->orderBy('name')
-        ->get();
+            ->where('role_type', 'student')
+            ->where('is_active', true)
+            ->select('id', 'name', 'username as nis', 'device_id')
+            ->orderBy('name')
+            ->get();
 
         if ($students->isEmpty()) {
-             return response()->json(['success' => true, 'data' => []]);
+            return response()->json(['success' => true, 'data' => []]);
         }
 
         $studentIds = $students->pluck('id');
 
-        // 3. Fetch Batch Attendance (Last 30 Days)
-        // Optimized: Single query for all students
+        // 3. OPTIMIZED: Single batch query for all attendance data (Last 30 Days)
         $thirtyDaysAgo = Carbon::now()->subDays(30)->toDateString();
-        
+
         $attendances = DB::table('attendances')
             ->whereIn('student_id', $studentIds)
             ->where('date', '>=', $thirtyDaysAgo)
             ->where('school_id', $user->school_id)
-            ->orderBy('date', 'desc') // Important for streak calc
+            ->orderBy('date', 'desc')
             ->select('student_id', 'status', 'date')
             ->get()
             ->groupBy('student_id');
 
-        // 4. Process Metrics per Student
+        // 4. Process Metrics per Student (single loop, no additional queries)
         $processedStudents = $students->map(function ($student) use ($attendances) {
             $records = $attendances->get($student->id) ?? collect();
-            
+
             // A. Last Status
             $lastRecord = $records->first();
             $lastStatus = $lastRecord ? $lastRecord->status : 'no_data';
-            
+
             // B. Attendance Rate (30 Days)
-            // We assume records exist for valid days (automated alpha or scan). 
-            // If records are sparse, this might be skewed, but sufficient for now.
             $totalRecords = $records->count();
             $presentCount = $records->whereIn('status', ['present', 'late'])->count();
-            $rate = $totalRecords > 0 ? round(($presentCount / $totalRecords) * 100, 1) : 0;
-            // Handle case with 0 records (new student) -> Default to 100% to avoid false alarm? Or 0%?
-            // Let's set 100% if new, unless enrolled long ago. Assuming 100% for no data to be kind.
-            if ($totalRecords === 0) $rate = 100;
+            $rate = $totalRecords > 0 ? round(($presentCount / $totalRecords) * 100, 1) : 100;
 
             // C. Consecutive Absence Streak
-            // Iterate from most recent. Break on present/late.
             $streak = 0;
             foreach ($records as $record) {
                 if (in_array($record->status, ['sick', 'permit', 'alpha'])) {
                     $streak++;
                 } else {
-                    break; 
+                    break;
                 }
             }
 
             // D. Risk Analysis
-            // Rule: Red if Rate < 70% OR Streak >= 3
-            // Yellow if Rate < 85% OR Streak >= 2
             $risk = 'green';
             if ($rate < 70 || $streak >= 3) {
                 $risk = 'red';
@@ -382,19 +373,18 @@ class TeacherDashboardController extends Controller
                 'id' => $student->id,
                 'name' => $student->name,
                 'nis' => $student->nis,
-                'registered' => !empty($student->device_id),
+                'registered' => ! empty($student->device_id),
                 'metrics' => [
-                    'last_status' => $lastStatus, // present, late, sick, permit, alpha, no_data
+                    'last_status' => $lastStatus,
                     'attendance_rate' => $rate,
                     'absence_streak' => $streak,
-                    'risk_level' => $risk // green, yellow, red
-                ]
+                    'risk_level' => $risk,
+                ],
             ];
         });
 
         // 5. Sort by Risk (Red first)
         $sortedStudents = $processedStudents->sortBy(function ($s) {
-            // Sort order: Red (1), Yellow (2), Green (3)
             return match ($s['metrics']['risk_level']) {
                 'red' => 1,
                 'yellow' => 2,
@@ -436,10 +426,10 @@ class TeacherDashboardController extends Controller
         $students = User::whereHas('classStudents', function ($query) use ($classId) {
             $query->where('class_id', $classId)->where('status', 'active');
         })
-        ->where('role_type', 'student')
-        ->where('is_active', true)
-        ->select('id', 'name', 'total_points', 'current_streak')
-        ->get();
+            ->where('role_type', 'student')
+            ->where('is_active', true)
+            ->select('id', 'name', 'total_points', 'current_streak')
+            ->get();
 
         // 3. Filter Candidates
         $closeToLevelUp = [];
@@ -453,7 +443,7 @@ class TeacherDashboardController extends Controller
             // Bronze (0-200) -> Next Silver (201). Threshold 196-200.
             // Silver (201-500) -> Next Gold (501). Threshold 490-500.
             // Gold (501-1000) -> Next Platinum (1001). Threshold 980-1000.
-            
+
             $nextLevel = null;
             $pointsNeeded = 0;
 
@@ -461,11 +451,11 @@ class TeacherDashboardController extends Controller
                 $nextLevel = 'Silver';
                 $pointsNeeded = 201 - $points;
             } elseif ($points >= 490 && $points <= 500) {
-                 $nextLevel = 'Gold';
-                 $pointsNeeded = 501 - $points;
+                $nextLevel = 'Gold';
+                $pointsNeeded = 501 - $points;
             } elseif ($points >= 980 && $points <= 1000) {
-                 $nextLevel = 'Platinum';
-                 $pointsNeeded = 1001 - $points;
+                $nextLevel = 'Platinum';
+                $pointsNeeded = 1001 - $points;
             }
 
             if ($nextLevel) {
@@ -474,7 +464,7 @@ class TeacherDashboardController extends Controller
                     'name' => $student->name,
                     'current_points' => $points,
                     'next_level' => $nextLevel,
-                    'points_needed' => $pointsNeeded
+                    'points_needed' => $pointsNeeded,
                 ];
             }
 
@@ -485,7 +475,7 @@ class TeacherDashboardController extends Controller
                     'id' => $student->id,
                     'name' => $student->name,
                     'current_streak' => $streak,
-                    'days_needed' => 30 - $streak
+                    'days_needed' => 30 - $streak,
                 ];
             }
         }
@@ -494,8 +484,8 @@ class TeacherDashboardController extends Controller
             'success' => true,
             'data' => [
                 'close_to_level_up' => $closeToLevelUp,
-                'close_to_streak_reward' => $closeToStreakReward
-            ]
+                'close_to_streak_reward' => $closeToStreakReward,
+            ],
         ]);
     }
 
@@ -527,19 +517,19 @@ class TeacherDashboardController extends Controller
         $students = User::whereHas('classStudents', function ($query) use ($classId) {
             $query->where('class_id', $classId)->where('status', 'active');
         })
-        ->where('role_type', 'student')
-        ->where('is_active', true)
-        ->pluck('name', 'id');
+            ->where('role_type', 'student')
+            ->where('is_active', true)
+            ->pluck('name', 'id');
 
         if ($students->isEmpty()) {
             return response()->json(['success' => true, 'data' => []]);
         }
-        
+
         $studentIds = $students->keys();
         $alerts = [];
-        
+
         // Fetch Risk Data (assuming 'student_attendance_risk' table is populated via Cron/Service)
-        // If not populated, we fallback to calculation or just skip. 
+        // If not populated, we fallback to calculation or just skip.
         // For REAL TIME accuracy, we query the Risk Table + Recent Attendance.
 
         $latestRisk = DB::table('student_attendance_risk')
@@ -557,8 +547,8 @@ class TeacherDashboardController extends Controller
                     'severity' => 'critical',
                     'student_id' => $risk->student_id,
                     'student_name' => $students[$risk->student_id] ?? 'Unknown',
-                    'detail' => "Student is at HIGH risk (Score: {$risk->risk_score}). Factors: " . implode(", ", json_decode($risk->factors_json) ?? []),
-                    'score' => $risk->risk_score
+                    'detail' => "Student is at HIGH risk (Score: {$risk->risk_score}). Factors: ".implode(', ', json_decode($risk->factors_json) ?? []),
+                    'score' => $risk->risk_score,
                 ];
             }
         }
@@ -576,15 +566,15 @@ class TeacherDashboardController extends Controller
         foreach ($latestRisk as $studentId => $current) {
             $prev = $previousRisk[$studentId] ?? null;
             $prevLevel = $prev ? $prev->risk_level : 'low'; // Default low if new
-            
+
             if ($prevLevel === 'low' && in_array($current->risk_level, ['medium', 'high'])) {
-                 $alerts[] = [
+                $alerts[] = [
                     'type' => 'risk_escalation',
                     'severity' => 'high',
                     'student_id' => $studentId,
                     'student_name' => $students[$studentId] ?? 'Unknown',
                     'detail' => "Risk escalated from {$prevLevel} to {$current->risk_level}",
-                    'escalation' => "{$prevLevel} -> {$current->risk_level}"
+                    'escalation' => "{$prevLevel} -> {$current->risk_level}",
                 ];
             }
         }
@@ -602,19 +592,19 @@ class TeacherDashboardController extends Controller
         foreach ($students as $id => $name) {
             $records = $recentRecords->get($id);
             $streak = 0;
-            
+
             if ($records) {
                 // Group by date to handle multiple sessions per day
                 $dates = $records->groupBy('attendance_date');
                 foreach ($dates as $date => $dayRecs) {
                     // Check if day is absent (all records absent)
-                    $isAbsent = $dayRecs->every(fn($r) => in_array($r->status, ['absent', 'alpha']));
+                    $isAbsent = $dayRecs->every(fn ($r) => in_array($r->status, ['absent', 'alpha']));
                     // If status 'alpha' (unexplained) specifically? Prompt says "absence" in general.
                     // Let's assume 'absent'/'alpha'.
                     if ($isAbsent) {
                         $streak++;
                     } else {
-                        break; 
+                        break;
                     }
                 }
             }
@@ -623,13 +613,13 @@ class TeacherDashboardController extends Controller
             // Let's alert on >= 2 if we haven't already alerted on high risk (streak 3 is high risk).
             // streak=2 is specific trigger.
             if ($streak == 2) {
-                 $alerts[] = [
+                $alerts[] = [
                     'type' => 'sudden_absence',
                     'severity' => 'medium',
                     'student_id' => $id,
                     'student_name' => $name,
-                    'detail' => "Absent for last 2 consecutive days",
-                    'days' => 2
+                    'detail' => 'Absent for last 2 consecutive days',
+                    'days' => 2,
                 ];
             }
         }
@@ -646,14 +636,13 @@ class TeacherDashboardController extends Controller
         ]);
     }
 
-
     /**
      * Get Student Risk Detail Breakdown
      */
-    public function getStudentRiskDetail(Request $request, $studentId, \App\Services\RiskAnalysisService $riskService) 
+    public function getStudentRiskDetail(Request $request, $studentId, \App\Services\RiskAnalysisService $riskService)
     {
         $user = $request->user();
-        
+
         // Validation: Ensure student belongs to teacher's class? Or just school?
         // For simplicity, just check school.
         $student = User::where('id', $studentId)
@@ -665,13 +654,14 @@ class TeacherDashboardController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $riskData
+            'data' => $riskData,
         ]);
     }
+
     /**
      * Get Class Timeline (Today's Schedule + Attendance)
      */
-    public function getClassTimeline(Request $request) 
+    public function getClassTimeline(Request $request)
     {
         $user = $request->user();
         $schoolId = $user->school_id;
@@ -722,25 +712,28 @@ class TeacherDashboardController extends Controller
             ->pluck('present_count', 'schedule_id');
 
         // 4. Transform
-        $timeline = $schedules->map(function($schedule) use ($attendanceCounts) {
+        $timeline = $schedules->map(function ($schedule) use ($attendanceCounts) {
             $now = Carbon::now()->format('H:i:s');
             $status = 'upcoming';
-            if ($now > $schedule->end_time) $status = 'completed';
-            elseif ($now >= $schedule->start_time) $status = 'ongoing';
-            
+            if ($now > $schedule->end_time) {
+                $status = 'completed';
+            } elseif ($now >= $schedule->start_time) {
+                $status = 'ongoing';
+            }
+
             return [
                 'id' => $schedule->id,
                 'subject' => $schedule->subject_name,
                 'teacher' => $schedule->teacher_name,
-                'time_range' => substr($schedule->start_time, 0, 5) . ' - ' . substr($schedule->end_time, 0, 5),
+                'time_range' => substr($schedule->start_time, 0, 5).' - '.substr($schedule->end_time, 0, 5),
                 'status' => $status,
-                'present_count' => $attendanceCounts[$schedule->id] ?? 0
+                'present_count' => $attendanceCounts[$schedule->id] ?? 0,
             ];
         });
 
         return response()->json([
             'success' => true,
-            'data' => $timeline
+            'data' => $timeline,
         ]);
     }
 
@@ -777,14 +770,15 @@ class TeacherDashboardController extends Controller
             ->get();
 
         // A. Weekly Attendance Rate
-        $weeklyStats = $monthAttendances->groupBy(function($item) {
+        $weeklyStats = $monthAttendances->groupBy(function ($item) {
             return Carbon::parse($item->attendance_date)->weekOfMonth;
-        })->map(function($weekRecords, $weekNum) {
+        })->map(function ($weekRecords, $weekNum) {
             $total = $weekRecords->count();
             $present = $weekRecords->whereIn('status', ['present', 'late'])->count();
+
             return [
-                'week' => 'Week ' . $weekNum,
-                'rate' => $total > 0 ? round(($present / $total) * 100, 1) : 0
+                'week' => 'Week '.$weekNum,
+                'rate' => $total > 0 ? round(($present / $total) * 100, 1) : 0,
             ];
         })->values();
 
@@ -796,11 +790,11 @@ class TeacherDashboardController extends Controller
         $topAbsent = $monthAttendances
             ->whereIn('status', ['absent', 'sick', 'permit', 'alpha'])
             ->groupBy('student_id')
-            ->map(function($records, $studentId) use ($studentNames) {
+            ->map(function ($records, $studentId) use ($studentNames) {
                 return [
                     'student_id' => $studentId,
                     'name' => $studentNames[$studentId] ?? 'Unknown',
-                    'count' => $records->count()
+                    'count' => $records->count(),
                 ];
             })
             ->sortByDesc('count')
@@ -811,11 +805,11 @@ class TeacherDashboardController extends Controller
         $topPunctual = $monthAttendances
             ->where('status', 'present')
             ->groupBy('student_id')
-            ->map(function($records, $studentId) use ($studentNames) {
+            ->map(function ($records, $studentId) use ($studentNames) {
                 return [
                     'student_id' => $studentId,
                     'name' => $studentNames[$studentId] ?? 'Unknown',
-                    'count' => $records->count()
+                    'count' => $records->count(),
                 ];
             })
             ->sortByDesc('count')
@@ -825,14 +819,14 @@ class TeacherDashboardController extends Controller
         // E. Average Arrival Time
         $times = $monthAttendances
             ->whereNotNull('check_in_time')
-            ->map(function($item) {
+            ->map(function ($item) {
                 return Carbon::parse($item->check_in_time)->secondsSinceMidnight();
             });
-        
+
         $avgArrivalTime = '-';
         if ($times->isNotEmpty()) {
             $avgSeconds = $times->average();
-            $avgArrivalTime = gmdate('H:i', (int)$avgSeconds);
+            $avgArrivalTime = gmdate('H:i', (int) $avgSeconds);
         }
 
         return response()->json([
@@ -842,8 +836,8 @@ class TeacherDashboardController extends Controller
                 'weekly_trends' => $weeklyStats,
                 'most_absent' => $topAbsent,
                 'most_punctual' => $topPunctual,
-                'avg_arrival_time' => $avgArrivalTime
-            ]
+                'avg_arrival_time' => $avgArrivalTime,
+            ],
         ]);
     }
 
@@ -872,42 +866,44 @@ class TeacherDashboardController extends Controller
         }
         $classId = $teacherRole->homeroom_class_id;
 
-        // 2. Fetch Students
+        // 2. OPTIMIZED: Fetch Students with eager loading
         $students = User::whereHas('classStudents', function ($query) use ($classId) {
             $query->where('class_id', $classId)->where('status', 'active');
         })
-        ->where('role_type', 'student')
-        ->where('is_active', true)
-        ->select('id', 'name')
-        ->get();
+            ->where('role_type', 'student')
+            ->where('is_active', true)
+            ->select('id', 'name')
+            ->get();
 
         if ($students->isEmpty()) {
             return response()->json(['success' => true, 'data' => []]);
         }
         $studentIds = $students->pluck('id');
 
-        // 3. Batch Query Data matching criteria
-        
-        // A. Today's Status
+        // 3. OPTIMIZED: Batch Query All Data in single queries
+
+        // A. Today's Status - Single query
         $todayRecords = DB::table('attendances')
             ->whereIn('student_id', $studentIds)
             ->where('attendance_date', $todayStr)
+            ->select('student_id', 'status')
+            ->get()
             ->pluck('status', 'student_id');
 
-        // B. 30 Days Stats
+        // B. 30 Days Stats - Single aggregated query
         $stats = DB::table('attendances')
             ->whereIn('student_id', $studentIds)
             ->where('attendance_date', '>=', $thirtyDaysAgo)
             ->select(
                 'student_id',
-                DB::raw('count(*) as total'), 
+                DB::raw('count(*) as total'),
                 DB::raw("SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) as present_count")
             )
             ->groupBy('student_id')
             ->get()
             ->keyBy('student_id');
 
-        // C. Last 5 Records
+        // C. Last 5 Records - Single query with window function simulation
         $recentHistory = DB::table('attendances')
             ->whereIn('student_id', $studentIds)
             ->orderBy('attendance_date', 'desc')
@@ -918,7 +914,7 @@ class TeacherDashboardController extends Controller
                 return $records->take(5);
             });
 
-        // D. Parents Info
+        // D. Parents Info - Single query with joins
         $studentParents = DB::table('student_parents')
             ->join('users', 'student_parents.parent_id', '=', 'users.id')
             ->leftJoin('user_profiles', 'users.id', '=', 'user_profiles.user_id')
@@ -933,23 +929,22 @@ class TeacherDashboardController extends Controller
             ->get()
             ->groupBy('student_id');
 
-        // 4. Filter and Build Response
+        // 4. Process and Filter (single loop, no additional queries)
         $contactList = [];
 
         foreach ($students as $student) {
             $issues = [];
             $todayStatus = $todayRecords[$student->id] ?? null;
-            
-            // Criteria 1: Absent Today (or Alpha/Sick/Permit)
-            // If no record exists, we treat it as Not Checked In (Potential Absent/Alpha)
-            if (!$todayStatus || in_array($todayStatus, ['absent', 'sick', 'permit', 'alpha'])) {
+
+            // Criteria 1: Absent Today
+            if (! $todayStatus || in_array($todayStatus, ['absent', 'sick', 'permit', 'alpha'])) {
                 $statusLabel = $todayStatus ? ucfirst($todayStatus) : 'Not Checked In';
                 $issues[] = "Absent today ({$statusLabel})";
             }
 
             // Criteria 2: Late Today
             if ($todayStatus === 'late') {
-                $issues[] = "Late today";
+                $issues[] = 'Late today';
             }
 
             // Criteria 3: Low Rate
@@ -959,13 +954,13 @@ class TeacherDashboardController extends Controller
                 $rate = ($stat->present_count / $stat->total) * 100;
             }
             if ($rate < 75) {
-                $issues[] = "Low attendance (" . round($rate, 1) . "%)";
+                $issues[] = 'Low attendance ('.round($rate, 1).'%)';
             }
 
             // Only include if there are issues
-            if (!empty($issues)) {
+            if (! empty($issues)) {
                 $parents = $studentParents[$student->id] ?? collect();
-                
+
                 $contactList[] = [
                     'student_id' => $student->id,
                     'student_name' => $student->name,
@@ -974,17 +969,17 @@ class TeacherDashboardController extends Controller
                         return [
                             'name' => $p->parent_name,
                             'relation' => $p->relationship,
-                            'contact' => $p->phone ?? $p->email ?? '-'
+                            'contact' => $p->phone ?? $p->email ?? '-',
                         ];
                     }),
-                    'history' => $recentHistory[$student->id] ?? []
+                    'history' => $recentHistory[$student->id] ?? [],
                 ];
             }
         }
 
         return response()->json([
             'success' => true,
-            'data' => $contactList
+            'data' => $contactList,
         ]);
     }
 
@@ -998,7 +993,7 @@ class TeacherDashboardController extends Controller
         $schoolId = $user->school_id;
         $today = Carbon::now()->toDateString();
         // Look back 3 days for corrections
-        $lookbackDate = Carbon::now()->subDays(3)->toDateString(); 
+        $lookbackDate = Carbon::now()->subDays(3)->toDateString();
 
         // 1. Resolve Homeroom
         $academicYearId = DB::table('academic_years')
@@ -1068,7 +1063,7 @@ class TeacherDashboardController extends Controller
                 }
             }
 
-            if (!empty($issues)) {
+            if (! empty($issues)) {
                 $list[] = [
                     'attendance_id' => $record->id,
                     'student_name' => $record->student_name,
@@ -1079,15 +1074,15 @@ class TeacherDashboardController extends Controller
                     'issues' => $issues,
                     'device_info' => in_array('device_mismatch', $issues) ? [
                         'registered' => $record->registered_device, // Should probably mask this in real app
-                        'used' => $record->device_id_in
-                    ] : null
+                        'used' => $record->device_id_in,
+                    ] : null,
                 ];
             }
         }
 
         return response()->json([
             'success' => true,
-            'data' => $list
+            'data' => $list,
         ]);
     }
 
@@ -1099,7 +1094,7 @@ class TeacherDashboardController extends Controller
     {
         $user = $request->user();
         $schoolId = $user->school_id;
-        
+
         // 1. Resolve Homeroom
         $academicYearId = DB::table('academic_years')
             ->where('school_id', $schoolId)
@@ -1112,8 +1107,8 @@ class TeacherDashboardController extends Controller
 
         if (! $teacherRole || ! $teacherRole->is_homeroom_teacher) {
             return response()->json([
-                'success' => true, 
-                'data' => ['score' => 0, 'grade' => 'N/A', 'details' => []]
+                'success' => true,
+                'data' => ['score' => 0, 'grade' => 'N/A', 'details' => []],
             ]);
         }
         $classId = $teacherRole->homeroom_class_id;
@@ -1125,9 +1120,9 @@ class TeacherDashboardController extends Controller
         $endLast = Carbon::now()->subMonth()->endOfMonth()->toDateString();
 
         // 3. Fetch Data Correctly
-        // Only count records where status is finalized? 
+        // Only count records where status is finalized?
         // We look at all records for the class in the period.
-        
+
         $currentStats = DB::table('attendances')
             ->where('class_id', $classId)
             ->whereBetween('attendance_date', [$startCurrent, $endCurrent])
@@ -1152,27 +1147,31 @@ class TeacherDashboardController extends Controller
         // (Present + Late) / Total
         $totalCur = $currentStats->total ?? 0;
         $attRateRaw = $totalCur > 0 ? ($currentStats->present_check / $totalCur) * 100 : 0;
-        if ($totalCur == 0) $attRateRaw = 100; // Neutral start for empty month? Or 0? Let's say 100 to be optimistic for new month
-        
+        if ($totalCur == 0) {
+            $attRateRaw = 100;
+        } // Neutral start for empty month? Or 0? Let's say 100 to be optimistic for new month
+
         $scoreAtt = $attRateRaw;
 
         // 5. Calculate Component 2: Punctuality Rate (30%)
         // Present (On Time) / Total
         $puncRateRaw = $totalCur > 0 ? ($currentStats->on_time_check / $totalCur) * 100 : 0;
-        if ($totalCur == 0) $puncRateRaw = 100;
+        if ($totalCur == 0) {
+            $puncRateRaw = 100;
+        }
 
         $scorePunc = $puncRateRaw;
 
         // 6. Calculate Component 3: Improvement (20%)
         // Based on Absence Rate (Lower is better)
         $absRateCur = $totalCur > 0 ? ($currentStats->absent_check / $totalCur) * 100 : 0;
-        
+
         $totalLast = $lastStats->total ?? 0;
         $absRateLast = $totalLast > 0 ? ($lastStats->absent_check / $totalLast) * 100 : $absRateCur; // Default to current if no history
 
-        // Logic: 
+        // Logic:
         // If AbsCur <= AbsLast -> 100 pts (Improved or Same)
-        // If AbsCur > AbsLast -> Score degrades. 
+        // If AbsCur > AbsLast -> Score degrades.
         // Formula: 100 * (AbsLast / AbsCur)
         if ($absRateCur <= $absRateLast) {
             $scoreImp = 100;
@@ -1188,10 +1187,15 @@ class TeacherDashboardController extends Controller
 
         // Grade
         $grade = 'F';
-        if ($finalScore >= 90) $grade = 'A';
-        elseif ($finalScore >= 80) $grade = 'B';
-        elseif ($finalScore >= 70) $grade = 'C';
-        elseif ($finalScore >= 60) $grade = 'D';
+        if ($finalScore >= 90) {
+            $grade = 'A';
+        } elseif ($finalScore >= 80) {
+            $grade = 'B';
+        } elseif ($finalScore >= 70) {
+            $grade = 'C';
+        } elseif ($finalScore >= 60) {
+            $grade = 'D';
+        }
 
         return response()->json([
             'success' => true,
@@ -1202,21 +1206,21 @@ class TeacherDashboardController extends Controller
                     'attendance_score' => [
                         'value' => round($scoreAtt, 1),
                         'weight' => '50%',
-                        'contribution' => round($scoreAtt * 0.50, 1)
+                        'contribution' => round($scoreAtt * 0.50, 1),
                     ],
                     'punctuality_score' => [
                         'value' => round($scorePunc, 1),
                         'weight' => '30%',
-                        'contribution' => round($scorePunc * 0.30, 1)
+                        'contribution' => round($scorePunc * 0.30, 1),
                     ],
                     'improvement_score' => [
                         'value' => round($scoreImp, 1),
                         'weight' => '20%',
                         'contribution' => round($scoreImp * 0.20, 1),
-                        'detail' => "Absence: " . round($absRateCur,1) . "% (Current) vs " . round($absRateLast,1) . "% (Last Month)"
-                    ]
-                ]
-            ]
+                        'detail' => 'Absence: '.round($absRateCur, 1).'% (Current) vs '.round($absRateLast, 1).'% (Last Month)',
+                    ],
+                ],
+            ],
         ]);
     }
 
@@ -1249,12 +1253,12 @@ class TeacherDashboardController extends Controller
         $student = User::whereHas('classStudents', function ($query) use ($classId) {
             $query->where('class_id', $classId)->where('status', 'active');
         })
-        ->where('id', $studentId)
-        ->where('role_type', 'student')
-        ->where('is_active', true)
-        ->first();
+            ->where('id', $studentId)
+            ->where('role_type', 'student')
+            ->where('is_active', true)
+            ->first();
 
-        if (!$student) {
+        if (! $student) {
             return response()->json(['success' => false, 'message' => 'Student not found in your class'], 404);
         }
 
@@ -1271,7 +1275,9 @@ class TeacherDashboardController extends Controller
 
         $totalRecords = $monthlyStats->total ?? 0;
         $attRate = $totalRecords > 0 ? ($monthlyStats->present_check / $totalRecords) * 100 : 0;
-        if ($totalRecords == 0) $attRate = 100; // Optimistic default
+        if ($totalRecords == 0) {
+            $attRate = 100;
+        } // Optimistic default
 
         // 4. Streak Calculation (All time recent)
         // Check last 10 records for streak
@@ -1281,7 +1287,7 @@ class TeacherDashboardController extends Controller
             ->orderBy('attendance_date', 'desc')
             ->limit(10)
             ->get();
-        
+
         $streak = 0;
         foreach ($recentRecords as $rec) {
             if (in_array($rec->status, ['absent', 'alpha', 'sick', 'permit'])) {
@@ -1306,15 +1312,15 @@ class TeacherDashboardController extends Controller
                     'id' => $student->id,
                     'name' => $student->name,
                     'nis' => $student->username, // Assuming username is NIS
-                    'photo' => $student->profile_photo_path ?? null // Should use accessor or profile table really
+                    'photo' => $student->profile_photo_path ?? null, // Should use accessor or profile table really
                 ],
                 'summary' => [
                     'attendance_rate_month' => round($attRate, 1),
                     'late_count_month' => (int) ($monthlyStats->late_count ?? 0),
-                    'absence_streak' => $streak
+                    'absence_streak' => $streak,
                 ],
-                'history' => $history
-            ]
+                'history' => $history,
+            ],
         ]);
     }
 
@@ -1384,7 +1390,7 @@ class TeacherDashboardController extends Controller
                 }
 
                 return [
-                    'id' => 'att_' . $log->id,
+                    'id' => 'att_'.$log->id,
                     'timestamp' => $log->created_at,
                     'time_ago' => Carbon::parse($log->created_at)->diffForHumans(),
                     'type' => $type,
@@ -1392,8 +1398,8 @@ class TeacherDashboardController extends Controller
                     'description' => $desc,
                     'meta' => [
                         'student_id' => $log->student_id,
-                        'student_name' => $log->student_name
-                    ]
+                        'student_name' => $log->student_name,
+                    ],
                 ];
             });
 
@@ -1407,13 +1413,13 @@ class TeacherDashboardController extends Controller
             ->get()
             ->map(function ($log) {
                 return [
-                    'id' => 'audit_' . $log->id,
+                    'id' => 'audit_'.$log->id,
                     'timestamp' => $log->created_at,
                     'time_ago' => Carbon::parse($log->created_at)->diffForHumans(),
                     'type' => 'warning', // Schedule changes are important
                     'title' => 'Schedule Change',
                     'description' => $log->description ?? $log->action,
-                    'meta' => []
+                    'meta' => [],
                 ];
             });
 
@@ -1425,7 +1431,7 @@ class TeacherDashboardController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $feed
+            'data' => $feed,
         ]);
     }
 
@@ -1469,7 +1475,7 @@ class TeacherDashboardController extends Controller
             // Logic: Count unique students? Or summing sessions?
             // "Total students taught today" -> Sum of students present/late in all sessions (seats filled)
             // If a student is taught twice (Math then Physics), they count twice? Usually yes for "volume" stats.
-            
+
             $attendancesToday = DB::table('attendances')
                 ->whereIn('schedule_id', $scheduleIds)
                 ->where('attendance_date', $today)
@@ -1478,12 +1484,12 @@ class TeacherDashboardController extends Controller
             $seatsFilled = $attendancesToday->whereIn('status', ['present', 'late'])->count();
             $lateToday = $attendancesToday->where('status', 'late')->count();
             $absentToday = $attendancesToday->whereIn('status', ['absent', 'alpha', 'sick', 'permit'])->count();
-            
+
             $totalRecorded = $seatsFilled + $absentToday; // Total students we SHOULD have taught (that have attendance record)
-            // If attendance hasn't been taken yet for a class, $totalRecorded might be small. 
+            // If attendance hasn't been taken yet for a class, $totalRecorded might be small.
             // Bettermetric: Sum of class sizes for *upcoming/completed* classes?
             // For now, let's stick to 'recorded' metrics to avoid complexity of "enrolled students" queries per class.
-            
+
             $rate = $totalRecorded > 0 ? ($seatsFilled / $totalRecorded) * 100 : 0;
 
             // 3. Next Upcoming Class
@@ -1495,7 +1501,7 @@ class TeacherDashboardController extends Controller
             // 4. 7-Day Trend for THIS Teacher (Across ALL their subjects)
             // We look for attendance records where schedule.teacher_id = user->id
             $sevendaysAgo = Carbon::now()->subDays(6)->toDateString();
-            
+
             $trendStats = DB::table('attendances')
                 ->join('schedules', 'attendances.schedule_id', '=', 'schedules.id')
                 ->where('schedules.teacher_id', $user->id)
@@ -1506,6 +1512,7 @@ class TeacherDashboardController extends Controller
                 ->map(function ($dayRecords, $date) {
                     $total = $dayRecords->count();
                     $present = $dayRecords->whereIn('status', ['present', 'late'])->count();
+
                     return $total > 0 ? round(($present / $total) * 100, 1) : 0;
                 });
 
@@ -1515,7 +1522,7 @@ class TeacherDashboardController extends Controller
                 $chartData[] = [
                     'date' => $d,
                     'label' => Carbon::parse($d)->isoFormat('dd'),
-                    'rate' => $trendStats[$d] ?? 0
+                    'rate' => $trendStats[$d] ?? 0,
                 ];
             }
 
@@ -1525,34 +1532,38 @@ class TeacherDashboardController extends Controller
                     'students_taught' => $seatsFilled, // Present/Late
                     'attendance_rate' => round($rate, 1),
                     'total_late' => $lateToday,
-                    'total_absent' => $absentToday
+                    'total_absent' => $absentToday,
                 ],
                 'next_class' => $nextClass ? [
                     'subject' => $nextClass->subject_name,
                     'class' => $nextClass->class_name,
                     'time' => substr($nextClass->start_time, 0, 5),
-                    'room' => $nextClass->room
+                    'room' => $nextClass->room,
                 ] : null,
-                'today_schedule' => $schedules->map(function($s) use ($nowTime) {
-                     $status = 'upcoming';
-                     if ($nowTime > $s->end_time) $status = 'finished';
-                     elseif ($nowTime >= $s->start_time) $status = 'ongoing';
-                     return [
-                         'id' => $s->id,
-                         'subject' => $s->subject_name,
-                         'class' => $s->class_name,
-                         'time' => substr($s->start_time, 0, 5) . ' - ' . substr($s->end_time, 0, 5),
-                         'room' => $s->room,
-                         'status' => $status
-                     ];
+                'today_schedule' => $schedules->map(function ($s) use ($nowTime) {
+                    $status = 'upcoming';
+                    if ($nowTime > $s->end_time) {
+                        $status = 'finished';
+                    } elseif ($nowTime >= $s->start_time) {
+                        $status = 'ongoing';
+                    }
+
+                    return [
+                        'id' => $s->id,
+                        'subject' => $s->subject_name,
+                        'class' => $s->class_name,
+                        'time' => substr($s->start_time, 0, 5).' - '.substr($s->end_time, 0, 5),
+                        'room' => $s->room,
+                        'status' => $status,
+                    ];
                 }),
-                'weekly_trend' => $chartData
+                'weekly_trend' => $chartData,
             ];
         });
 
         return response()->json([
             'success' => true,
-            'data' => $data
+            'data' => $data,
         ]);
     }
 
@@ -1619,14 +1630,14 @@ class TeacherDashboardController extends Controller
         // 4. Build Response
         $monitoringData = $schedules->map(function ($schedule) use ($classCounts, $attendanceStats) {
             $totalStudents = $classCounts[$schedule->class_id] ?? 0;
-            
+
             // Get stats for this specific session
             $stats = $attendanceStats->get($schedule->id) ?? collect();
-            
+
             $present = $stats->where('status', 'present')->sum('count');
             $late = $stats->where('status', 'late')->sum('count');
             $absent = $stats->whereIn('status', ['absent', 'alpha', 'sick', 'permit'])->sum('count');
-            
+
             // "Not Checked In" is the remainder of students who have NO record for this schedule
             $totalRecorded = $present + $late + $absent;
             $notCheckedIn = max(0, $totalStudents - $totalRecorded);
@@ -1634,14 +1645,17 @@ class TeacherDashboardController extends Controller
             // Determine Session Status
             $now = Carbon::now()->format('H:i:s');
             $sessionStatus = 'upcoming';
-            if ($now > $schedule->end_time) $sessionStatus = 'finished';
-            elseif ($now >= $schedule->start_time) $sessionStatus = 'ongoing';
+            if ($now > $schedule->end_time) {
+                $sessionStatus = 'finished';
+            } elseif ($now >= $schedule->start_time) {
+                $sessionStatus = 'ongoing';
+            }
 
             return [
                 'schedule_id' => $schedule->id,
                 'class_name' => $schedule->class_name,
                 'subject_name' => $schedule->subject_name,
-                'time' => substr($schedule->start_time, 0, 5) . ' - ' . substr($schedule->end_time, 0, 5),
+                'time' => substr($schedule->start_time, 0, 5).' - '.substr($schedule->end_time, 0, 5),
                 'session_status' => $sessionStatus,
                 'stats' => [
                     'total_students' => $totalStudents,
@@ -1649,14 +1663,14 @@ class TeacherDashboardController extends Controller
                     'late' => $late,
                     'absent' => $absent,
                     'not_checked_in' => $notCheckedIn,
-                    'attendance_rate' => $totalStudents > 0 ? round((($present + $late) / $totalStudents) * 100, 1) : 0
-                ]
+                    'attendance_rate' => $totalStudents > 0 ? round((($present + $late) / $totalStudents) * 100, 1) : 0,
+                ],
             ];
         });
 
         return response()->json([
             'success' => true,
-            'data' => $monitoringData
+            'data' => $monitoringData,
         ]);
     }
 
@@ -1673,26 +1687,26 @@ class TeacherDashboardController extends Controller
         // Let's stick to strict ownership for now or simple check.
         $schedule = DB::table('schedules')
             ->where('id', $scheduleId)
-            ->where('teacher_id', $user->id) 
+            ->where('teacher_id', $user->id)
             ->where('is_active', true)
             ->select('class_id', 'subject_id')
             ->first();
 
-        if (!$schedule) {
+        if (! $schedule) {
             return response()->json(['success' => false, 'message' => 'Schedule not found or unauthorized'], 404);
         }
 
         // 2. Base Query: Active Students in Class
         $query = User::whereHas('classStudents', function ($q) use ($schedule) {
             $q->where('class_id', $schedule->class_id)
-              ->where('status', 'active');
+                ->where('status', 'active');
         })
-        ->where('role_type', 'student')
-        ->where('is_active', true)
-        ->select('users.id', 'users.name', 'users.username as nis', 'users.profile_photo_url', 'users.device_id as registered_device');
+            ->where('role_type', 'student')
+            ->where('is_active', true)
+            ->select('users.id', 'users.name', 'users.username as nis', 'users.profile_photo_url', 'users.device_id as registered_device');
 
         // Search Filter
-        if ($request->has('search') && !empty($request->search)) {
+        if ($request->has('search') && ! empty($request->search)) {
             $search = $request->search;
             $query->where('name', 'like', "%{$search}%");
         }
@@ -1711,10 +1725,10 @@ class TeacherDashboardController extends Controller
 
         // 4. Transform & Filter
         $statusFilter = $request->get('status'); // present, late, absent, not_checked_in
-        
+
         $list = $students->map(function ($student) use ($attendances) {
             $att = $attendances[$student->id] ?? null;
-            
+
             // Determine Status
             $status = 'not_checked_in';
             $checkInTime = '-';
@@ -1724,14 +1738,14 @@ class TeacherDashboardController extends Controller
             if ($att) {
                 $status = $att->status; // present, late, absent, sick, alpha...
                 $checkInTime = $att->check_in_time ? Carbon::parse($att->check_in_time)->format('H:i') : '-';
-                
+
                 // Device Anomaly Check
                 // If student has registered device, but checked in with different one?
-                if ($att->check_in_time && !empty($student->registered_device) && !empty($att->device_id_in)) {
-                   if ($student->registered_device !== $att->device_id_in) {
-                       $deviceAnomaly = true;
-                       $anomalyDetail = 'Device Mismatch';
-                   }
+                if ($att->check_in_time && ! empty($student->registered_device) && ! empty($att->device_id_in)) {
+                    if ($student->registered_device !== $att->device_id_in) {
+                        $deviceAnomaly = true;
+                        $anomalyDetail = 'Device Mismatch';
+                    }
                 }
             }
 
@@ -1744,7 +1758,7 @@ class TeacherDashboardController extends Controller
                 'status_label' => $status === 'not_checked_in' ? 'Belum Absen' : ucfirst($status),
                 'check_in_time' => $checkInTime,
                 'device_anomaly' => $deviceAnomaly,
-                'anomaly_detail' => $anomalyDetail
+                'anomaly_detail' => $anomalyDetail,
             ];
         });
 
@@ -1757,13 +1771,14 @@ class TeacherDashboardController extends Controller
                 if ($statusFilter === 'absent') {
                     return in_array($item['status'], ['absent', 'alpha', 'sick', 'permit']);
                 }
+
                 return $item['status'] === $statusFilter;
             });
         }
 
         return response()->json([
             'success' => true,
-            'data' => $list->values()
+            'data' => $list->values(),
         ]);
     }
 
@@ -1784,16 +1799,18 @@ class TeacherDashboardController extends Controller
             ->where('class_id', $classId)
             ->where('is_active', true)
             ->exists();
-        
+
         // Homeroom override?
-        if (!$hasAccess) {
-             $isHomeroom = TeacherRole::where('teacher_id', $user->id)
+        if (! $hasAccess) {
+            $isHomeroom = TeacherRole::where('teacher_id', $user->id)
                 ->where('homeroom_class_id', $classId)
                 ->exists();
-             if ($isHomeroom) $hasAccess = true;
+            if ($isHomeroom) {
+                $hasAccess = true;
+            }
         }
 
-        if (!$hasAccess) {
+        if (! $hasAccess) {
             return response()->json(['success' => false, 'message' => 'Unauthorized access to this class analytics'], 403);
         }
 
@@ -1803,34 +1820,34 @@ class TeacherDashboardController extends Controller
             ->where('attendances.class_id', $classId)
             ->where('attendances.school_id', $schoolId)
             ->whereBetween('attendances.attendance_date', [$startOfMonth, $endOfMonth]);
-            // Filter by teacher's subject? 
-            // "Subject Teacher Dashboard" typically wants to see behavior in THEIR class.
-            // But "Average arrival time" implies general school arrival?
-            // Let's scope to ONLY schedules taught by THIS teacher for specific behavior analysis, 
-            // OR if prompt implies general class behavior, we use all.
-            // "For selected class..." -> implied general or specific.
-            // Usually a teacher wants to know "Are they late to MY class?".
-            // Let's filter by schedule.teacher_id = user->id to be safe and relevant.
-        
+        // Filter by teacher's subject?
+        // "Subject Teacher Dashboard" typically wants to see behavior in THEIR class.
+        // But "Average arrival time" implies general school arrival?
+        // Let's scope to ONLY schedules taught by THIS teacher for specific behavior analysis,
+        // OR if prompt implies general class behavior, we use all.
+        // "For selected class..." -> implied general or specific.
+        // Usually a teacher wants to know "Are they late to MY class?".
+        // Let's filter by schedule.teacher_id = user->id to be safe and relevant.
+
         $monthAttendances->join('schedules', 'attendances.schedule_id', '=', 'schedules.id')
-             ->where('schedules.teacher_id', $user->id)
-             ->select(
-                 'attendances.student_id', 
-                 'attendances.status', 
-                 'attendances.check_in_time',
-                 'users.name as student_name'
-             );
+            ->where('schedules.teacher_id', $user->id)
+            ->select(
+                'attendances.student_id',
+                'attendances.status',
+                'attendances.check_in_time',
+                'users.name as student_name'
+            );
 
         $records = $monthAttendances->get();
 
         if ($records->isEmpty()) {
-             return response()->json([
+            return response()->json([
                 'success' => true,
                 'data' => [
                     'top_late' => [],
                     'frequent_absence' => [],
-                    'avg_arrival_time' => '-'
-                ]
+                    'avg_arrival_time' => '-',
+                ],
             ]);
         }
 
@@ -1841,7 +1858,7 @@ class TeacherDashboardController extends Controller
                 return [
                     'student_id' => $items->first()->student_id,
                     'name' => $items->first()->student_name,
-                    'count' => $items->count()
+                    'count' => $items->count(),
                 ];
             })
             ->sortByDesc('count')
@@ -1855,7 +1872,7 @@ class TeacherDashboardController extends Controller
                 return [
                     'student_id' => $items->first()->student_id,
                     'name' => $items->first()->student_name,
-                    'count' => $items->count()
+                    'count' => $items->count(),
                 ];
             })
             ->filter(function ($item) {
@@ -1869,11 +1886,11 @@ class TeacherDashboardController extends Controller
             ->map(function ($item) {
                 return Carbon::parse($item->check_in_time)->secondsSinceMidnight();
             });
-        
+
         $avgTime = '-';
         if ($arrivalTimes->isNotEmpty()) {
             $avgSeconds = $arrivalTimes->average();
-            $avgTime = gmdate('H:i', (int)$avgSeconds);
+            $avgTime = gmdate('H:i', (int) $avgSeconds);
         }
 
         return response()->json([
@@ -1882,8 +1899,8 @@ class TeacherDashboardController extends Controller
                 'period' => Carbon::now()->format('F Y'),
                 'top_late' => $topLate,
                 'frequent_absence' => $frequentAbsence,
-                'avg_arrival_time' => $avgTime
-            ]
+                'avg_arrival_time' => $avgTime,
+            ],
         ]);
     }
 
@@ -1896,7 +1913,7 @@ class TeacherDashboardController extends Controller
             'schedule_id' => 'required|exists:schedules,id',
             'student_id' => 'required|exists:users,id',
             'status' => 'required|in:present,late,absent,sick,permit,alpha',
-            'reason' => 'required|string|min:5'
+            'reason' => 'required|string|min:5',
         ]);
 
         $user = $request->user();
@@ -1910,16 +1927,16 @@ class TeacherDashboardController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$schedule) {
+        if (! $schedule) {
             return response()->json(['success' => false, 'message' => 'Unauthorized or invalid schedule'], 403);
         }
 
         // Time Window Check: Start Time to End Time + 30 mins
-        // We only enforce this for TODAY's schedule. 
+        // We only enforce this for TODAY's schedule.
         // If teacher tries to edit past attendance, that's a different flow (Correction).
         // Assuming this is for "real-time" manual entry.
-        $startTime = Carbon::parse($todayStr . ' ' . $schedule->start_time);
-        $endTime = Carbon::parse($todayStr . ' ' . $schedule->end_time)->addMinutes(30);
+        $startTime = Carbon::parse($todayStr.' '.$schedule->start_time);
+        $endTime = Carbon::parse($todayStr.' '.$schedule->end_time)->addMinutes(30);
 
         if ($now->lessThan($startTime) || $now->greaterThan($endTime)) {
             // Optional: Soften this restriction for "Correction" if needed, but prompt says "Controlled... within class time window".
@@ -1935,7 +1952,7 @@ class TeacherDashboardController extends Controller
         // 3. Prevent Overwrite of QR Scan without explicit override logic?
         // Prompt says "Cannot overwrite QR-generated attendance without audit trail".
         // We WILL overwrite, but we MUST create an audit trail (AttendanceLog).
-        
+
         if ($existing && $existing->verification_type === 'qr_scan' && $existing->status === 'present') {
             // If try to mark absent after QR scan?
             // Allowed but flagged.
@@ -1943,7 +1960,7 @@ class TeacherDashboardController extends Controller
 
         DB::beginTransaction();
         try {
-            $att = $existing ?: new \App\Models\Attendance();
+            $att = $existing ?: new \App\Models\Attendance;
             $att->school_id = $user->school_id;
             $att->student_id = $request->student_id;
             $att->schedule_id = $request->schedule_id;
@@ -1951,16 +1968,18 @@ class TeacherDashboardController extends Controller
             $att->attendance_date = $todayStr;
             // If changing to present/late, set check_in_time if not set
             if (in_array($request->status, ['present', 'late'])) {
-                 if (!$att->check_in_time) $att->check_in_time = $now->toTimeString();
+                if (! $att->check_in_time) {
+                    $att->check_in_time = $now->toTimeString();
+                }
             } else {
                 // If marking absent, should we clear check_in? Or keep it history?
-                // Usually keep check_in_time if they were here but left? 
+                // Usually keep check_in_time if they were here but left?
                 // Simple logic: Don't clear check_in_time if it exists, to preserve evidence they were here.
             }
-            
+
             $att->status = $request->status;
             $att->verification_type = 'manual'; // Override type
-            $att->notes = $request->reason . " (By Teacher: {$user->name})";
+            $att->notes = $request->reason." (By Teacher: {$user->name})";
             $att->save();
 
             // 4. Audit Trail
@@ -1970,19 +1989,20 @@ class TeacherDashboardController extends Controller
                 'action' => $existing ? 'manual_update' : 'manual_create',
                 'previous_status' => $existing ? $existing->status : null,
                 'new_status' => $request->status,
-                'notes' => $request->reason
+                'notes' => $request->reason,
             ]);
 
             DB::commit();
 
             return response()->json([
-                'success' => true, 
+                'success' => true,
                 'message' => 'Attendance updated successfully',
-                'data' => $att
+                'data' => $att,
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json(['success' => false, 'message' => 'Failed to update attendance'], 500);
         }
 
@@ -2016,8 +2036,8 @@ class TeacherDashboardController extends Controller
                     'best_class' => null,
                     'worst_class' => null,
                     'avg_punctuality' => 0,
-                    'class_performance' => []
-                ]
+                    'class_performance' => [],
+                ],
             ]);
         }
 
@@ -2035,7 +2055,7 @@ class TeacherDashboardController extends Controller
                 'attendances.class_id',
                 DB::raw('count(*) as total'),
                 DB::raw("SUM(CASE WHEN attendances.status IN ('present', 'late') THEN 1 ELSE 0 END) as present_count"),
-                DB::raw("SUM(CASE WHEN attendances.status = 'late' THEN 1 ELSE 0 END) as late_count") 
+                DB::raw("SUM(CASE WHEN attendances.status = 'late' THEN 1 ELSE 0 END) as late_count")
             )
             ->groupBy('attendances.class_id')
             ->get();
@@ -2043,8 +2063,8 @@ class TeacherDashboardController extends Controller
         // 3. Process Per Class Metrics
         $performance = $attendanceStats->map(function ($stat) use ($classNames) {
             $rate = $stat->total > 0 ? ($stat->present_count / $stat->total) * 100 : 0;
-            $punctualityRate = $stat->present_count > 0 
-                ? ( ($stat->present_count - $stat->late_count) / $stat->present_count ) * 100 
+            $punctualityRate = $stat->present_count > 0
+                ? (($stat->present_count - $stat->late_count) / $stat->present_count) * 100
                 : 0;
 
             return [
@@ -2052,19 +2072,19 @@ class TeacherDashboardController extends Controller
                 'class_name' => $classNames[$stat->class_id] ?? 'Unknown',
                 'attendance_rate' => round($rate, 1),
                 'punctuality_rate' => round($punctualityRate, 1),
-                'total_sessions' => $stat->total // Approximation of student-sessions
+                'total_sessions' => $stat->total, // Approximation of student-sessions
             ];
         });
 
         // Fill in classes with 0 data
         foreach ($distinctClasses as $cls) {
-            if (!$performance->contains('class_id', $cls->id)) {
+            if (! $performance->contains('class_id', $cls->id)) {
                 $performance->push([
                     'class_id' => $cls->id,
                     'class_name' => $cls->name,
                     'attendance_rate' => 0,
                     'punctuality_rate' => 0,
-                    'total_sessions' => 0
+                    'total_sessions' => 0,
                 ]);
             }
         }
@@ -2085,14 +2105,14 @@ class TeacherDashboardController extends Controller
                 'avg_punctuality' => round($avgPunctuality, 1),
                 'best_class' => $bestClass ? [
                     'name' => $bestClass['class_name'],
-                    'rate' => $bestClass['attendance_rate']
+                    'rate' => $bestClass['attendance_rate'],
                 ] : null,
                 'worst_class' => $worstClass ? [
-                     'name' => $worstClass['class_name'],
-                     'rate' => $worstClass['attendance_rate']
+                    'name' => $worstClass['class_name'],
+                    'rate' => $worstClass['attendance_rate'],
                 ] : null,
-                'class_breakdown' => $performance
-            ]
+                'class_breakdown' => $performance,
+            ],
         ]);
     }
 
@@ -2136,11 +2156,11 @@ class TeacherDashboardController extends Controller
         // 2. Counts
         // Total Students per class
         $classCounts = DB::table('class_students')
-             ->whereIn('class_id', $classIds)
-             ->where('status', 'active')
-             ->select('class_id', DB::raw('count(*) as count'))
-             ->groupBy('class_id')
-             ->pluck('count', 'class_id');
+            ->whereIn('class_id', $classIds)
+            ->where('status', 'active')
+            ->select('class_id', DB::raw('count(*) as count'))
+            ->groupBy('class_id')
+            ->pluck('count', 'class_id');
 
         // Present Count per schedule
         $attendanceCounts = DB::table('attendances')
@@ -2152,28 +2172,31 @@ class TeacherDashboardController extends Controller
             ->pluck('count', 'schedule_id');
 
         // 3. Map
-        $timeline = $schedules->map(function($s) use ($classCounts, $attendanceCounts, $now) {
+        $timeline = $schedules->map(function ($s) use ($classCounts, $attendanceCounts, $now) {
             $total = $classCounts[$s->class_id] ?? 0;
             $present = $attendanceCounts[$s->id] ?? 0;
-            
+
             $percentage = $total > 0 ? round(($present / $total) * 100, 1) : 0;
-            
+
             $status = 'not started';
-            if ($now > $s->end_time) $status = 'completed';
-            elseif ($now >= $s->start_time) $status = 'ongoing';
+            if ($now > $s->end_time) {
+                $status = 'completed';
+            } elseif ($now >= $s->start_time) {
+                $status = 'ongoing';
+            }
 
             return [
                 'class' => $s->class_name,
                 'subject' => $s->subject_name,
-                'time_range' => substr($s->start_time, 0, 5) . ' - ' . substr($s->end_time, 0, 5),
+                'time_range' => substr($s->start_time, 0, 5).' - '.substr($s->end_time, 0, 5),
                 'status' => $status,
-                'present_percentage' => $percentage
+                'present_percentage' => $percentage,
             ];
         });
 
         return response()->json([
-            'success' => true, 
-            'data' => $timeline
+            'success' => true,
+            'data' => $timeline,
         ]);
     }
 
@@ -2192,7 +2215,7 @@ class TeacherDashboardController extends Controller
             ->select('id', 'name', 'username as nis', 'profile_photo_url')
             ->first();
 
-        if (!$student) {
+        if (! $student) {
             return response()->json(['success' => false, 'message' => 'Student not found'], 404);
         }
 
@@ -2224,12 +2247,12 @@ class TeacherDashboardController extends Controller
 
         // 4. Last 5 Records
         $lastFive = $records->take(5)->map(function ($rec) {
-             return [
-                 'date' => Carbon::parse($rec->attendance_date)->isoFormat('dddd, D MMMM Y'),
-                 'status' => $rec->status,
-                 'check_in' => $rec->check_in_time ? substr($rec->check_in_time, 0, 5) : '-',
-                 'subject' => $rec->subject_name
-             ];
+            return [
+                'date' => Carbon::parse($rec->attendance_date)->isoFormat('dddd, D MMMM Y'),
+                'status' => $rec->status,
+                'check_in' => $rec->check_in_time ? substr($rec->check_in_time, 0, 5) : '-',
+                'subject' => $rec->subject_name,
+            ];
         })->values();
 
         return response()->json([
@@ -2240,10 +2263,10 @@ class TeacherDashboardController extends Controller
                     'attendance_rate' => round($rate, 1),
                     'total_late' => $late,
                     'total_absent' => $absent,
-                    'total_sessions' => $totalSessions
+                    'total_sessions' => $totalSessions,
                 ],
-                'history_recent' => $lastFive
-            ]
+                'history_recent' => $lastFive,
+            ],
         ]);
     }
 
@@ -2263,15 +2286,15 @@ class TeacherDashboardController extends Controller
             ->where('class_id', $classId)
             ->where('is_active', true)
             ->exists();
-        
-        if (!$hasAccess) {
-             // Fallback for homeroom
-             $isHomeroom = TeacherRole::where('teacher_id', $user->id)
+
+        if (! $hasAccess) {
+            // Fallback for homeroom
+            $isHomeroom = TeacherRole::where('teacher_id', $user->id)
                 ->where('homeroom_class_id', $classId)
                 ->exists();
-             if (!$isHomeroom) {
-                 return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
-             }
+            if (! $isHomeroom) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+            }
         }
 
         // 2. Query Data
@@ -2282,7 +2305,7 @@ class TeacherDashboardController extends Controller
         // However, if the chart is "14-day trend", and I only teach Monday, the chart will be empty for 12 days.
         // That might look broken.
         // Let's QUERY for THIS teacher's sessions. If empty on days, so be it (it's accurate).
-        
+
         $data = DB::table('attendances')
             ->join('schedules', 'attendances.schedule_id', '=', 'schedules.id')
             ->where('attendances.class_id', $classId)
@@ -2309,23 +2332,23 @@ class TeacherDashboardController extends Controller
             $late = $dayRecords->where('status', 'late')->count();
             // Group absences
             $absent = $dayRecords->whereIn('status', ['absent', 'alpha', 'sick', 'permit'])->count();
-            
+
             // if no records, maybe no class that day?
             // checking if a schedule existed that day is expensive (need to check day_of_week, holidays etc).
             // For simple trend, just returning counts is fine. Front-end can handle 0s.
-            
+
             $chartData[] = [
                 'date' => $dString,
                 'label' => $date->isoFormat('dd (D/M)'),
                 'present' => $present,
                 'late' => $late,
-                'absent' => $absent
+                'absent' => $absent,
             ];
         }
 
         return response()->json([
             'success' => true,
-            'data' => $chartData
+            'data' => $chartData,
         ]);
     }
 
@@ -2339,7 +2362,7 @@ class TeacherDashboardController extends Controller
 
         // 1. Get Teacher's Schedule IDs (All Active)
         $scheduleIds = DB::table('schedules')
-            ->where('teacher_id', $user->id) 
+            ->where('teacher_id', $user->id)
             ->where('school_id', $schoolId)
             ->pluck('id');
 
@@ -2350,12 +2373,12 @@ class TeacherDashboardController extends Controller
         // 2. Fetch Attendance Logs linked to Teacher's Schedules
         // Note: 'attendances' table has schedule_id, we need to join logs -> attendances -> schedules
         // This ensures the feed shows events relevant to classes THIS teacher teaches.
-        
+
         $logs = DB::table('attendance_logs')
             ->join('attendances', 'attendance_logs.attendance_id', '=', 'attendances.id')
             ->join('users', 'attendances.student_id', '=', 'users.id')
             ->join('classes', 'attendances.class_id', '=', 'classes.id')
-            // Join schedule just to verify or get subject info? 
+            // Join schedule just to verify or get subject info?
             // AttendanceRecord typically has schedule_id.
             ->whereIn('attendances.schedule_id', $scheduleIds)
             ->where('attendances.school_id', $schoolId)
@@ -2403,7 +2426,7 @@ class TeacherDashboardController extends Controller
             }
 
             return [
-                'id' => 'log_' . $log->log_id,
+                'id' => 'log_'.$log->log_id,
                 'action_type' => $log->action, // raw action
                 'type' => $type, // UI semantic type (success, warning, info)
                 'title' => $title,
@@ -2412,14 +2435,14 @@ class TeacherDashboardController extends Controller
                 'time_ago' => Carbon::parse($log->created_at)->diffForHumans(),
                 'meta' => [
                     'student' => $log->student_name,
-                    'class' => $log->class_name
-                ]
+                    'class' => $log->class_name,
+                ],
             ];
         });
 
         return response()->json([
             'success' => true,
-            'data' => $feed
+            'data' => $feed,
         ]);
     }
 }

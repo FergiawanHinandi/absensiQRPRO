@@ -197,7 +197,7 @@ class UserManagementController extends Controller
 
         // Security: Super Admin cannot deactivate own account
         if ($user->id === auth()->id()) {
-             return response()->json(['message' => 'Cannot deactivate your own account.'], 403);
+            return response()->json(['message' => 'Cannot deactivate your own account.'], 403);
         }
 
         $user->is_active = ! $user->is_active;

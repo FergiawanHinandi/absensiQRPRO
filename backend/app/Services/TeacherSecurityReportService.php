@@ -19,12 +19,13 @@ use Illuminate\Support\Str;
 
 /**
  * Teacher Security Report Service
- * 
+ *
  * Generates comprehensive investigation reports for suspicious teacher behavior.
  */
 class TeacherSecurityReportService
 {
     protected BehaviorAnomalyService $behaviorService;
+
     protected TeacherHeatmapService $heatmapService;
 
     public function __construct(
@@ -40,7 +41,7 @@ class TeacherSecurityReportService
      */
     public function generateReport(
         int $teacherId,
-        string $range = '7d',
+        string $range,
         int $generatedBy,
         string $generationType = SecurityReport::GENERATION_MANUAL
     ): SecurityReport {
@@ -289,7 +290,7 @@ class TeacherSecurityReportService
      */
     protected function getLocationAnalysis(int $schoolId, int $teacherId, Carbon $startDate, Carbon $endDate): array
     {
-        $range = $startDate->diffInDays($endDate) . 'd';
+        $range = $startDate->diffInDays($endDate).'d';
         $heatmapData = $this->heatmapService->getHeatmapData(
             $schoolId,
             $teacherId,
@@ -487,15 +488,15 @@ class TeacherSecurityReportService
 
         if ($riskLevel === SecurityReport::RISK_CRITICAL || $riskLevel === SecurityReport::RISK_HIGH) {
             $recommendations[] = 'Schedule a meeting with the teacher to discuss findings';
-            
+
             if ($reportData['device_history']['device_integrity'] === 'FAILED') {
                 $recommendations[] = 'Verify device binding and consider re-binding';
             }
-            
+
             if ($reportData['location_analysis']['clusters_outside_school'] > 0) {
                 $recommendations[] = 'Review location scan policies and provide clarification';
             }
-            
+
             if ($reportData['security_alerts']['unresolved_alerts'] > 0) {
                 $recommendations[] = 'Resolve pending security alerts';
             }
@@ -524,13 +525,13 @@ class TeacherSecurityReportService
     protected function storePdf($pdf, string $fileName): string
     {
         $directory = 'security-reports';
-        
+
         // Ensure directory exists
-        if (!Storage::exists($directory)) {
+        if (! Storage::exists($directory)) {
             Storage::makeDirectory($directory);
         }
 
-        $path = $directory . '/' . $fileName;
+        $path = $directory.'/'.$fileName;
         Storage::put($path, $pdf->output());
 
         return $path;
@@ -543,7 +544,7 @@ class TeacherSecurityReportService
     {
         $timestamp = now()->format('Ymd_His');
         $teacherSlug = Str::slug($teacher->name, '_');
-        
+
         return "investigation_{$teacherSlug}_{$startDate->format('Ymd')}_{$timestamp}.pdf";
     }
 
@@ -553,7 +554,7 @@ class TeacherSecurityReportService
     protected function getDateRange(string $range): array
     {
         $endDate = now();
-        
+
         $days = match ($range) {
             '7d' => 7,
             '14d' => 14,

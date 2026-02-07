@@ -68,7 +68,7 @@ class SubscriptionController extends Controller
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json(['message' => 'Gagal memproses pembayaran. Silakan coba lagi atau hubungi support.'], 500);
         }
     }

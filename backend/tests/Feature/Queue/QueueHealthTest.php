@@ -2,11 +2,9 @@
 
 namespace Tests\Feature\Queue;
 
-use App\Jobs\TestFailingJob;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class QueueHealthTest extends TestCase
@@ -16,7 +14,7 @@ class QueueHealthTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create super admin for testing
         $this->superAdmin = User::factory()->create([
             'role_type' => 'super_admin',

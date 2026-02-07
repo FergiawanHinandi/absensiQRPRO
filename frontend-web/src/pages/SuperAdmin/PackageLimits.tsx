@@ -195,8 +195,7 @@ export const PackageLimits: React.FC = () => {
                         max_classes: school.max_classes || 20,
                         current_students: school.users_count || 0,
                         current_teachers: 0, // TODO: Get from API
-                        max_classes: school.max_classes || 20,
-                        current_students: school.users_count || 0,
+                        current_classes: 0, // Placeholder
                     },
                     package_type: school.package_type || 'basic',
                 }));

@@ -21,11 +21,15 @@ class GenerateSecurityReportJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public int $backoff = 60;
+
     public int $timeout = 300; // 5 minutes
 
     protected int $teacherId;
+
     protected string $range;
+
     protected string $triggerReason;
 
     /**
@@ -39,7 +43,7 @@ class GenerateSecurityReportJob implements ShouldQueue
         $this->teacherId = $teacherId;
         $this->range = $range;
         $this->triggerReason = $triggerReason;
-        
+
         $this->onQueue('security');
     }
 
@@ -49,11 +53,12 @@ class GenerateSecurityReportJob implements ShouldQueue
     public function handle(TeacherSecurityReportService $reportService): void
     {
         $teacher = User::with('school')->find($this->teacherId);
-        
-        if (!$teacher) {
+
+        if (! $teacher) {
             Log::channel('security')->warning('Auto-report generation skipped: teacher not found', [
                 'teacher_id' => $this->teacherId,
             ]);
+
             return;
         }
 
@@ -68,17 +73,19 @@ class GenerateSecurityReportJob implements ShouldQueue
                 'teacher_id' => $this->teacherId,
                 'teacher_name' => $teacher->name,
             ]);
+
             return;
         }
 
         // Find a super_admin or school_admin to attribute the report to
         $systemAdmin = $this->findSystemAdmin($teacher->school_id);
-        
-        if (!$systemAdmin) {
+
+        if (! $systemAdmin) {
             Log::channel('security')->error('Auto-report generation failed: no admin found', [
                 'teacher_id' => $this->teacherId,
                 'school_id' => $teacher->school_id,
             ]);
+
             return;
         }
 
@@ -142,12 +149,12 @@ class GenerateSecurityReportJob implements ShouldQueue
     {
         // Find admins to notify
         $admins = User::where(function ($query) use ($teacher) {
-                $query->where('role_type', 'super_admin')
-                    ->orWhere(function ($q) use ($teacher) {
-                        $q->whereIn('role_type', ['admin', 'school_admin'])
-                          ->where('school_id', $teacher->school_id);
-                    });
-            })
+            $query->where('role_type', 'super_admin')
+                ->orWhere(function ($q) use ($teacher) {
+                    $q->whereIn('role_type', ['admin', 'school_admin'])
+                        ->where('school_id', $teacher->school_id);
+                });
+        })
             ->where('is_active', true)
             ->get();
 
@@ -157,7 +164,7 @@ class GenerateSecurityReportJob implements ShouldQueue
                 'school_id' => $teacher->school_id,
                 'type' => 'auto_security_report',
                 'severity' => $report->risk_level === 'high' ? 'high' : 'medium',
-                'description' => "Auto-generated security report for {$teacher->name} - Risk Level: " . strtoupper($report->risk_level),
+                'description' => "Auto-generated security report for {$teacher->name} - Risk Level: ".strtoupper($report->risk_level),
                 'ip_address' => request()->ip(),
             ]);
 
@@ -187,8 +194,8 @@ class GenerateSecurityReportJob implements ShouldQueue
     {
         return [
             'security-report',
-            'teacher:' . $this->teacherId,
-            'trigger:' . $this->triggerReason,
+            'teacher:'.$this->teacherId,
+            'trigger:'.$this->triggerReason,
         ];
     }
 }

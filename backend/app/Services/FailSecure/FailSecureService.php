@@ -23,29 +23,43 @@ class FailSecureService
      * System state constants
      */
     public const STATE_HEALTHY = 'healthy';
+
     public const STATE_DEGRADED = 'degraded';
+
     public const STATE_CRITICAL = 'critical';
+
     public const STATE_UNKNOWN = 'unknown';
 
     /**
      * Component identifiers
      */
     public const COMPONENT_REDIS = 'redis';
+
     public const COMPONENT_DATABASE = 'database';
+
     public const COMPONENT_QUEUE = 'queue';
+
     public const COMPONENT_CACHE = 'cache';
+
     public const COMPONENT_POLICY = 'policy_service';
+
     public const COMPONENT_LOCATION = 'location_service';
+
     public const COMPONENT_DEVICE = 'device_service';
 
     /**
      * Fallback event types
      */
     public const EVENT_POLICY_FALLBACK = 'policy_fallback_used';
+
     public const EVENT_RATE_LIMIT_FALLBACK = 'rate_limit_fallback';
+
     public const EVENT_LOCATION_VALIDATION_FAILED = 'location_validation_failed';
+
     public const EVENT_DEVICE_VALIDATION_UNAVAILABLE = 'device_validation_unavailable';
+
     public const EVENT_SYSTEM_DEGRADED = 'system_degraded';
+
     public const EVENT_SECURITY_VALIDATION_FAILED = 'security_validation_failed';
 
     /**
@@ -111,9 +125,10 @@ class FailSecureService
 
         try {
             // Try cache first
-            $cachedState = Cache::get(self::STATE_CACHE_PREFIX . 'overall');
+            $cachedState = Cache::get(self::STATE_CACHE_PREFIX.'overall');
             if ($cachedState) {
                 $this->currentSystemState = $cachedState;
+
                 return $cachedState;
             }
 
@@ -132,7 +147,7 @@ class FailSecureService
             }
 
             // Cache for 30 seconds
-            Cache::put(self::STATE_CACHE_PREFIX . 'overall', $this->currentSystemState, 30);
+            Cache::put(self::STATE_CACHE_PREFIX.'overall', $this->currentSystemState, 30);
 
             return $this->currentSystemState;
         } catch (Throwable $e) {
@@ -141,6 +156,7 @@ class FailSecureService
                 'error' => $e->getMessage(),
             ]);
             $this->currentSystemState = self::STATE_DEGRADED;
+
             return self::STATE_DEGRADED;
         }
     }
@@ -164,6 +180,7 @@ class FailSecureService
     public function isDegraded(): bool
     {
         $state = $this->getSystemState();
+
         return in_array($state, [self::STATE_DEGRADED, self::STATE_CRITICAL]);
     }
 
@@ -183,6 +200,7 @@ class FailSecureService
         if ($this->isDegraded()) {
             return (int) ceil($normalLimit * self::DEGRADED_RATE_LIMIT_FACTOR);
         }
+
         return $normalLimit;
     }
 
@@ -259,7 +277,7 @@ class FailSecureService
      */
     public function hasFallbackActive(): bool
     {
-        return !empty($this->activeFallbacks);
+        return ! empty($this->activeFallbacks);
     }
 
     /**
@@ -302,8 +320,8 @@ class FailSecureService
             );
 
             // Clear cached system state
-            Cache::forget(self::STATE_CACHE_PREFIX . 'overall');
-            Cache::forget(self::STATE_CACHE_PREFIX . $component);
+            Cache::forget(self::STATE_CACHE_PREFIX.'overall');
+            Cache::forget(self::STATE_CACHE_PREFIX.$component);
         } catch (Throwable $e) {
             Log::error('FailSecure: Cannot update component state', [
                 'component' => $component,
@@ -319,7 +337,7 @@ class FailSecureService
     public function checkRedisHealth(): string
     {
         try {
-            $cacheKey = self::STATE_CACHE_PREFIX . self::COMPONENT_REDIS;
+            $cacheKey = self::STATE_CACHE_PREFIX.self::COMPONENT_REDIS;
             $cached = Cache::store('array')->get($cacheKey);
             if ($cached !== null) {
                 return $cached;
@@ -334,9 +352,11 @@ class FailSecureService
             $this->updateComponentState(self::COMPONENT_REDIS, $state, $responseMs);
 
             Cache::store('array')->put($cacheKey, $state, 10);
+
             return $state;
         } catch (Throwable $e) {
             $this->updateComponentState(self::COMPONENT_REDIS, self::STATE_CRITICAL, null, $e->getMessage());
+
             return self::STATE_CRITICAL;
         }
     }
@@ -347,7 +367,7 @@ class FailSecureService
     public function checkDatabaseHealth(): string
     {
         try {
-            $cacheKey = self::STATE_CACHE_PREFIX . self::COMPONENT_DATABASE;
+            $cacheKey = self::STATE_CACHE_PREFIX.self::COMPONENT_DATABASE;
             $cached = Cache::store('array')->get($cacheKey);
             if ($cached !== null) {
                 return $cached;
@@ -368,9 +388,11 @@ class FailSecureService
             $this->updateComponentState(self::COMPONENT_DATABASE, $state, $responseMs);
 
             Cache::store('array')->put($cacheKey, $state, 10);
+
             return $state;
         } catch (Throwable $e) {
             $this->updateComponentState(self::COMPONENT_DATABASE, self::STATE_CRITICAL, null, $e->getMessage());
+
             return self::STATE_CRITICAL;
         }
     }
@@ -381,7 +403,7 @@ class FailSecureService
     public function checkQueueHealth(): string
     {
         try {
-            $cacheKey = self::STATE_CACHE_PREFIX . self::COMPONENT_QUEUE;
+            $cacheKey = self::STATE_CACHE_PREFIX.self::COMPONENT_QUEUE;
             $cached = Cache::store('array')->get($cacheKey);
             if ($cached !== null) {
                 return $cached;
@@ -416,6 +438,7 @@ class FailSecureService
             $this->updateComponentState(self::COMPONENT_QUEUE, $state, null, null);
 
             Cache::store('array')->put($cacheKey, $state, 30);
+
             return $state;
         } catch (Throwable $e) {
             return self::STATE_UNKNOWN;
@@ -428,10 +451,10 @@ class FailSecureService
     public function checkCacheHealth(): string
     {
         try {
-            $cacheKey = self::STATE_CACHE_PREFIX . self::COMPONENT_CACHE;
+            $cacheKey = self::STATE_CACHE_PREFIX.self::COMPONENT_CACHE;
 
-            $testKey = 'fail_secure_health_check_' . uniqid();
-            $testValue = 'test_' . time();
+            $testKey = 'fail_secure_health_check_'.uniqid();
+            $testValue = 'test_'.time();
 
             $start = microtime(true);
             Cache::put($testKey, $testValue, 10);
@@ -441,6 +464,7 @@ class FailSecureService
 
             if ($retrieved !== $testValue) {
                 $this->updateComponentState(self::COMPONENT_CACHE, self::STATE_CRITICAL, $responseMs, 'Cache read/write mismatch');
+
                 return self::STATE_CRITICAL;
             }
 
@@ -450,6 +474,7 @@ class FailSecureService
             return $state;
         } catch (Throwable $e) {
             $this->updateComponentState(self::COMPONENT_CACHE, self::STATE_CRITICAL, null, $e->getMessage());
+
             return self::STATE_CRITICAL;
         }
     }
@@ -457,10 +482,10 @@ class FailSecureService
     /**
      * Execute with fail-secure handling
      *
-     * @param callable $operation The main operation
-     * @param callable $fallback The fallback if operation fails
-     * @param string $component Component identifier for logging
-     * @param string $fallbackDescription Description of fallback action
+     * @param  callable  $operation  The main operation
+     * @param  callable  $fallback  The fallback if operation fails
+     * @param  string  $component  Component identifier for logging
+     * @param  string  $fallbackDescription  Description of fallback action
      * @return mixed Result of operation or fallback
      */
     public function executeWithFallback(
@@ -515,7 +540,7 @@ class FailSecureService
 
         // Count fallbacks by type
         $fallbackCounts = $recentFallbacks->groupBy('event_type')
-            ->map(fn($items) => $items->count());
+            ->map(fn ($items) => $items->count());
 
         return [
             'system_state' => $this->getSystemState(),
@@ -537,10 +562,10 @@ class FailSecureService
     public function clearStateCache(): void
     {
         $this->currentSystemState = null;
-        Cache::forget(self::STATE_CACHE_PREFIX . 'overall');
+        Cache::forget(self::STATE_CACHE_PREFIX.'overall');
 
         foreach ([self::COMPONENT_REDIS, self::COMPONENT_DATABASE, self::COMPONENT_QUEUE, self::COMPONENT_CACHE] as $component) {
-            Cache::forget(self::STATE_CACHE_PREFIX . $component);
+            Cache::forget(self::STATE_CACHE_PREFIX.$component);
         }
     }
 
@@ -550,7 +575,7 @@ class FailSecureService
     public function forceDegradedMode(bool $enabled = true): void
     {
         if ($enabled) {
-            Cache::put(self::STATE_CACHE_PREFIX . 'overall', self::STATE_DEGRADED, 3600);
+            Cache::put(self::STATE_CACHE_PREFIX.'overall', self::STATE_DEGRADED, 3600);
             $this->currentSystemState = self::STATE_DEGRADED;
         } else {
             $this->clearStateCache();

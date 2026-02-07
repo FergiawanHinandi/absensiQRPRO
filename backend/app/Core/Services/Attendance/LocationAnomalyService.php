@@ -14,14 +14,14 @@ class LocationAnomalyService
      * Does NOT block the attendance, only flags it.
      * UNLESS: Suspicious activity + New/Untrusted Device -> Force Logout
      *
-     * @param Attendance $currentAttendance The newly created attendance record
-     * @param array $scanData Raw scan data including lat, lng, accuracy, device_id
+     * @param  Attendance  $currentAttendance  The newly created attendance record
+     * @param  array  $scanData  Raw scan data including lat, lng, accuracy, device_id
      */
     public function checkAndFlag(Attendance $currentAttendance, array $scanData): void
     {
         $studentId = $currentAttendance->student_id;
         $schoolId = $currentAttendance->school_id;
-        
+
         // 1. Get the previous attendance for this student (excluding the current one)
         $lastAttendance = Attendance::where('student_id', $studentId)
             ->where('id', '!=', $currentAttendance->id)
@@ -34,11 +34,11 @@ class LocationAnomalyService
         if ($this->checkImpossibleTravel($currentAttendance, $lastAttendance)) {
             $anomalyDetected = true;
         }
-        
+
         if ($this->checkAccuracyAnomaly($currentAttendance, $scanData, $lastAttendance)) {
             $anomalyDetected = true;
         }
-        
+
         if ($this->checkDeviceChurn($currentAttendance, $scanData, $studentId)) {
             $anomalyDetected = true;
         }
@@ -51,15 +51,15 @@ class LocationAnomalyService
                 ->exists();
 
             if (! $isTrusted) {
-                Log::channel('security')->critical("Suspicious Activity on Untrusted Device - Forcing Logout", [
-                    'student_id' => $studentId, 
-                    'device_id' => $scanData['device_id']
+                Log::channel('security')->critical('Suspicious Activity on Untrusted Device - Forcing Logout', [
+                    'student_id' => $studentId,
+                    'device_id' => $scanData['device_id'],
                 ]);
 
                 // Revoke all tokens
                 User::find($studentId)->tokens()->delete();
 
-                throw new \Exception("Aktivitas mencurigakan terdeteksi dari perangkat yang tidak dikenali demi keamanan akun anda. Silakan login kembali untuk verifikasi.");
+                throw new \Exception('Aktivitas mencurigakan terdeteksi dari perangkat yang tidak dikenali demi keamanan akun anda. Silakan login kembali untuk verifikasi.');
             }
         }
     }
@@ -70,16 +70,16 @@ class LocationAnomalyService
      */
     private function checkImpossibleTravel(Attendance $current, ?Attendance $last): bool
     {
-        if (!$last || !$last->lat_in || !$last->lng_in || !$current->lat_in || !$current->lng_in) {
+        if (! $last || ! $last->lat_in || ! $last->lng_in || ! $current->lat_in || ! $current->lng_in) {
             return false;
         }
 
         $minutesDiff = $current->created_at->diffInMinutes($last->created_at);
         if ($minutesDiff <= 10) {
             $distance = $this->calculateDistance(
-                $current->lat_in, 
-                $current->lng_in, 
-                $last->lat_in, 
+                $current->lat_in,
+                $current->lng_in,
+                $last->lat_in,
                 $last->lng_in
             );
 
@@ -91,9 +91,11 @@ class LocationAnomalyService
                     'curr_lat' => $current->lat_in,
                     'curr_lng' => $current->lng_in,
                 ]);
+
                 return true;
             }
         }
+
         return false;
     }
 
@@ -112,12 +114,13 @@ class LocationAnomalyService
             ]);
             $flagged = true;
         } elseif ($currentAccuracy > 500) {
-             $this->flagAttendance($current, 'accuracy_jump', 'low', [
+            $this->flagAttendance($current, 'accuracy_jump', 'low', [
                 'message' => "GPS Accuracy is poor ({$currentAccuracy}m).",
                 'accuracy' => $currentAccuracy,
             ]);
             $flagged = true;
         }
+
         return $flagged;
     }
 
@@ -127,7 +130,9 @@ class LocationAnomalyService
     private function checkDeviceChurn(Attendance $current, array $scanData, int $studentId): bool
     {
         $currentDeviceId = $scanData['device_id'] ?? null;
-        if (!$currentDeviceId) return false;
+        if (! $currentDeviceId) {
+            return false;
+        }
 
         $recentDevices = Attendance::where('student_id', $studentId)
             ->where('id', '!=', $current->id)
@@ -138,14 +143,16 @@ class LocationAnomalyService
             ->unique();
 
         if ($recentDevices->count() >= 2) {
-             if (!$recentDevices->contains($currentDeviceId)) {
-                 $this->flagAttendance($current, 'device_churn', 'medium', [
-                     'message' => "Frequent device changes detected.",
-                     'current_device' => $currentDeviceId,
-                 ]);
-                 return true;
-             }
+            if (! $recentDevices->contains($currentDeviceId)) {
+                $this->flagAttendance($current, 'device_churn', 'medium', [
+                    'message' => 'Frequent device changes detected.',
+                    'current_device' => $currentDeviceId,
+                ]);
+
+                return true;
+            }
         }
+
         return false;
     }
 

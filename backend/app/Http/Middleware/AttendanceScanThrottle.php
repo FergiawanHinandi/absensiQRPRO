@@ -138,7 +138,7 @@ class AttendanceScanThrottle
             $request->header('Accept-Encoding'),
         ];
 
-        return 'fp_' . substr(md5(implode('|', $components)), 0, 16);
+        return 'fp_'.substr(md5(implode('|', $components)), 0, 16);
     }
 
     /**

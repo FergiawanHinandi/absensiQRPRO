@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Validate Token Binding Middleware
- * 
+ *
  * Validates device fingerprint and IP country binding for admin tokens.
  * For super_admin and school_admin roles:
  * - If device fingerprint changes → revoke token, force re-login
@@ -30,14 +30,14 @@ class ValidateTokenBinding
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return $next($request);
         }
 
         // Get the current access token
         $token = $user->currentAccessToken();
 
-        if (!$token || !($token instanceof PersonalAccessToken)) {
+        if (! $token || ! ($token instanceof PersonalAccessToken)) {
             return $next($request);
         }
 

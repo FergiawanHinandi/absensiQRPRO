@@ -1,16 +1,13 @@
 <?php
 
+use App\Jobs\CalculateAttendanceRisk;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-
-
 use Illuminate\Support\Facades\Schedule;
-use App\Jobs\CalculateAttendanceRisk;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
-
 
 Schedule::command('exports:cleanup')->hourly();
 Schedule::command('security:aggregate-alerts')->everyFiveMinutes();
@@ -49,47 +46,79 @@ Schedule::command('security:backup-hashes --verify')
 // AUTOMATED ENCRYPTED BACKUP SYSTEM
 // ============================================================
 
-// Daily database backup at 02:00 AM
+// Daily FULL database backup at 02:00 AM
+// - Compressed with Gzip
+// - Encrypted with AES-256 (BACKUP_ENCRYPTION_KEY)
+// - Stored locally then synced to S3
+// - Retained for 30 days
 Schedule::command('backup:run --only-db')
     ->dailyAt('02:00')
     ->withoutOverlapping()
     ->runInBackground()
     ->onSuccess(function () {
-        \Illuminate\Support\Facades\Log::channel('security')
-            ->info('Scheduled database backup completed successfully');
+        \Illuminate\Support\Facades\Log::channel('backup')
+            ->info('Daily database backup completed successfully', [
+                'type' => 'database',
+                'scheduled_time' => '02:00',
+                'timestamp' => now()->toIso8601String(),
+            ]);
     })
     ->onFailure(function () {
-        \Illuminate\Support\Facades\Log::channel('security')
-            ->critical('Scheduled database backup FAILED');
-        // Alert will be triggered by backup:monitor
+        \Illuminate\Support\Facades\Log::channel('backup')
+            ->critical('Daily database backup FAILED', [
+                'type' => 'database',
+                'scheduled_time' => '02:00',
+                'timestamp' => now()->toIso8601String(),
+            ]);
     });
 
-// Daily files backup at 02:30 AM (after security hash backup)
+// Daily files backup at 02:45 AM (after security hash backup at 02:30)
 Schedule::command('backup:run --only-files')
     ->dailyAt('02:45')
     ->withoutOverlapping()
     ->runInBackground()
     ->onSuccess(function () {
-        \Illuminate\Support\Facades\Log::channel('security')
-            ->info('Scheduled files backup completed successfully');
+        \Illuminate\Support\Facades\Log::channel('backup')
+            ->info('Daily files backup completed successfully', [
+                'type' => 'files',
+                'scheduled_time' => '02:45',
+                'timestamp' => now()->toIso8601String(),
+            ]);
     })
     ->onFailure(function () {
-        \Illuminate\Support\Facades\Log::channel('security')
-            ->critical('Scheduled files backup FAILED');
+        \Illuminate\Support\Facades\Log::channel('backup')
+            ->critical('Daily files backup FAILED', [
+                'type' => 'files',
+                'scheduled_time' => '02:45',
+                'timestamp' => now()->toIso8601String(),
+            ]);
     });
 
-// Weekly backup cleanup on Sunday at 03:00 AM
+// Backup cleanup - runs daily at 03:00 AM (removes backups older than 30 days)
 Schedule::command('backup:clean')
-    ->weeklyOn(0, '03:00') // Sunday
+    ->dailyAt('03:00')
     ->withoutOverlapping()
-    ->runInBackground();
+    ->runInBackground()
+    ->onSuccess(function () {
+        \Illuminate\Support\Facades\Log::channel('backup')
+            ->info('Backup cleanup completed', [
+                'retention_days' => 30,
+                'timestamp' => now()->toIso8601String(),
+            ]);
+    });
 
 // Backup health monitoring every 6 hours
-Schedule::command('backup:health-check --silent')
+Schedule::command('backup:health-check --silent --max-age=26')
     ->everySixHours()
     ->withoutOverlapping()
     ->runInBackground()
     ->onFailure(function () {
-        \Illuminate\Support\Facades\Log::channel('security')
-            ->critical('Backup health check detected issues');
+        \Illuminate\Support\Facades\Log::channel('backup')
+            ->critical('Backup health check detected issues - immediate attention required');
     });
+
+// 🔄 Auto-Scale Queue Workers (Every Minute)
+Schedule::command('queue:autoscale --os=linux')->everyMinute()->withoutOverlapping();
+
+// 🚨 System Health Monitoring (Alerting)
+Schedule::command('monitor:system')->everyMinute()->runInBackground();

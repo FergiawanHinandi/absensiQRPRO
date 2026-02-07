@@ -191,7 +191,7 @@ class TeacherController extends Controller
     {
         $user = $request->user();
         $schoolId = $user->school_id;
-        
+
         // CRITICAL: Add pagination parameters
         $perPage = min($request->input('per_page', 20), 100); // Max 100 per page
         $search = $request->input('search');
@@ -228,10 +228,10 @@ class TeacherController extends Controller
             'teacher:id,name,email', // Only load required fields
             'subject:id,name,code',
             'class:id,name,grade_level',
-            'academicYear:id,name,start_date,end_date'
+            'academicYear:id,name,start_date,end_date',
         ])
-        ->orderBy('created_at', 'desc')
-        ->paginate($perPage);
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
 
         // CRITICAL: Transform data efficiently without additional queries
         $assignments->getCollection()->transform(function ($assignment) {
@@ -289,15 +289,15 @@ class TeacherController extends Controller
         $assignments = TeacherSubject::whereHas('teacher', function ($q) use ($schoolId) {
             $q->where('school_id', $schoolId);
         })
-        ->with([
-            'teacher:id,name',
-            'subject:id,name',
-            'class:id,name',
-        ])
-        ->lazy(100); // Process 100 records at a time
+            ->with([
+                'teacher:id,name',
+                'subject:id,name',
+                'class:id,name',
+            ])
+            ->lazy(100); // Process 100 records at a time
 
         $result = [];
-        
+
         // CRITICAL: Process in chunks to prevent memory overflow
         foreach ($assignments as $assignment) {
             $result[] = [
@@ -305,7 +305,7 @@ class TeacherController extends Controller
                 'subject_name' => $assignment->subject->name,
                 'class_name' => $assignment->class->name,
             ];
-            
+
             // CRITICAL: Optional memory management for very large datasets
             if (count($result) >= 1000) {
                 // Process batch and clear memory
@@ -317,7 +317,7 @@ class TeacherController extends Controller
         return response()->json([
             'success' => true,
             'data' => $result,
-            'memory_usage' => memory_get_usage(true) / 1024 / 1024 . ' MB',
+            'memory_usage' => memory_get_usage(true) / 1024 / 1024 .' MB',
         ]);
     }
 

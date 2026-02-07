@@ -13,12 +13,13 @@ use Illuminate\Http\Request;
 
 /**
  * Security Dashboard Behavior Risk Controller
- * 
+ *
  * Provides endpoints for viewing teacher behavior risk assessments.
  */
 class SecurityDashboardBehaviorController extends Controller
 {
     protected BehaviorAnomalyService $anomalyService;
+
     protected BehaviorBaselineService $baselineService;
 
     public function __construct(
@@ -31,7 +32,7 @@ class SecurityDashboardBehaviorController extends Controller
 
     /**
      * GET /api/v1/admin/security-dashboard/behavior-risk
-     * 
+     *
      * Returns teachers with elevated risk levels
      */
     public function behaviorRisk(Request $request): JsonResponse
@@ -62,7 +63,7 @@ class SecurityDashboardBehaviorController extends Controller
 
         $results = $baselines->map(function ($baseline) {
             $topFactors = $baseline->getTopRiskFactors(3);
-            
+
             return [
                 'user_id' => $baseline->user_id,
                 'teacher_name' => $baseline->user?->name ?? 'Unknown',
@@ -101,7 +102,7 @@ class SecurityDashboardBehaviorController extends Controller
 
     /**
      * GET /api/v1/admin/security-dashboard/behavior-risk/{userId}
-     * 
+     *
      * Get detailed behavior analysis for a specific teacher
      */
     public function teacherDetail(Request $request, int $userId): JsonResponse
@@ -114,7 +115,7 @@ class SecurityDashboardBehaviorController extends Controller
             ->where('role_type', 'teacher')
             ->first();
 
-        if (!$teacher) {
+        if (! $teacher) {
             return response()->json([
                 'success' => false,
                 'message' => 'Teacher not found.',
@@ -181,7 +182,7 @@ class SecurityDashboardBehaviorController extends Controller
 
     /**
      * POST /api/v1/admin/security-dashboard/behavior-risk/{userId}/clear-flag
-     * 
+     *
      * Clear review flag for a teacher
      */
     public function clearFlag(Request $request, int $userId): JsonResponse
@@ -189,10 +190,10 @@ class SecurityDashboardBehaviorController extends Controller
         $schoolId = $request->user()->school_id;
 
         $baseline = BehaviorBaseline::forUser($userId)
-            ->whereHas('user', fn($q) => $q->where('school_id', $schoolId))
+            ->whereHas('user', fn ($q) => $q->where('school_id', $schoolId))
             ->first();
 
-        if (!$baseline) {
+        if (! $baseline) {
             return response()->json([
                 'success' => false,
                 'message' => 'Baseline not found.',
@@ -209,7 +210,7 @@ class SecurityDashboardBehaviorController extends Controller
 
     /**
      * POST /api/v1/admin/security-dashboard/behavior-risk/{userId}/clear-reverification
-     * 
+     *
      * Clear device re-verification requirement
      */
     public function clearReverification(Request $request, int $userId): JsonResponse
@@ -217,10 +218,10 @@ class SecurityDashboardBehaviorController extends Controller
         $schoolId = $request->user()->school_id;
 
         $baseline = BehaviorBaseline::forUser($userId)
-            ->whereHas('user', fn($q) => $q->where('school_id', $schoolId))
+            ->whereHas('user', fn ($q) => $q->where('school_id', $schoolId))
             ->first();
 
-        if (!$baseline) {
+        if (! $baseline) {
             return response()->json([
                 'success' => false,
                 'message' => 'Baseline not found.',
@@ -237,7 +238,7 @@ class SecurityDashboardBehaviorController extends Controller
 
     /**
      * POST /api/v1/admin/security-dashboard/behavior-risk/{userId}/reanalyze
-     * 
+     *
      * Trigger immediate re-analysis for a teacher
      */
     public function reanalyze(Request $request, int $userId): JsonResponse
@@ -249,7 +250,7 @@ class SecurityDashboardBehaviorController extends Controller
             ->where('role_type', 'teacher')
             ->first();
 
-        if (!$teacher) {
+        if (! $teacher) {
             return response()->json([
                 'success' => false,
                 'message' => 'Teacher not found.',
@@ -271,7 +272,7 @@ class SecurityDashboardBehaviorController extends Controller
 
     /**
      * GET /api/v1/admin/security-dashboard/behavior-trends
-     * 
+     *
      * Get behavior risk trends over time for the school
      */
     public function behaviorTrends(Request $request): JsonResponse
@@ -282,7 +283,7 @@ class SecurityDashboardBehaviorController extends Controller
         // Get daily aggregated risk data
         $trends = BehaviorMetricDaily::forSchool($schoolId)
             ->where('date', '>=', now()->subDays($days)->toDateString())
-            ->selectRaw("
+            ->selectRaw('
                 date,
                 COUNT(DISTINCT user_id) as active_teachers,
                 SUM(total_scans) as total_scans,
@@ -290,7 +291,7 @@ class SecurityDashboardBehaviorController extends Controller
                 SUM(outside_radius_attempts) as total_outside_radius,
                 SUM(device_mismatch_attempts) as total_device_mismatch,
                 AVG(avg_scan_interval_seconds) as avg_scan_interval
-            ")
+            ')
             ->groupBy('date')
             ->orderBy('date')
             ->get()
@@ -300,13 +301,13 @@ class SecurityDashboardBehaviorController extends Controller
                     'active_teachers' => (int) $row->active_teachers,
                     'total_scans' => (int) $row->total_scans,
                     'total_failed' => (int) $row->total_failed,
-                    'failed_ratio' => $row->total_scans > 0 
-                        ? round($row->total_failed / $row->total_scans, 4) 
+                    'failed_ratio' => $row->total_scans > 0
+                        ? round($row->total_failed / $row->total_scans, 4)
                         : 0,
                     'outside_radius' => (int) $row->total_outside_radius,
                     'device_mismatch' => (int) $row->total_device_mismatch,
-                    'avg_scan_interval' => $row->avg_scan_interval 
-                        ? round($row->avg_scan_interval, 1) 
+                    'avg_scan_interval' => $row->avg_scan_interval
+                        ? round($row->avg_scan_interval, 1)
                         : null,
                 ];
             });

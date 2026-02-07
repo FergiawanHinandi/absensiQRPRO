@@ -11,17 +11,18 @@ use Illuminate\Support\Facades\Request;
 
 /**
  * Admin Audit Service
- * 
+ *
  * Centralizes all admin action logging for the multi-tenant attendance platform.
- * Provides dual-write capability: writes to both admin_activity_logs table and 
+ * Provides dual-write capability: writes to both admin_activity_logs table and
  * the immutable security log chain for tamper-proof audit trails.
- * 
+ *
  * Usage:
  *   $auditService->log('teacher_device_reset', 'Teacher', $teacherId, 'Reset device for Teacher X');
  */
 class AdminAuditService
 {
     protected ?ImmutableSecurityLogService $immutableLogService = null;
+
     protected ?SecurityAlertService $securityAlertService = null;
 
     /**
@@ -32,6 +33,7 @@ class AdminAuditService
         if ($this->immutableLogService === null) {
             $this->immutableLogService = app(ImmutableSecurityLogService::class);
         }
+
         return $this->immutableLogService;
     }
 
@@ -43,23 +45,24 @@ class AdminAuditService
         if ($this->securityAlertService === null) {
             $this->securityAlertService = app(SecurityAlertService::class);
         }
+
         return $this->securityAlertService;
     }
 
     /**
      * Log an admin action.
-     * 
+     *
      * This method:
      * 1. Creates an AdminActivityLog record
      * 2. Writes to the immutable security log chain
      * 3. Triggers alerts for high-risk actions
-     * 
-     * @param string $actionType One of AdminActivityLog::ACTION_* constants
-     * @param string|null $targetType Entity type being acted upon (e.g., 'Teacher', 'Student')
-     * @param int|null $targetId Entity ID being acted upon
-     * @param string $description Human-readable description
-     * @param array $metadata Additional structured data about the action
-     * @param User|null $admin Override the admin user (defaults to authenticated user)
+     *
+     * @param  string  $actionType  One of AdminActivityLog::ACTION_* constants
+     * @param  string|null  $targetType  Entity type being acted upon (e.g., 'Teacher', 'Student')
+     * @param  int|null  $targetId  Entity ID being acted upon
+     * @param  string  $description  Human-readable description
+     * @param  array  $metadata  Additional structured data about the action
+     * @param  User|null  $admin  Override the admin user (defaults to authenticated user)
      * @return AdminActivityLog|null The created log entry, or null if logging fails
      */
     public function log(
@@ -72,11 +75,12 @@ class AdminAuditService
     ): ?AdminActivityLog {
         $admin = $admin ?? Auth::user();
 
-        if (!$admin) {
+        if (! $admin) {
             Log::channel('security')->warning('AdminAuditService::log called without authenticated user', [
                 'action_type' => $actionType,
                 'description' => $description,
             ]);
+
             return null;
         }
 
@@ -105,7 +109,7 @@ class AdminAuditService
                 $this->triggerHighRiskAlert($activityLog, $admin, $metadata);
             }
 
-            Log::channel('security')->info("Admin action logged", [
+            Log::channel('security')->info('Admin action logged', [
                 'log_id' => $activityLog->id,
                 'admin_id' => $admin->id,
                 'admin_email' => $admin->email,
@@ -353,15 +357,15 @@ class AdminAuditService
         bool $enabled,
         array $metadata = []
     ): ?AdminActivityLog {
-        $action = $enabled 
-            ? AdminActivityLog::ACTION_MAINTENANCE_ENABLE 
+        $action = $enabled
+            ? AdminActivityLog::ACTION_MAINTENANCE_ENABLE
             : AdminActivityLog::ACTION_MAINTENANCE_DISABLE;
 
         return $this->log(
             $action,
             'System',
             null,
-            "Maintenance mode " . ($enabled ? 'enabled' : 'disabled'),
+            'Maintenance mode '.($enabled ? 'enabled' : 'disabled'),
             $metadata
         );
     }
@@ -505,11 +509,11 @@ class AdminAuditService
     ): void {
         try {
             $severity = $this->determineSeverity($activityLog->action_type);
-            
+
             $alertMessage = $this->formatAlertMessage($activityLog, $admin);
 
             $this->getSecurityAlertService()->createAlert(
-                'admin_action_' . $activityLog->action_type,
+                'admin_action_'.$activityLog->action_type,
                 $severity,
                 $alertMessage,
                 array_merge($metadata, [
@@ -528,7 +532,7 @@ class AdminAuditService
                 $severity === SecurityAlert::SEVERITY_CRITICAL // Force notify for critical
             );
 
-            Log::channel('security')->warning("High-risk admin action alert triggered", [
+            Log::channel('security')->warning('High-risk admin action alert triggered', [
                 'action_type' => $activityLog->action_type,
                 'admin_id' => $admin->id,
                 'severity' => $severity,
@@ -619,6 +623,7 @@ class AdminAuditService
         if ($userAgent === null) {
             return null;
         }
+
         return substr($userAgent, 0, 500);
     }
 
@@ -631,15 +636,15 @@ class AdminAuditService
         ?int $targetId
     ): string {
         $actionDisplay = ucwords(str_replace('_', ' ', $actionType));
-        
+
         if ($targetType && $targetId) {
             return "{$actionDisplay} for {$targetType} #{$targetId}";
         }
-        
+
         if ($targetType) {
             return "{$actionDisplay} for {$targetType}";
         }
-        
+
         return $actionDisplay;
     }
 
@@ -649,6 +654,7 @@ class AdminAuditService
     protected function findUserIdByEmail(string $email): ?int
     {
         $user = User::where('email', $email)->first(['id']);
+
         return $user?->id;
     }
 

@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 /**
  * Advanced Rate Limiting Tests
- * 
+ *
  * Tests all rate limiting layers:
  * 1. Global IP-based (DDoS protection)
  * 2. Login brute force protection
@@ -23,7 +23,9 @@ class AdvancedRateLimitingTest extends TestCase
     use RefreshDatabase;
 
     private School $school;
+
     private User $admin;
+
     private User $student;
 
     protected function setUp(): void
@@ -121,7 +123,7 @@ class AdvancedRateLimitingTest extends TestCase
         // Make 10 scan attempts
         for ($i = 1; $i <= 10; $i++) {
             $response = $this->postJson('/api/v1/attendance/scan', [
-                'qr_token' => 'test_token_' . $i,
+                'qr_token' => 'test_token_'.$i,
                 'latitude' => -6.2,
                 'longitude' => 106.8,
             ], [
@@ -254,7 +256,7 @@ class AdvancedRateLimitingTest extends TestCase
         // For practical testing, we'll just verify the middleware is applied
 
         $response = $this->getJson('/api/v1/test');
-        
+
         // Should have rate limit headers
         $response->assertHeader('X-RateLimit-Limit');
     }
@@ -271,7 +273,7 @@ class AdvancedRateLimitingTest extends TestCase
 
         // Next request should include Retry-After header
         $response = $this->getJson('/api/v1/auth/me');
-        
+
         $response->assertStatus(429);
         $response->assertHeader('Retry-After');
         $response->assertJsonStructure([
@@ -287,7 +289,7 @@ class AdvancedRateLimitingTest extends TestCase
         // Try different usernames from same IP
         for ($i = 1; $i <= 5; $i++) {
             $response = $this->postJson('/api/v1/auth/login', [
-                'username' => 'user' . $i,
+                'username' => 'user'.$i,
                 'password' => 'wrong',
             ]);
 

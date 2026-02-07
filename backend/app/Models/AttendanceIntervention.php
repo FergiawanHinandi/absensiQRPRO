@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AttendanceIntervention extends Model
 {
-    use HasFactory, BelongsToSchool;
+    use BelongsToSchool, HasFactory;
 
     protected $fillable = [
         'school_id',
@@ -23,9 +23,13 @@ class AttendanceIntervention extends Model
      * Action types
      */
     public const ACTION_CALL_PARENT = 'call_parent';
+
     public const ACTION_COUNSELING = 'counseling';
+
     public const ACTION_WARNING = 'warning';
+
     public const ACTION_HOME_VISIT = 'home_visit';
+
     public const ACTION_OTHER = 'other';
 
     /**

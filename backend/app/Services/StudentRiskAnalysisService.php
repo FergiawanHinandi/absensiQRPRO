@@ -4,11 +4,9 @@ namespace App\Services;
 
 use App\Models\Attendance;
 use App\Models\User;
-use App\Models\ClassModel;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
-use App\Services\ParentEarlyWarningService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Student Risk Analysis Service
@@ -18,13 +16,18 @@ class StudentRiskAnalysisService
 {
     // Risk level constants
     public const RISK_LOW = 'low';
+
     public const RISK_MEDIUM = 'medium';
+
     public const RISK_HIGH = 'high';
+
     public const RISK_CRITICAL = 'critical';
 
     // Risk thresholds (percentage)
     public const THRESHOLD_CRITICAL = 50; // < 50% attendance
+
     public const THRESHOLD_HIGH = 70;     // 50-70% attendance
+
     public const THRESHOLD_MEDIUM = 85;   // 70-85% attendance
     // LOW = > 85% attendance
 
@@ -33,8 +36,8 @@ class StudentRiskAnalysisService
      */
     public function getRiskOverview(int $schoolId): array
     {
-        $cacheKey = "risk_overview_{$schoolId}_" . now()->format('Y-m-d');
-        
+        $cacheKey = "risk_overview_{$schoolId}_".now()->format('Y-m-d');
+
         return Cache::remember($cacheKey, 3600, function () use ($schoolId) {
             return [
                 'total_students_by_risk' => $this->getTotalStudentsByRisk($schoolId),
@@ -54,7 +57,7 @@ class StudentRiskAnalysisService
     {
         // Calculate attendance percentage for each student in last 30 days
         $thirtyDaysAgo = Carbon::now()->subDays(30);
-        
+
         $studentRisks = DB::select("
             WITH student_attendance AS (
                 SELECT 
@@ -102,7 +105,7 @@ class StudentRiskAnalysisService
             $schoolId,
             self::THRESHOLD_CRITICAL,
             self::THRESHOLD_HIGH,
-            self::THRESHOLD_MEDIUM
+            self::THRESHOLD_MEDIUM,
         ]);
 
         // Group by risk level
@@ -188,7 +191,7 @@ class StudentRiskAnalysisService
             self::THRESHOLD_MEDIUM,
             $thirtyDaysAgo->format('Y-m-d'),
             $schoolId,
-            $schoolId
+            $schoolId,
         ]);
 
         return array_map(function ($class) {
@@ -218,12 +221,12 @@ class StudentRiskAnalysisService
     public function getRiskTrend30Days(int $schoolId): array
     {
         $trends = [];
-        
+
         // Calculate risk for each of the last 30 days
         for ($i = 29; $i >= 0; $i--) {
             $date = Carbon::now()->subDays($i);
             $weekStart = $date->copy()->subDays(6); // 7-day rolling window
-            
+
             $dailyRisk = DB::select("
                 WITH daily_student_risk AS (
                     SELECT 
@@ -260,11 +263,11 @@ class StudentRiskAnalysisService
                 self::THRESHOLD_HIGH,
                 self::THRESHOLD_HIGH,
                 self::THRESHOLD_MEDIUM,
-                self::THRESHOLD_MEDIUM
+                self::THRESHOLD_MEDIUM,
             ]);
 
             $risk = $dailyRisk[0] ?? null;
-            
+
             $trends[] = [
                 'date' => $date->format('Y-m-d'),
                 'day_name' => $date->format('l'),
@@ -321,7 +324,7 @@ class StudentRiskAnalysisService
             $thirtyDaysAgo->format('Y-m-d'),
             $schoolId,
             $schoolId,
-            self::THRESHOLD_CRITICAL
+            self::THRESHOLD_CRITICAL,
         ]);
 
         return array_map(function ($student) {
@@ -340,7 +343,7 @@ class StudentRiskAnalysisService
                     'attendance_percentage' => (float) $student->attendance_percentage,
                 ],
                 'last_attendance_date' => $student->last_attendance_date,
-                'days_since_last_attendance' => $student->last_attendance_date 
+                'days_since_last_attendance' => $student->last_attendance_date
                     ? Carbon::parse($student->last_attendance_date)->diffInDays(now())
                     : null,
                 'risk_level' => 'critical',
@@ -387,7 +390,7 @@ class StudentRiskAnalysisService
         ", [
             $thirtyDaysAgo->format('Y-m-d'),
             $schoolId,
-            $schoolId
+            $schoolId,
         ]);
 
         $stat = $stats[0] ?? null;
@@ -408,7 +411,10 @@ class StudentRiskAnalysisService
      */
     private function calculatePercentage($value, $total): float
     {
-        if ($total == 0) return 0.0;
+        if ($total == 0) {
+            return 0.0;
+        }
+
         return round(($value / $total) * 100, 2);
     }
 
@@ -420,14 +426,14 @@ class StudentRiskAnalysisService
         $thirtyDaysAgo = Carbon::now()->subDays(30);
         $parentWarningService = app(ParentEarlyWarningService::class);
         // Build threshold conditions based on risk level
-        $thresholdCondition = match($riskLevel) {
-            'critical' => 'attendance_percentage < ' . self::THRESHOLD_CRITICAL,
-            'high' => 'attendance_percentage >= ' . self::THRESHOLD_CRITICAL . ' AND attendance_percentage < ' . self::THRESHOLD_HIGH,
-            'medium' => 'attendance_percentage >= ' . self::THRESHOLD_HIGH . ' AND attendance_percentage < ' . self::THRESHOLD_MEDIUM,
-            'low' => 'attendance_percentage >= ' . self::THRESHOLD_MEDIUM,
+        $thresholdCondition = match ($riskLevel) {
+            'critical' => 'attendance_percentage < '.self::THRESHOLD_CRITICAL,
+            'high' => 'attendance_percentage >= '.self::THRESHOLD_CRITICAL.' AND attendance_percentage < '.self::THRESHOLD_HIGH,
+            'medium' => 'attendance_percentage >= '.self::THRESHOLD_HIGH.' AND attendance_percentage < '.self::THRESHOLD_MEDIUM,
+            'low' => 'attendance_percentage >= '.self::THRESHOLD_MEDIUM,
             default => 'attendance_percentage >= 0'
         };
-        $classFilter = $classId ? "AND cs.class_id = {$classId}" : "";
+        $classFilter = $classId ? "AND cs.class_id = {$classId}" : '';
         $students = DB::select("
             SELECT 
                 u.id as student_id,
@@ -464,7 +470,7 @@ class StudentRiskAnalysisService
             $thirtyDaysAgo->format('Y-m-d'),
             $schoolId,
             $schoolId,
-            $limit
+            $limit,
         ]);
         // Integrasi notifikasi ke orang tua untuk risk level medium/high
         if (in_array($riskLevel, ['medium', 'high'])) {
@@ -475,6 +481,7 @@ class StudentRiskAnalysisService
                 }
             }
         }
+
         return array_map(function ($student) use ($riskLevel) {
             return [
                 'student_id' => $student->student_id,
@@ -491,7 +498,7 @@ class StudentRiskAnalysisService
                     'attendance_percentage' => (float) $student->attendance_percentage,
                 ],
                 'last_attendance_date' => $student->last_attendance_date,
-                'days_since_last_attendance' => $student->last_attendance_date 
+                'days_since_last_attendance' => $student->last_attendance_date
                     ? Carbon::parse($student->last_attendance_date)->diffInDays(now())
                     : null,
                 'risk_level' => $riskLevel,
@@ -514,7 +521,7 @@ class StudentRiskAnalysisService
     public function getExportData(int $schoolId, bool $includeDetails = false): array
     {
         $overview = $this->getRiskOverview($schoolId);
-        
+
         $exportData = [
             'school_id' => $schoolId,
             'generated_at' => now()->toISOString(),

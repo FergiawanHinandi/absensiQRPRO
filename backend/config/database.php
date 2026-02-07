@@ -86,11 +86,80 @@ return [
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '5432'),
+
+            /*
+            |------------------------------------------------------------------
+            | Read/Write Split Configuration (Primary + Replica)
+            |------------------------------------------------------------------
+            |
+            | When DB_REPLICA_HOST is set, Laravel will automatically route:
+            | - SELECT queries → Replica (read)
+            | - INSERT/UPDATE/DELETE → Primary (write)
+            |
+            | Set DB_REPLICA_ENABLED=true to enable read/write splitting.
+            | In failover scenario, set DB_REPLICA_HOST to primary host.
+            |
+            */
+            'read' => env('DB_REPLICA_ENABLED', false) ? [
+                'host' => [
+                    env('DB_REPLICA_HOST', env('DB_HOST', '127.0.0.1')),
+                    // Add more replicas here for load balancing
+                    // env('DB_REPLICA_HOST_2'),
+                ],
+                'port' => env('DB_REPLICA_PORT', env('DB_PORT', '5432')),
+            ] : null,
+
+            'write' => [
+                'host' => env('DB_HOST', '127.0.0.1'),
+                'port' => env('DB_PORT', '5432'),
+            ],
+
+            // Sticky connections: after write, subsequent reads use write connection
+            // Prevents reading stale data immediately after writing
+            'sticky' => env('DB_STICKY', true),
+
+            // Shared configuration for both read and write
             'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+
+            // Connection pool settings for high availability
+            'options' => [
+                PDO::ATTR_TIMEOUT => env('DB_TIMEOUT', 5),
+                PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', false),
+            ],
+
+            // Retry configuration for transient failures
+            'retry_after' => env('DB_RETRY_AFTER', 100), // milliseconds
+            'max_retries' => env('DB_MAX_RETRIES', 3),
+
+            // Path to pg_dump binary for backups (Windows: C:\Program Files\PostgreSQL\XX\bin)
+            'dump' => [
+                'dump_binary_path' => env('PG_DUMP_PATH', 'C:\\Program Files\\PostgreSQL\\18\\bin'),
+            ],
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | Failover Connection (Manual Failover Target)
+        |----------------------------------------------------------------------
+        |
+        | Use this connection when primary fails and you need to promote replica.
+        | Switch by setting DB_CONNECTION=pgsql_failover in .env
+        |
+        */
+        'pgsql_failover' => [
+            'driver' => 'pgsql',
+            'host' => env('DB_FAILOVER_HOST', env('DB_REPLICA_HOST', '127.0.0.1')),
+            'port' => env('DB_FAILOVER_PORT', env('DB_REPLICA_PORT', '5432')),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_FAILOVER_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('DB_FAILOVER_PASSWORD', env('DB_PASSWORD', '')),
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
@@ -148,35 +217,61 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-database-'),
-            'persistent' => env('REDIS_PERSISTENT', false),
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_database_'),
+            'replication' => env('REDIS_REPLICATION', null),
+            'service' => env('REDIS_SENTINEL_SERVICE', 'mymaster'),
+            'parameters' => [
+                'password' => env('REDIS_PASSWORD'),
+                'database' => env('REDIS_DB', '0'),
+            ],
         ],
 
-        'default' => [
-            'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
-            'username' => env('REDIS_USERNAME'),
-            'password' => env('REDIS_PASSWORD'),
-            'port' => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_DB', '0'),
-            'max_retries' => env('REDIS_MAX_RETRIES', 3),
-            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
-            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
-            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
-        ],
+        /*
+        |--------------------------------------------------------------------------
+        | Redis Connection Configuration
+        |--------------------------------------------------------------------------
+        |
+        | Supports both standard single-instance connection and Sentinel HA.
+        | To enable Sentinel: set REDIS_REPLICATION=sentinel in .env
+        |
+        */
 
-        'cache' => [
-            'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
-            'username' => env('REDIS_USERNAME'),
-            'password' => env('REDIS_PASSWORD'),
-            'port' => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_CACHE_DB', '1'),
-            'max_retries' => env('REDIS_MAX_RETRIES', 3),
-            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
-            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
-            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
-        ],
+        'default' => env('REDIS_REPLICATION') === 'sentinel'
+            ? [
+                env('REDIS_SENTINEL_1', 'tcp://127.0.0.1:26379'),
+                env('REDIS_SENTINEL_2', 'tcp://127.0.0.1:26379'),
+                env('REDIS_SENTINEL_3', 'tcp://127.0.0.1:26379'),
+            ]
+            : [
+                'url' => env('REDIS_URL'),
+                'host' => env('REDIS_HOST', '127.0.0.1'),
+                'password' => env('REDIS_PASSWORD'),
+                'port' => env('REDIS_PORT', '6379'),
+                'database' => env('REDIS_DB', '0'),
+            ],
+
+        'cache' => env('REDIS_REPLICATION') === 'sentinel'
+            ? [
+                'service' => env('REDIS_SENTINEL_SERVICE', 'mymaster'), // Explicitly point to service for cache if needed, or rely on options
+                // In sentinel mode with predis, the connection logic is often handled by the 'default' or top level options + connection list
+                // Duplicate connection list here if granular control needed, implies using same sentinels
+                env('REDIS_SENTINEL_1', 'tcp://127.0.0.1:26379'),
+                env('REDIS_SENTINEL_2', 'tcp://127.0.0.1:26379'),
+                env('REDIS_SENTINEL_3', 'tcp://127.0.0.1:26379'),
+                'options' => [
+                    'parameters' => [
+                        'password' => env('REDIS_PASSWORD'),
+                        'database' => env('REDIS_CACHE_DB', '1'),
+                    ]
+                ]
+            ]
+            : [
+                'url' => env('REDIS_URL'),
+                'host' => env('REDIS_HOST', '127.0.0.1'),
+                'password' => env('REDIS_PASSWORD'),
+                'port' => env('REDIS_PORT', '6379'),
+                'database' => env('REDIS_CACHE_DB', '1'),
+            ],
 
     ],
 

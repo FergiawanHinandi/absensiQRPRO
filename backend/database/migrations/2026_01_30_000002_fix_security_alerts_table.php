@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         // Check if table exists
-        if (!Schema::hasTable('security_alerts')) {
+        if (! Schema::hasTable('security_alerts')) {
             Schema::create('security_alerts', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('school_id')->nullable();
@@ -22,7 +22,7 @@ return new class extends Migration
                 $table->ipAddress('ip_address')->nullable();
                 $table->timestamp('updated_at')->nullable();
                 $table->timestamp('created_at')->nullable();
-                
+
                 $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
                 $table->index(['school_id', 'type', 'created_at']);
             });
@@ -33,12 +33,12 @@ return new class extends Migration
                 if (Schema::hasColumn('security_alerts', 'type')) {
                     $table->string('type')->default('login')->change();
                 }
-                
+
                 // Make severity column nullable or add default
                 if (Schema::hasColumn('security_alerts', 'severity')) {
                     $table->string('severity')->default('medium')->change();
                 }
-                
+
                 // Ensure description is nullable for now
                 if (Schema::hasColumn('security_alerts', 'description')) {
                     $table->text('description')->nullable()->change();

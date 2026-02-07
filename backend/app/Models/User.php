@@ -41,6 +41,10 @@ class User extends Authenticatable
         'photo_review_status',
         'photo_reviewed_at',
         'photo_reviewed_by',
+        // Security fields for login rate limiting
+        'failed_login_attempts',
+        'last_failed_login_at',
+        'locked_until',
     ];
 
     /**
@@ -68,6 +72,9 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'last_streak_date' => 'date',
             'photo_reviewed_at' => 'datetime',
+            // Security fields
+            'last_failed_login_at' => 'datetime',
+            'locked_until' => 'datetime',
         ];
     }
 
@@ -89,6 +96,9 @@ class User extends Authenticatable
     /**
      * Check if user is eligible for rewards
      * Criteria: Streak >= 30 AND Attendance >= 95% in current active semester
+     *
+     * WARNING: This attribute performs database queries.
+     * DO NOT add this to the $appends array to avoid N+1 performance issues.
      */
     public function getRewardEligibleAttribute(): bool
     {
@@ -100,13 +110,13 @@ class User extends Authenticatable
         // 2. Check Attendance Percentage in Active Semester
         // Note: This involves DB queries. Be careful with N+1.
         $schoolId = $this->school_id;
-        
+
         // Find active academic year for this school
         $academicYear = \App\Models\AcademicYear::where('school_id', $schoolId)
             ->where('is_active', true)
             ->first();
 
-        if (!$academicYear) {
+        if (! $academicYear) {
             return false;
         }
 
@@ -123,7 +133,7 @@ class User extends Authenticatable
             ")
             ->first();
 
-        if (!$stats || $stats->total_days == 0) {
+        if (! $stats || $stats->total_days == 0) {
             return false;
         }
 
@@ -156,6 +166,14 @@ class User extends Authenticatable
     public function classStudents()
     {
         return $this->hasMany(ClassStudent::class, 'student_id');
+    }
+
+    public function class()
+    {
+        return $this->belongsToMany(ClassModel::class, 'class_students', 'student_id', 'class_id')
+            ->wherePivot('status', 'active')
+            ->withTimestamps()
+            ->limit(1);
     }
 
     public function teacherDevices()

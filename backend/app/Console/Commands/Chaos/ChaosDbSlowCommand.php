@@ -38,6 +38,7 @@ class ChaosDbSlowCommand extends Command
         if (app()->environment('production')) {
             $this->error('❌ Chaos testing is DISABLED in production environment!');
             $this->error('   This command can only be run in staging, testing, or local environments.');
+
             return Command::FAILURE;
         }
 
@@ -47,21 +48,23 @@ class ChaosDbSlowCommand extends Command
 
         $this->newLine();
         $this->warn('🐌 CHAOS ENGINEERING: Slow Database Simulation');
-        $this->warn('   Environment: ' . app()->environment());
-        $this->warn('   Duration: ' . $duration . ' seconds');
-        $this->warn('   Simulated latency: ' . $latency . 'ms');
+        $this->warn('   Environment: '.app()->environment());
+        $this->warn('   Duration: '.$duration.' seconds');
+        $this->warn('   Simulated latency: '.$latency.'ms');
         $this->newLine();
 
         if ($dryRun) {
             $this->info('🔍 DRY RUN MODE - No changes will be made');
             $this->newLine();
             $this->showExpectedBehavior($latency);
+
             return Command::SUCCESS;
         }
 
         // Confirm before proceeding
-        if (!$this->confirm('⚠️  This will simulate slow database responses. Continue?')) {
+        if (! $this->confirm('⚠️  This will simulate slow database responses. Continue?')) {
             $this->info('Cancelled.');
+
             return Command::SUCCESS;
         }
 
@@ -126,8 +129,8 @@ class ChaosDbSlowCommand extends Command
             }
 
             $this->info('✅ Chaos test activated');
-            $this->info('   - Simulated latency: ' . $latency . 'ms');
-            $this->info('   - System state: ' . ($latency >= 2000 ? 'DEGRADED' : 'HEALTHY (latency below threshold)'));
+            $this->info('   - Simulated latency: '.$latency.'ms');
+            $this->info('   - System state: '.($latency >= 2000 ? 'DEGRADED' : 'HEALTHY (latency below threshold)'));
             $this->newLine();
 
             // Show progress bar
@@ -213,7 +216,7 @@ class ChaosDbSlowCommand extends Command
 
         } catch (\Throwable $e) {
             $this->newLine();
-            $this->error('❌ Chaos test failed: ' . $e->getMessage());
+            $this->error('❌ Chaos test failed: '.$e->getMessage());
 
             // Cleanup
             try {
@@ -224,7 +227,7 @@ class ChaosDbSlowCommand extends Command
                 $failSecureService->forceDegradedMode(false);
                 $failSecureService->clearStateCache();
             } catch (\Throwable $cleanupError) {
-                $this->warn('   Could not fully restore state: ' . $cleanupError->getMessage());
+                $this->warn('   Could not fully restore state: '.$cleanupError->getMessage());
             }
 
             return Command::FAILURE;
@@ -264,8 +267,8 @@ class ChaosDbSlowCommand extends Command
 
         $this->line('   <fg=yellow>1. Database Response Time</fg=yellow>');
         $this->line("      - Simulated latency: {$latencyMs}ms");
-        $this->line('      - Threshold for degraded: ' . FailSecureService::DB_SLOW_THRESHOLD_MS . 'ms');
-        $this->line('      - Will trigger degraded mode: ' . ($willTriggerDegraded ? '<fg=red>YES</fg=red>' : '<fg=green>NO</fg=green>'));
+        $this->line('      - Threshold for degraded: '.FailSecureService::DB_SLOW_THRESHOLD_MS.'ms');
+        $this->line('      - Will trigger degraded mode: '.($willTriggerDegraded ? '<fg=red>YES</fg=red>' : '<fg=green>NO</fg=green>'));
         $this->newLine();
 
         if ($willTriggerDegraded) {
@@ -340,13 +343,13 @@ class ChaosDbSlowCommand extends Command
 
             $this->line("      - Fallback events recorded: <fg=cyan>{$fallbackEvents}</fg=cyan>");
         } catch (\Throwable $e) {
-            $this->line("      - Fallback events: <fg=red>Could not retrieve</fg=red>");
+            $this->line('      - Fallback events: <fg=red>Could not retrieve</fg=red>');
         }
 
         $this->newLine();
         $this->line('   Current State:');
-        $this->line('      - System state: <fg=green>' . $failSecureService->getSystemState() . '</fg=green>');
-        $this->line('      - Degraded mode: ' . ($failSecureService->isDegraded() ? '<fg=yellow>Yes</fg=yellow>' : '<fg=green>No</fg=green>'));
+        $this->line('      - System state: <fg=green>'.$failSecureService->getSystemState().'</fg=green>');
+        $this->line('      - Degraded mode: '.($failSecureService->isDegraded() ? '<fg=yellow>Yes</fg=yellow>' : '<fg=green>No</fg=green>'));
 
         $this->newLine();
         $this->info('💡 Review the fallback_events table and security logs for detailed analysis.');

@@ -21,14 +21,23 @@ class FailSecureException extends Exception
      * Failure types
      */
     public const TYPE_LOCATION_VALIDATION = 'location_validation_failed';
+
     public const TYPE_DEVICE_VALIDATION = 'device_validation_failed';
+
     public const TYPE_POLICY_SERVICE = 'policy_service_unavailable';
+
     public const TYPE_RATE_LIMIT = 'rate_limit_service_unavailable';
+
     public const TYPE_GEOFENCE = 'geofence_validation_failed';
+
     public const TYPE_QR_VALIDATION = 'qr_validation_failed';
+
     public const TYPE_SECURITY_SERVICE = 'security_service_unavailable';
+
     public const TYPE_DATABASE = 'database_unavailable';
+
     public const TYPE_CACHE = 'cache_unavailable';
+
     public const TYPE_UNKNOWN = 'unknown_validation_failure';
 
     /**
@@ -59,13 +68,13 @@ class FailSecureException extends Exception
     /**
      * Create a new FailSecureException
      *
-     * @param string $message Technical message (for logging)
-     * @param string $failureType Type of failure
-     * @param string|null $userMessage User-friendly message
-     * @param array $context Additional context data
-     * @param bool $isCritical Whether this is a critical failure
-     * @param int $httpStatusCode HTTP status code
-     * @param \Throwable|null $previous Previous exception
+     * @param  string  $message  Technical message (for logging)
+     * @param  string  $failureType  Type of failure
+     * @param  string|null  $userMessage  User-friendly message
+     * @param  array  $context  Additional context data
+     * @param  bool  $isCritical  Whether this is a critical failure
+     * @param  int  $httpStatusCode  HTTP status code
+     * @param  \Throwable|null  $previous  Previous exception
      */
     public function __construct(
         string $message,
@@ -183,9 +192,9 @@ class FailSecureException extends Exception
         ];
 
         if ($this->isCritical) {
-            \Log::channel('security')->critical('FailSecure: ' . $this->getMessage(), $logContext);
+            \Log::channel('security')->critical('FailSecure: '.$this->getMessage(), $logContext);
         } else {
-            \Log::channel('security')->warning('FailSecure: ' . $this->getMessage(), $logContext);
+            \Log::channel('security')->warning('FailSecure: '.$this->getMessage(), $logContext);
         }
     }
 

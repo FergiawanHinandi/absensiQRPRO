@@ -9,10 +9,10 @@ use Illuminate\Support\Str;
 
 /**
  * RefreshToken Model
- * 
+ *
  * Secure refresh token for token rotation flow.
  * Tokens are stored hashed; plaintext is only available at creation.
- * 
+ *
  * @property int $id
  * @property int $user_id
  * @property string $token_hash
@@ -52,13 +52,21 @@ class RefreshToken extends Model
      * Revocation reasons
      */
     public const REVOKED_MANUAL = 'manual';
+
     public const REVOKED_ROTATION = 'rotation';
+
     public const REVOKED_PASSWORD_CHANGE = 'password_change';
+
     public const REVOKED_LOGOUT = 'logout';
+
     public const REVOKED_EXPIRED = 'expired';
+
     public const REVOKED_DEVICE_MISMATCH = 'device_mismatch';
+
     public const REVOKED_IP_COUNTRY_CHANGE = 'ip_country_change';
+
     public const REVOKED_ABUSE = 'abuse_detected';
+
     public const REVOKED_ADMIN = 'admin_revoked';
 
     protected $fillable = [
@@ -142,8 +150,8 @@ class RefreshToken extends Model
             'personal_access_token_id' => $accessTokenId,
             'device_fingerprint' => $deviceInfo['fingerprint'] ?? null,
             'device_name' => $deviceInfo['device_name'] ?? null,
-            'user_agent' => isset($deviceInfo['user_agent']) 
-                ? substr($deviceInfo['user_agent'], 0, 500) 
+            'user_agent' => isset($deviceInfo['user_agent'])
+                ? substr($deviceInfo['user_agent'], 0, 500)
                 : null,
             'platform' => $deviceInfo['platform'] ?? null,
             'initial_ip' => $deviceInfo['ip'] ?? null,
@@ -167,6 +175,7 @@ class RefreshToken extends Model
     public static function findByPlaintext(string $plaintext): ?self
     {
         $hash = hash('sha256', $plaintext);
+
         return self::where('token_hash', $hash)->first();
     }
 
@@ -179,7 +188,7 @@ class RefreshToken extends Model
      */
     public function isValid(): bool
     {
-        return !$this->isExpired() && !$this->isRevoked();
+        return ! $this->isExpired() && ! $this->isRevoked();
     }
 
     /**
@@ -286,7 +295,7 @@ class RefreshToken extends Model
     public static function revokeAllForUser(int $userId, string $reason = self::REVOKED_MANUAL): int
     {
         $tokens = self::forUser($userId)->valid()->get();
-        
+
         foreach ($tokens as $token) {
             $token->revoke($reason);
         }
@@ -303,7 +312,7 @@ class RefreshToken extends Model
             ->valid()
             ->where('id', '!=', $exceptTokenId)
             ->get();
-        
+
         foreach ($tokens as $token) {
             $token->revoke($reason);
         }

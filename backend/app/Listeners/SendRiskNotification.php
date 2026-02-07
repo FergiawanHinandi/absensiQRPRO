@@ -21,7 +21,9 @@ class SendRiskNotification implements ShouldQueue
         try {
             $riskProfile = $event->riskProfile;
             $student = User::find($riskProfile->student_id);
-            if (!$student) return;
+            if (! $student) {
+                return;
+            }
 
             // Get Parent and Homeroom Teacher
             $parents = $this->getParents($student);
@@ -51,7 +53,7 @@ class SendRiskNotification implements ShouldQueue
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Failed to send risk notification: " . $e->getMessage());
+            Log::error('Failed to send risk notification: '.$e->getMessage());
         }
     }
 
@@ -79,6 +81,7 @@ class SendRiskNotification implements ShouldQueue
                 return User::find($class->homeroom_teacher_id);
             }
         }
+
         return null;
     }
 }

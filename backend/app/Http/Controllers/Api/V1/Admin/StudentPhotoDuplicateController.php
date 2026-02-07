@@ -23,13 +23,13 @@ class StudentPhotoDuplicateController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', User::class); // Or a specific permission
-        
+
         $schoolId = $request->user()->school_id;
         $duplicates = $this->faceService->findAllDuplicatesInSchool($schoolId);
 
         return response()->json([
             'success' => true,
-            'data' => $duplicates
+            'data' => $duplicates,
         ]);
     }
 
@@ -39,7 +39,7 @@ class StudentPhotoDuplicateController extends Controller
     public function resolve(Request $request, $studentId)
     {
         $this->authorize('update', User::class);
-        
+
         $student = User::where('id', $studentId)
             ->where('school_id', $request->user()->school_id)
             ->firstOrFail();
@@ -53,7 +53,7 @@ class StudentPhotoDuplicateController extends Controller
             Log::channel('audit')->info('photo_duplicate_cleared', [
                 'student_id' => $student->id,
                 'admin_id' => $request->user()->id,
-                'reason' => 'false_positive'
+                'reason' => 'false_positive',
             ]);
         } elseif ($action === 'corrected') {
             // "Corrected" usually means they acknowledged it and will reupload.
@@ -66,7 +66,7 @@ class StudentPhotoDuplicateController extends Controller
             Log::channel('audit')->info('photo_duplicate_cleared', [
                 'student_id' => $student->id,
                 'admin_id' => $request->user()->id,
-                'reason' => 'corrected'
+                'reason' => 'corrected',
             ]);
         } else {
             return response()->json(['message' => 'Invalid action'], 400);

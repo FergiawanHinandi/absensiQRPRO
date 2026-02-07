@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Check Device Reverification
- * 
+ *
  * Forces teachers flagged with requires_device_reverification to re-verify
  * their device before making attendance scans.
  */
@@ -31,20 +31,20 @@ class CheckDeviceReverification
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        
+
         // Only check for authenticated teachers
-        if (!$user || $user->role_type !== 'teacher') {
+        if (! $user || $user->role_type !== 'teacher') {
             return $next($request);
         }
 
         // Only check protected routes
-        if (!$this->isProtectedRoute($request->path())) {
+        if (! $this->isProtectedRoute($request->path())) {
             return $next($request);
         }
 
         // Check if user requires device re-verification
         $baseline = BehaviorBaseline::forUser($user->id)->first();
-        
+
         if ($baseline && $baseline->requires_device_reverification) {
             return response()->json([
                 'success' => false,
@@ -71,6 +71,7 @@ class CheckDeviceReverification
                 return true;
             }
         }
+
         return false;
     }
 }

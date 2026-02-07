@@ -30,6 +30,7 @@ final class QrService
         if ($this->policyService === null) {
             $this->policyService = app(SecurityPolicyService::class);
         }
+
         return $this->policyService;
     }
 
@@ -45,23 +46,23 @@ final class QrService
         // Get expiry from policy service (configurable per school) or fall back to config
         $expiryMinutes =
             $this->getPolicyService()->getQrExpiryMinutes($schoolId) ??
-            config("qr.expiry_minutes", 10);
+            config('qr.expiry_minutes', 10);
 
         $payload = [
-            "sid" => $data["schedule_id"],
-            "qid" => $data["qr_id"],
-            "typ" => $data["type"], // 'in' | 'out'
-            "iat" => now()->timestamp,
-            "exp" => now()->addMinutes($expiryMinutes)->timestamp,
-            "nonce" => Str::random(16),
-            "v" => 1,
+            'sid' => $data['schedule_id'],
+            'qid' => $data['qr_id'],
+            'typ' => $data['type'], // 'in' | 'out'
+            'iat' => now()->timestamp,
+            'exp' => now()->addMinutes($expiryMinutes)->timestamp,
+            'nonce' => Str::random(16),
+            'v' => 1,
         ];
 
         $encoded = base64_encode(json_encode($payload));
-        $signature = hash_hmac("sha256", $encoded, config("qr.secret"));
+        $signature = hash_hmac('sha256', $encoded, config('qr.secret'));
 
         // Format: payload.signature
-        return $encoded . "." . $signature;
+        return $encoded.'.'.$signature;
     }
 
     /**
@@ -77,28 +78,28 @@ final class QrService
     public function validate(string $token, ?int $schoolId = null): QrPayload
     {
         // 1. Check format
-        if (!str_contains($token, ".")) {
-            throw new InvalidQrException("Invalid token format");
+        if (! str_contains($token, '.')) {
+            throw new InvalidQrException('Invalid token format');
         }
 
-        [$encoded, $signature] = explode(".", $token, 2);
+        [$encoded, $signature] = explode('.', $token, 2);
 
         // 2. Verify HMAC signature (TIMING ATTACK PROTECTION)
-        $expectedSignature = hash_hmac("sha256", $encoded, config("qr.secret"));
+        $expectedSignature = hash_hmac('sha256', $encoded, config('qr.secret'));
 
-        if (!hash_equals($expectedSignature, $signature)) {
-            throw new InvalidQrException("Invalid signature");
+        if (! hash_equals($expectedSignature, $signature)) {
+            throw new InvalidQrException('Invalid signature');
         }
 
         // 3. Decode payload
         $payload = json_decode(base64_decode($encoded), true);
 
-        if (!$payload || !is_array($payload)) {
-            throw new InvalidQrException("Invalid payload");
+        if (! $payload || ! is_array($payload)) {
+            throw new InvalidQrException('Invalid payload');
         }
 
         // 4. Check required fields (nonce is mandatory for replay protection)
-        $requiredFields = ["sid", "qid", "typ", "iat", "exp", "nonce"];
+        $requiredFields = ['sid', 'qid', 'typ', 'iat', 'exp', 'nonce'];
         foreach ($requiredFields as $field) {
             if (empty($payload[$field])) {
                 throw new InvalidQrException(
@@ -108,33 +109,33 @@ final class QrService
         }
 
         // 5. Check expiry (CRITICAL: Prevent expired QR usage)
-        if ($payload["exp"] < now()->timestamp) {
-            throw new QrExpiredException("QR code expired");
+        if ($payload['exp'] < now()->timestamp) {
+            throw new QrExpiredException('QR code expired');
         }
 
         // 6. Check not too old (anti-replay, prevent very old tokens)
         // Get max age from policy service (configurable per school)
         $maxAgeHours =
-            $this->getPolicyService()->get("qr.max_age_hours", $schoolId) ??
-            config("qr.max_age_hours", 24);
+            $this->getPolicyService()->get('qr.max_age_hours', $schoolId) ??
+            config('qr.max_age_hours', 24);
         $maxAge = $maxAgeHours * 3600;
 
-        if ($payload["iat"] < now()->timestamp - $maxAge) {
-            throw new InvalidQrException("QR code too old");
+        if ($payload['iat'] < now()->timestamp - $maxAge) {
+            throw new InvalidQrException('QR code too old');
         }
 
         // 7. CRITICAL: Strict nonce validation to prevent replay attacks
-        $cacheKey = "qr_nonce:" . $payload["nonce"];
+        $cacheKey = 'qr_nonce:'.$payload['nonce'];
         if (\Illuminate\Support\Facades\Cache::has($cacheKey)) {
             throw new InvalidQrException(
-                "QR code already used (replay attack detected)",
+                'QR code already used (replay attack detected)',
             );
         }
 
         // Get nonce TTL from policy service (configurable per school)
         $nonceTtl =
-            $this->getPolicyService()->get("qr.nonce_ttl_seconds", $schoolId) ??
-            max(60, $payload["exp"] - now()->timestamp);
+            $this->getPolicyService()->get('qr.nonce_ttl_seconds', $schoolId) ??
+            max(60, $payload['exp'] - now()->timestamp);
 
         // Store nonce for replay protection
         \Illuminate\Support\Facades\Cache::put($cacheKey, true, $nonceTtl);

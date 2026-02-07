@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Behavior Baseline
- * 
+ *
  * Stores rolling 14-day behavioral baselines for each teacher.
  * Used as reference point for anomaly detection.
  */
@@ -21,13 +21,18 @@ class BehaviorBaseline extends Model
 
     // Risk level constants
     public const RISK_NORMAL = 'normal';
+
     public const RISK_SUSPICIOUS = 'suspicious';
+
     public const RISK_HIGH = 'high';
+
     public const RISK_CRITICAL = 'critical';
 
     // Risk score thresholds
     public const THRESHOLD_SUSPICIOUS = 3;
+
     public const THRESHOLD_HIGH = 6;
+
     public const THRESHOLD_CRITICAL = 9;
 
     protected $fillable = [
@@ -114,9 +119,9 @@ class BehaviorBaseline extends Model
     public function scopeAtRisk($query)
     {
         return $query->whereIn('current_risk_level', [
-            self::RISK_SUSPICIOUS, 
-            self::RISK_HIGH, 
-            self::RISK_CRITICAL
+            self::RISK_SUSPICIOUS,
+            self::RISK_HIGH,
+            self::RISK_CRITICAL,
         ]);
     }
 
@@ -231,10 +236,10 @@ class BehaviorBaseline extends Model
     public function getTopRiskFactors(int $limit = 3): array
     {
         $factors = $this->current_risk_factors ?? [];
-        
+
         // Sort by score descending
-        uasort($factors, fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
-        
+        uasort($factors, fn ($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
+
         return array_slice($factors, 0, $limit, true);
     }
 
@@ -256,6 +261,7 @@ class BehaviorBaseline extends Model
         if ($score >= self::THRESHOLD_SUSPICIOUS) {
             return self::RISK_SUSPICIOUS;
         }
+
         return self::RISK_NORMAL;
     }
 

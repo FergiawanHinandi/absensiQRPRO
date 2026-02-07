@@ -8,8 +8,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Backup\BackupDestination\BackupDestination;
 use Spatie\Backup\Helpers\Format;
-use Spatie\Backup\Tasks\Monitor\BackupDestinationStatus;
-use Spatie\Backup\Tasks\Monitor\BackupDestinationStatusFactory;
 
 class MonitorBackupHealth extends Command
 {
@@ -41,7 +39,7 @@ class MonitorBackupHealth extends Command
         $maxAgeHours = (int) $this->option('max-age');
         $silent = $this->option('silent');
 
-        if (!$silent) {
+        if (! $silent) {
             $this->info('🔍 Checking backup health...');
             $this->newLine();
         }
@@ -51,12 +49,12 @@ class MonitorBackupHealth extends Command
 
         foreach ($statuses as $status) {
             $statusResult = $this->checkBackupStatus($status, $maxAgeHours);
-            
-            if (!$statusResult['healthy']) {
+
+            if (! $statusResult['healthy']) {
                 $issues[] = $statusResult;
             }
 
-            if (!$silent) {
+            if (! $silent) {
                 $this->displayStatus($statusResult);
             }
         }
@@ -73,12 +71,13 @@ class MonitorBackupHealth extends Command
         }
 
         // Handle any issues found
-        if (!empty($issues)) {
+        if (! empty($issues)) {
             $this->handleBackupIssues($issues);
+
             return Command::FAILURE;
         }
 
-        if (!$silent) {
+        if (! $silent) {
             $this->newLine();
             $this->info('✅ All backups are healthy');
         }
@@ -87,7 +86,8 @@ class MonitorBackupHealth extends Command
     }
 
     /**
-     * Get backup statuses from spatie/laravel-backup.
+     * Get backup statuses from configured disks.
+     * Uses direct BackupDestination instead of deprecated StatusFactory.
      */
     protected function getBackupStatuses(): array
     {
@@ -97,11 +97,28 @@ class MonitorBackupHealth extends Command
         foreach ($monitorConfig as $config) {
             foreach ($config['disks'] ?? [] as $diskName) {
                 try {
+                    // Check if disk is configured before trying to create destination
+                    $diskConfig = config("filesystems.disks.{$diskName}");
+                    if (!$diskConfig) {
+                        Log::channel('backup')->warning("Disk not configured, skipping: {$diskName}");
+                        continue;
+                    }
+
+                    // Skip S3 disks if credentials are not configured
+                    if (($diskConfig['driver'] ?? '') === 's3') {
+                        if (empty($diskConfig['key']) || empty($diskConfig['bucket'])) {
+                            Log::channel('backup')->info("S3 disk '{$diskName}' not configured, skipping");
+                            continue;
+                        }
+                    }
+
                     $backupDestination = BackupDestination::create($diskName, $config['name']);
-                    $statuses[] = BackupDestinationStatusFactory::createForBackupDestination($backupDestination)
-                        ->setHealthChecks($config['health_checks'] ?? []);
+                    $statuses[] = [
+                        'destination' => $backupDestination,
+                        'health_checks' => $config['health_checks'] ?? [],
+                    ];
                 } catch (\Exception $e) {
-                    Log::channel('security')->warning("Cannot check backup status for disk: {$diskName}", [
+                    Log::channel('backup')->warning("Cannot check backup status for disk: {$diskName}", [
                         'error' => $e->getMessage(),
                     ]);
                 }
@@ -112,11 +129,11 @@ class MonitorBackupHealth extends Command
     }
 
     /**
-     * Check the health of a backup status.
+     * Check the health of a backup destination.
      */
-    protected function checkBackupStatus(BackupDestinationStatus $status, int $maxAgeHours): array
+    protected function checkBackupStatus(array $statusData, int $maxAgeHours): array
     {
-        $destination = $status->backupDestination();
+        $destination = $statusData['destination'];
         $newestBackup = $destination->newestBackup();
 
         $result = [
@@ -132,10 +149,11 @@ class MonitorBackupHealth extends Command
         ];
 
         // Check if any backup exists
-        if (!$newestBackup) {
+        if (! $newestBackup) {
             $result['healthy'] = false;
             $result['message'] = 'No backups found on this disk';
             $result['severity'] = 'critical';
+
             return $result;
         }
 
@@ -150,10 +168,27 @@ class MonitorBackupHealth extends Command
             $result['severity'] = $ageHours > ($maxAgeHours * 2) ? 'critical' : 'high';
         }
 
-        // Run health checks from spatie/laravel-backup
-        foreach ($status->getHealthChecks() as $healthCheck) {
+        // Run health checks from config
+        $healthChecks = $statusData['health_checks'] ?? [];
+        foreach ($healthChecks as $checkClass => $checkValue) {
             try {
-                $healthCheck->check($destination);
+                if (is_a($checkClass, \Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumAgeInDays::class, true)) {
+                    $maxAgeDays = $checkValue;
+                    if ($newestBackup->date()->diffInDays(now()) > $maxAgeDays) {
+                        $result['healthy'] = false;
+                        $result['message'] = "Backup is older than {$maxAgeDays} days";
+                        $result['severity'] = 'critical';
+                    }
+                }
+                if (is_a($checkClass, \Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumStorageInMegabytes::class, true)) {
+                    $maxStorageMb = $checkValue;
+                    $usedStorageMb = $destination->usedStorage() / 1024 / 1024;
+                    if ($usedStorageMb > $maxStorageMb) {
+                        $result['healthy'] = false;
+                        $result['message'] = "Backup storage ({$usedStorageMb}MB) exceeds limit ({$maxStorageMb}MB)";
+                        $result['severity'] = 'high';
+                    }
+                }
             } catch (\Exception $e) {
                 $result['healthy'] = false;
                 $result['message'] = $e->getMessage();
@@ -172,16 +207,16 @@ class MonitorBackupHealth extends Command
         $icon = $status['healthy'] ? '✅' : '❌';
         $this->line("{$icon} {$status['name']} ({$status['disk']})");
         $this->line("   Message: {$status['message']}");
-        
+
         if ($status['newest_backup_at']) {
             $this->line("   Last backup: {$status['newest_backup_at']}");
             $this->line("   Age: {$status['backup_age_hours']} hours");
         }
-        
+
         if (isset($status['total_size'])) {
             $this->line("   Total size: {$status['total_size']}");
         }
-        
+
         $this->newLine();
     }
 
@@ -211,7 +246,7 @@ class MonitorBackupHealth extends Command
                 true // Force notify - backup failures are critical
             );
 
-            Log::channel('security')->critical('Backup health check failed', $issue);
+            Log::channel('backup')->critical('Backup health check failed', $issue);
         }
     }
 }

@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * AdminActivityLog Model
- * 
+ *
  * Tracks all sensitive admin actions for audit purposes.
  * This model is immutable - updates and deletes are prevented at both
  * the application and database levels.
- * 
+ *
  * @property int $id
  * @property int $admin_user_id
  * @property string $role
@@ -73,71 +73,110 @@ class AdminActivityLog extends Model
 
     // User Management
     public const ACTION_USER_CREATE = 'user_create';
+
     public const ACTION_USER_UPDATE = 'user_update';
+
     public const ACTION_USER_DELETE = 'user_delete';
+
     public const ACTION_USER_DEACTIVATE = 'user_deactivate';
+
     public const ACTION_USER_ACTIVATE = 'user_activate';
+
     public const ACTION_USER_PASSWORD_RESET = 'user_password_reset';
 
     // Teacher Management
     public const ACTION_TEACHER_CREATE = 'teacher_create';
+
     public const ACTION_TEACHER_UPDATE = 'teacher_update';
+
     public const ACTION_TEACHER_DELETE = 'teacher_delete';
+
     public const ACTION_TEACHER_DEVICE_RESET = 'teacher_device_reset';
+
     public const ACTION_TEACHER_SCHEDULE_ASSIGN = 'teacher_schedule_assign';
 
     // Student Management
     public const ACTION_STUDENT_CREATE = 'student_create';
+
     public const ACTION_STUDENT_UPDATE = 'student_update';
+
     public const ACTION_STUDENT_DELETE = 'student_delete';
+
     public const ACTION_STUDENT_IMPORT = 'student_import';
+
     public const ACTION_STUDENT_QR_REGENERATE = 'student_qr_regenerate';
 
     // Class/Subject Management
     public const ACTION_CLASS_CREATE = 'class_create';
+
     public const ACTION_CLASS_UPDATE = 'class_update';
+
     public const ACTION_CLASS_DELETE = 'class_delete';
+
     public const ACTION_SUBJECT_CREATE = 'subject_create';
+
     public const ACTION_SUBJECT_UPDATE = 'subject_update';
+
     public const ACTION_SUBJECT_DELETE = 'subject_delete';
 
     // Schedule Management
     public const ACTION_SCHEDULE_CREATE = 'schedule_create';
+
     public const ACTION_SCHEDULE_UPDATE = 'schedule_update';
+
     public const ACTION_SCHEDULE_DELETE = 'schedule_delete';
+
     public const ACTION_SCHEDULE_BULK_CREATE = 'schedule_bulk_create';
 
     // Attendance Management
     public const ACTION_ATTENDANCE_OVERRIDE = 'attendance_override';
+
     public const ACTION_ATTENDANCE_MANUAL_ENTRY = 'attendance_manual_entry';
+
     public const ACTION_ATTENDANCE_DELETE = 'attendance_delete';
+
     public const ACTION_ATTENDANCE_EXPORT = 'attendance_export';
 
     // School Configuration
     public const ACTION_SCHOOL_CREATE = 'school_create';
+
     public const ACTION_SCHOOL_UPDATE = 'school_update';
+
     public const ACTION_SCHOOL_DELETE = 'school_delete';
+
     public const ACTION_SCHOOL_SETTINGS_UPDATE = 'school_settings_update';
+
     public const ACTION_GEOFENCE_UPDATE = 'geofence_update';
 
     // Security Actions
     public const ACTION_LOGIN = 'login';
+
     public const ACTION_LOGOUT = 'logout';
+
     public const ACTION_LOGIN_FAILED = 'login_failed';
+
     public const ACTION_API_KEY_GENERATE = 'api_key_generate';
+
     public const ACTION_API_KEY_REVOKE = 'api_key_revoke';
+
     public const ACTION_PERMISSION_CHANGE = 'permission_change';
 
     // System Actions
     public const ACTION_BACKUP_CREATE = 'backup_create';
+
     public const ACTION_BACKUP_RESTORE = 'backup_restore';
+
     public const ACTION_MAINTENANCE_ENABLE = 'maintenance_enable';
+
     public const ACTION_MAINTENANCE_DISABLE = 'maintenance_disable';
+
     public const ACTION_AUDIT_LOG_VIEW = 'audit_log_view';
 
     // Data Export/Import
     public const ACTION_DATA_EXPORT = 'data_export';
+
     public const ACTION_DATA_IMPORT = 'data_import';
+
     public const ACTION_REPORT_GENERATE = 'report_generate';
 
     /**
@@ -167,8 +206,8 @@ class AdminActivityLog extends Model
     public function update(array $attributes = [], array $options = []): bool
     {
         throw new \RuntimeException(
-            'AdminActivityLog records are immutable and cannot be updated. ' .
-            'Record ID: ' . ($this->id ?? 'new')
+            'AdminActivityLog records are immutable and cannot be updated. '.
+            'Record ID: '.($this->id ?? 'new')
         );
     }
 
@@ -178,8 +217,8 @@ class AdminActivityLog extends Model
     public function delete(): ?bool
     {
         throw new \RuntimeException(
-            'AdminActivityLog records are immutable and cannot be deleted. ' .
-            'Record ID: ' . ($this->id ?? 'new')
+            'AdminActivityLog records are immutable and cannot be deleted. '.
+            'Record ID: '.($this->id ?? 'new')
         );
     }
 
@@ -189,8 +228,8 @@ class AdminActivityLog extends Model
     public function forceDelete(): ?bool
     {
         throw new \RuntimeException(
-            'AdminActivityLog records are immutable and cannot be force deleted. ' .
-            'Record ID: ' . ($this->id ?? 'new')
+            'AdminActivityLog records are immutable and cannot be force deleted. '.
+            'Record ID: '.($this->id ?? 'new')
         );
     }
 
@@ -274,11 +313,11 @@ class AdminActivityLog extends Model
     public function scopeForTarget($query, string $targetType, ?int $targetId = null)
     {
         $query->where('target_type', $targetType);
-        
+
         if ($targetId !== null) {
             $query->where('target_id', $targetId);
         }
-        
+
         return $query;
     }
 
@@ -288,11 +327,11 @@ class AdminActivityLog extends Model
     public function scopeDateRange($query, string $from, ?string $to = null)
     {
         $query->where('created_at', '>=', $from);
-        
+
         if ($to) {
             $query->where('created_at', '<=', $to);
         }
-        
+
         return $query;
     }
 
@@ -368,7 +407,7 @@ class AdminActivityLog extends Model
     {
         $reflection = new \ReflectionClass(self::class);
         $constants = $reflection->getConstants();
-        
+
         return array_filter($constants, function ($key) {
             return str_starts_with($key, 'ACTION_');
         }, ARRAY_FILTER_USE_KEY);

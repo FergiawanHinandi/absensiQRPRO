@@ -3,12 +3,11 @@
 namespace App\Http\Controllers\Api\V1\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Schedule;
 use App\Models\AuditLog;
+use App\Models\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Carbon\Carbon;
 
 class ScheduleController extends Controller
 {
@@ -75,7 +74,7 @@ class ScheduleController extends Controller
         $schedule = DB::transaction(function () use ($validated, $schoolId, $user) {
             $schedule = Schedule::create(array_merge($validated, [
                 'school_id' => $schoolId,
-                'is_active' => true
+                'is_active' => true,
             ]));
 
             AuditLog::create([
@@ -115,7 +114,7 @@ class ScheduleController extends Controller
             'start_time' => 'sometimes|date_format:H:i',
             'end_time' => 'sometimes|date_format:H:i|after:start_time',
             'room' => 'nullable|string|max:100',
-            'is_active' => 'boolean'
+            'is_active' => 'boolean',
         ]);
 
         // If time/day/class/teacher changing, re-validate overlaps
@@ -158,6 +157,7 @@ class ScheduleController extends Controller
         }
 
         $schedule->delete();
+
         return response()->success(null, 'Schedule deleted successfully');
     }
 
@@ -167,7 +167,7 @@ class ScheduleController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:csv,txt'
+            'file' => 'required|file|mimes:csv,txt',
         ]);
 
         $file = $request->file('file');
@@ -180,8 +180,10 @@ class ScheduleController extends Controller
 
         // Naive implementation for brevity. In prod, use queued job.
         foreach ($data as $index => $row) {
-            if (count($row) < 6) continue;
-            
+            if (count($row) < 6) {
+                continue;
+            }
+
             try {
                 // Map CSV columns (assuming strict order or name matching needed in real app)
                 // Format: Class Name, Subject Code, Teacher Email/Name, Day(0-6), Start, End
@@ -209,19 +211,19 @@ class ScheduleController extends Controller
                     'day_of_week' => $day,
                     'start_time' => $start,
                     'end_time' => $end,
-                    'is_active' => true
+                    'is_active' => true,
                 ]);
 
                 $successCount++;
             } catch (\Exception $e) {
-                $errors[] = "Row " . ($index + 2) . ": " . $e->getMessage();
+                $errors[] = 'Row '.($index + 2).': '.$e->getMessage();
             }
         }
 
         return response()->json([
             'success' => true,
             'imported' => $successCount,
-            'errors' => $errors
+            'errors' => $errors,
         ]);
     }
 
@@ -231,7 +233,7 @@ class ScheduleController extends Controller
     public function getWeeklyScheduleByClass(Request $request, $classId)
     {
         $schoolId = $request->user()->school_id;
-        
+
         $schedules = Schedule::with(['subject', 'teacher'])
             ->where('school_id', $schoolId)
             ->where('class_id', $classId)
@@ -274,7 +276,7 @@ class ScheduleController extends Controller
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($q2) use ($start, $end) {
                     $q2->where('start_time', '<', $end)
-                       ->where('end_time', '>', $start);
+                        ->where('end_time', '>', $start);
                 });
             })
             ->when($ignoreId, function ($q, $id) {
@@ -296,7 +298,7 @@ class ScheduleController extends Controller
             ->where(function ($q) use ($start, $end) {
                 $q->where(function ($q2) use ($start, $end) {
                     $q2->where('start_time', '<', $end)
-                       ->where('end_time', '>', $start);
+                        ->where('end_time', '>', $start);
                 });
             })
             ->when($ignoreId, function ($q, $id) {

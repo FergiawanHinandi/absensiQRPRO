@@ -3,36 +3,37 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * System Health Monitoring Controller
- * 
+ *
  * Provides operational visibility for:
  * - Queue health (failed/pending jobs)
  * - Security events (rate limiting, anomalies)
  * - QR code security anomalies
- * 
+ *
  * Access: Admin only with system:monitor ability
- * 
+ *
  * @author AbsensiQRPro Team
+ *
  * @version 1.0.0
  */
 class SystemHealthController extends Controller
 {
     /**
      * Get comprehensive system health metrics
-     * 
+     *
      * GET /api/v1/admin/system/health
-     * 
+     *
      * Returns:
      * - queue_failed_last_24h: Failed jobs in last 24 hours
      * - queue_pending: Jobs waiting to be processed
      * - rate_limit_blocks_last_hour: Rate limit violations
      * - qr_anomalies_last_24h: QR security anomalies detected
-     * 
+     *
      * @return \Illuminate\Http\JsonResponse
      */
     public function health()
@@ -78,9 +79,9 @@ class SystemHealthController extends Controller
 
     /**
      * Get detailed queue health metrics
-     * 
+     *
      * GET /api/v1/admin/system/health/queue
-     * 
+     *
      * @return \Illuminate\Http\JsonResponse
      */
     public function queueHealth()
@@ -110,9 +111,9 @@ class SystemHealthController extends Controller
 
     /**
      * Get detailed security metrics
-     * 
+     *
      * GET /api/v1/admin/system/health/security
-     * 
+     *
      * @return \Illuminate\Http\JsonResponse
      */
     public function securityHealth()
@@ -146,8 +147,6 @@ class SystemHealthController extends Controller
 
     /**
      * Get count of failed jobs in last 24 hours
-     * 
-     * @return int
      */
     private function getFailedJobsLast24h(): int
     {
@@ -160,8 +159,6 @@ class SystemHealthController extends Controller
 
     /**
      * Get count of pending jobs in queue
-     * 
-     * @return int
      */
     private function getPendingJobs(): int
     {
@@ -172,8 +169,6 @@ class SystemHealthController extends Controller
 
     /**
      * Get total failed jobs (all time)
-     * 
-     * @return int
      */
     private function getTotalFailedJobs(): int
     {
@@ -182,8 +177,6 @@ class SystemHealthController extends Controller
 
     /**
      * Get queue lag in seconds (oldest pending job age)
-     * 
-     * @return int
      */
     private function getQueueLagSeconds(): int
     {
@@ -191,7 +184,7 @@ class SystemHealthController extends Controller
             ->orderBy('created_at', 'asc')
             ->first();
 
-        if (!$oldestJob) {
+        if (! $oldestJob) {
             return 0;
         }
 
@@ -200,8 +193,6 @@ class SystemHealthController extends Controller
 
     /**
      * Get failed jobs grouped by queue name
-     * 
-     * @return array
      */
     private function getFailedJobsByQueue(): array
     {
@@ -220,16 +211,14 @@ class SystemHealthController extends Controller
 
     /**
      * Get rate limit blocks in last hour
-     * 
+     *
      * Uses activity_log table to count rate limit violations
-     * 
-     * @return int
      */
     private function getRateLimitBlocksLastHour(): int
     {
         return Cache::remember('system_health:rate_limit_blocks_1h', 60, function () {
             // Check if activity_log table exists
-            if (!$this->tableExists('activity_log')) {
+            if (! $this->tableExists('activity_log')) {
                 return 0;
             }
 
@@ -242,13 +231,11 @@ class SystemHealthController extends Controller
 
     /**
      * Get rate limit blocks in last 24 hours
-     * 
-     * @return int
      */
     private function getRateLimitBlocksLast24h(): int
     {
         return Cache::remember('system_health:rate_limit_blocks_24h', 300, function () {
-            if (!$this->tableExists('activity_log')) {
+            if (! $this->tableExists('activity_log')) {
                 return 0;
             }
 
@@ -261,19 +248,17 @@ class SystemHealthController extends Controller
 
     /**
      * Get QR code security anomalies in last 24 hours
-     * 
+     *
      * Anomalies include:
      * - Invalid HMAC signatures
      * - Expired QR codes
      * - Cross-school QR attempts
      * - Inactive student scans
-     * 
-     * @return int
      */
     private function getQrAnomaliesLast24h(): int
     {
         return Cache::remember('system_health:qr_anomalies_24h', 300, function () {
-            if (!$this->tableExists('activity_log')) {
+            if (! $this->tableExists('activity_log')) {
                 return 0;
             }
 
@@ -281,10 +266,10 @@ class SystemHealthController extends Controller
             return DB::table('activity_log')
                 ->where(function ($query) {
                     $query->where('description', 'LIKE', '%QR%anomaly%')
-                          ->orWhere('description', 'LIKE', '%Invalid HMAC%')
-                          ->orWhere('description', 'LIKE', '%Expired QR%')
-                          ->orWhere('description', 'LIKE', '%Cross-school%')
-                          ->orWhere('description', 'LIKE', '%Inactive student%');
+                        ->orWhere('description', 'LIKE', '%Invalid HMAC%')
+                        ->orWhere('description', 'LIKE', '%Expired QR%')
+                        ->orWhere('description', 'LIKE', '%Cross-school%')
+                        ->orWhere('description', 'LIKE', '%Inactive student%');
                 })
                 ->where('created_at', '>=', now()->subDay())
                 ->count();
@@ -293,13 +278,11 @@ class SystemHealthController extends Controller
 
     /**
      * Get failed login attempts in last hour
-     * 
-     * @return int
      */
     private function getFailedLoginAttemptsLastHour(): int
     {
         return Cache::remember('system_health:failed_logins_1h', 60, function () {
-            if (!$this->tableExists('activity_log')) {
+            if (! $this->tableExists('activity_log')) {
                 return 0;
             }
 
@@ -312,21 +295,19 @@ class SystemHealthController extends Controller
 
     /**
      * Get suspicious activities in last 24 hours
-     * 
-     * @return int
      */
     private function getSuspiciousActivitiesLast24h(): int
     {
         return Cache::remember('system_health:suspicious_24h', 300, function () {
-            if (!$this->tableExists('activity_log')) {
+            if (! $this->tableExists('activity_log')) {
                 return 0;
             }
 
             return DB::table('activity_log')
                 ->where(function ($query) {
                     $query->where('description', 'LIKE', '%suspicious%')
-                          ->orWhere('description', 'LIKE', '%unauthorized%')
-                          ->orWhere('description', 'LIKE', '%blocked%');
+                        ->orWhere('description', 'LIKE', '%unauthorized%')
+                        ->orWhere('description', 'LIKE', '%blocked%');
                 })
                 ->where('created_at', '>=', now()->subDay())
                 ->count();
@@ -339,8 +320,7 @@ class SystemHealthController extends Controller
 
     /**
      * Calculate overall health status based on metrics
-     * 
-     * @param array $metrics
+     *
      * @return string 'healthy', 'degraded', or 'critical'
      */
     private function calculateHealthStatus(array $metrics): string
@@ -378,9 +358,6 @@ class SystemHealthController extends Controller
 
     /**
      * Generate alerts based on metrics
-     * 
-     * @param array $metrics
-     * @return array
      */
     private function generateAlerts(array $metrics): array
     {
@@ -467,9 +444,6 @@ class SystemHealthController extends Controller
 
     /**
      * Check if a database table exists
-     * 
-     * @param string $table
-     * @return bool
      */
     private function tableExists(string $table): bool
     {
@@ -482,15 +456,15 @@ class SystemHealthController extends Controller
 
     /**
      * Get backup system status
-     * 
+     *
      * GET /api/v1/admin/system/backup-status
-     * 
+     *
      * Returns backup health information including:
      * - Last backup timestamp
      * - Backup age in hours
      * - Health status (healthy/warning/critical)
      * - Storage disk information
-     * 
+     *
      * @return \Illuminate\Http\JsonResponse
      */
     public function backupStatus()
@@ -498,7 +472,7 @@ class SystemHealthController extends Controller
         try {
             $backupName = config('backup.backup.name', 'AbsensiQRPro');
             $disks = config('backup.backup.destination.disks', ['local']);
-            
+
             $statuses = [];
             $overallStatus = 'healthy';
             $oldestBackup = null;
@@ -508,7 +482,7 @@ class SystemHealthController extends Controller
                 try {
                     $destination = \Spatie\Backup\BackupDestination\BackupDestination::create($diskName, $backupName);
                     $newest = $destination->newestBackup();
-                    
+
                     $diskStatus = [
                         'disk' => $diskName,
                         'status' => 'healthy',
@@ -525,7 +499,7 @@ class SystemHealthController extends Controller
                         $diskStatus['backup_age_hours'] = $ageHours;
 
                         // Update overall timestamps
-                        if (!$newestBackup || $newest->date()->gt($newestBackup)) {
+                        if (! $newestBackup || $newest->date()->gt($newestBackup)) {
                             $newestBackup = $newest->date();
                         }
 
@@ -550,7 +524,7 @@ class SystemHealthController extends Controller
                     Log::warning("Could not check backup status for disk: {$diskName}", [
                         'error' => $e->getMessage(),
                     ]);
-                    
+
                     $statuses[] = [
                         'disk' => $diskName,
                         'status' => 'unknown',
@@ -566,7 +540,7 @@ class SystemHealthController extends Controller
                     'backup_age_hours' => $newestBackup ? $newestBackup->diffInHours(now()) : null,
                     'status' => $overallStatus,
                     'storage_disks' => $statuses,
-                    'encryption_enabled' => !empty(config('backup.encryption.key')),
+                    'encryption_enabled' => ! empty(config('backup.encryption.key')),
                     'retention_policy' => [
                         'daily_backups_days' => config('backup.cleanup.default_strategy.keep_daily_backups_for_days'),
                         'weekly_backups_weeks' => config('backup.cleanup.default_strategy.keep_weekly_backups_for_weeks'),

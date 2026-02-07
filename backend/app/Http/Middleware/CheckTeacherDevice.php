@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Check Teacher Device Middleware
- * 
+ *
  * Ensures teachers can only perform attendance from approved devices.
  * This middleware should be applied to teacher attendance routes.
  */
@@ -29,14 +29,14 @@ class CheckTeacherDevice
         $user = $request->user();
 
         // Only check for teachers
-        if (!$user || $user->role_type !== 'teacher') {
+        if (! $user || $user->role_type !== 'teacher') {
             return $next($request);
         }
 
         // Get device ID from request
         $deviceId = $this->getDeviceId($request);
 
-        if (!$deviceId) {
+        if (! $deviceId) {
             return response()->json([
                 'success' => false,
                 'message' => 'Device ID diperlukan untuk absensi.',
@@ -50,7 +50,7 @@ class CheckTeacherDevice
             ->first();
 
         // Device not registered
-        if (!$device) {
+        if (! $device) {
             // Auto-register new device (unapproved)
             $result = TeacherDevice::registerDevice(
                 schoolId: $user->school_id,
@@ -64,7 +64,7 @@ class CheckTeacherDevice
 
             Log::channel('security')->info('New teacher device registered', [
                 'teacher_id' => $user->id,
-                'device_id' => substr($deviceId, 0, 10) . '...',
+                'device_id' => substr($deviceId, 0, 10).'...',
                 'ip' => $request->ip(),
             ]);
 
@@ -89,7 +89,7 @@ class CheckTeacherDevice
         if ($device->revoked_at) {
             Log::channel('security')->warning('Revoked device access attempt', [
                 'teacher_id' => $user->id,
-                'device_id' => substr($deviceId, 0, 10) . '...',
+                'device_id' => substr($deviceId, 0, 10).'...',
                 'revoked_at' => $device->revoked_at->toIso8601String(),
                 'ip' => $request->ip(),
             ]);
@@ -98,7 +98,7 @@ class CheckTeacherDevice
             $this->alertService->createAlert(
                 SecurityAlertService::TYPE_UNAPPROVED_DEVICE,
                 'high',
-                "Revoked device attempted access",
+                'Revoked device attempted access',
                 [
                     'teacher_id' => $user->id,
                     'teacher_name' => $user->name,
@@ -122,7 +122,7 @@ class CheckTeacherDevice
         }
 
         // Device not approved
-        if (!$device->is_approved) {
+        if (! $device->is_approved) {
             return response()->json([
                 'success' => false,
                 'message' => 'Perangkat belum disetujui. Menunggu persetujuan admin.',
@@ -149,7 +149,7 @@ class CheckTeacherDevice
         $deviceId = $request->header('X-Device-ID');
 
         // Fallback to request body
-        if (!$deviceId) {
+        if (! $deviceId) {
             $deviceId = $request->input('device_id');
         }
 

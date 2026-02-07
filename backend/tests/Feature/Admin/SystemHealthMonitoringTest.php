@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 /**
  * System Health Monitoring API Tests
- * 
+ *
  * Tests for admin-only system health endpoints:
  * - GET /api/v1/admin/system/health
  * - GET /api/v1/admin/system/health/queue
@@ -21,6 +21,7 @@ class SystemHealthMonitoringTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $teacher;
 
     protected function setUp(): void
@@ -92,7 +93,7 @@ class SystemHealthMonitoringTest extends TestCase
             'is_active' => true,
         ]);
         $adminNoPermission->assignRole('admin');
-        
+
         // Explicitly revoke system:monitor if it exists
         if ($adminNoPermission->hasPermissionTo('system:monitor')) {
             $adminNoPermission->revokePermissionTo('system:monitor');
@@ -113,15 +114,15 @@ class SystemHealthMonitoringTest extends TestCase
             'is_active' => true,
         ]);
         $wildcardUser->assignRole('admin');
-        
+
         // Revoke system:monitor explicitly
         if ($wildcardUser->hasPermissionTo('system:monitor')) {
             $wildcardUser->revokePermissionTo('system:monitor');
         }
-        
+
         // Create token with wildcard ability ONLY (simulating old behavior)
         $token = $wildcardUser->createToken('test', ['*'])->plainTextToken;
-        
+
         $response = $this->withToken($token)
             ->getJson('/api/v1/admin/system/health');
 
@@ -385,7 +386,7 @@ class SystemHealthMonitoringTest extends TestCase
         $response->assertStatus(200);
 
         $queueLag = $response->json('data.queue_lag_seconds');
-        
+
         // Should be approximately 600 seconds (10 minutes)
         $this->assertGreaterThan(590, $queueLag);
         $this->assertLessThan(610, $queueLag);
@@ -399,7 +400,7 @@ class SystemHealthMonitoringTest extends TestCase
             'is_active' => true,
         ]);
         $superAdmin->assignRole('super_admin');
-        
+
         // Super admin gets both wildcard AND explicit system:monitor
         $superAdmin->givePermissionTo('*');
         $superAdmin->givePermissionTo('system:monitor');
@@ -408,7 +409,7 @@ class SystemHealthMonitoringTest extends TestCase
             ->getJson('/api/v1/admin/system/health');
 
         $response->assertStatus(200);
-        
+
         // Verify super admin has explicit permission
         $this->assertTrue($superAdmin->hasPermissionTo('system:monitor'));
     }
@@ -438,7 +439,7 @@ class SystemHealthMonitoringTest extends TestCase
         $response->assertStatus(200);
 
         $timestamp = $response->json('data.timestamp');
-        
+
         // Verify ISO 8601 format (e.g., 2026-01-28T22:45:00+08:00)
         $this->assertMatchesRegularExpression(
             '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/',

@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
+use App\Models\AcademicYear;
+use App\Models\Attendance;
+use App\Models\Classroom;
+use App\Models\School;
 use App\Models\Student;
 use App\Models\Teacher;
-use App\Models\Classroom;
-use App\Models\Attendance;
-use App\Models\AcademicYear;
-use App\Models\School;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class SchoolAdminDashboardController extends Controller
 {
@@ -28,13 +28,14 @@ class SchoolAdminDashboardController extends Controller
             ->first();
         $attendanceMethod = $school->attendance_method ?? 'QR';
         $schoolStatus = $school->is_active ? 'Active' : 'Suspended';
+
         return response()->json([
             'school_name' => $school->name,
             'total_students' => $totalStudents,
             'total_teachers' => $totalTeachers,
             'active_academic_year' => $activeAcademicYear ? $activeAcademicYear->name : null,
             'attendance_method' => $attendanceMethod,
-            'school_status' => $schoolStatus
+            'school_status' => $schoolStatus,
         ]);
     }
 
@@ -48,7 +49,7 @@ class SchoolAdminDashboardController extends Controller
             $totalStudents = Student::where('school_id', $schoolId)->count();
             $totalTeachers = Teacher::where('school_id', $schoolId)->count();
             $activeClassIds = Classroom::where('school_id', $schoolId)
-                ->whereHas('schedules', function($q) use ($today) {
+                ->whereHas('schedules', function ($q) use ($today) {
                     $q->whereDate('date', $today);
                 })
                 ->pluck('id');
@@ -78,6 +79,7 @@ class SchoolAdminDashboardController extends Controller
                 ->groupBy('date')
                 ->orderBy('date')
                 ->get();
+
             return [
                 'total_students' => $totalStudents,
                 'total_teachers' => $totalTeachers,
@@ -92,6 +94,7 @@ class SchoolAdminDashboardController extends Controller
                 'attendance_trend' => $trend,
             ];
         });
+
         return response()->json($summary);
     }
 
@@ -105,16 +108,20 @@ class SchoolAdminDashboardController extends Controller
         $timeSlot = $request->input('time_slot');
         $classesQuery = Classroom::query()
             ->where('school_id', $schoolId)
-            ->whereHas('schedules', function($q) use ($today, $timeSlot) {
+            ->whereHas('schedules', function ($q) use ($today, $timeSlot) {
                 $q->whereDate('date', $today);
                 if ($timeSlot) {
                     [$start, $end] = explode('-', $timeSlot);
                     $q->where('start_time', '>=', $start)
-                      ->where('end_time', '<=', $end);
+                        ->where('end_time', '<=', $end);
                 }
             });
-        if ($grade) $classesQuery->where('grade', $grade);
-        if ($classId) $classesQuery->where('id', $classId);
+        if ($grade) {
+            $classesQuery->where('grade', $grade);
+        }
+        if ($classId) {
+            $classesQuery->where('id', $classId);
+        }
         $classes = $classesQuery->withCount(['students'])->get();
         $attendance = Attendance::where('school_id', $schoolId)
             ->whereDate('date', $today)
@@ -127,11 +134,12 @@ class SchoolAdminDashboardController extends Controller
             ->groupBy('classroom_id')
             ->get()
             ->keyBy('classroom_id');
-        $result = $classes->map(function($class) use ($attendance) {
+        $result = $classes->map(function ($class) use ($attendance) {
             $present = (int) ($attendance[$class->id]->present ?? 0);
             $late = (int) ($attendance[$class->id]->late ?? 0);
             $total = $class->students_count;
             $notCheckedIn = $total - $present - $late;
+
             return [
                 'class_id' => $class->id,
                 'class_name' => $class->name,
@@ -142,6 +150,7 @@ class SchoolAdminDashboardController extends Controller
                 'not_checked_in' => max($notCheckedIn, 0),
             ];
         });
+
         return response()->json([
             'date' => $today->toDateString(),
             'classes' => $result,
@@ -167,20 +176,27 @@ class SchoolAdminDashboardController extends Controller
                 'classrooms.name as class_name',
                 'classrooms.grade',
                 \DB::raw('(SELECT ROUND(SUM(status="present" OR status="late")/COUNT(*),2)*100 FROM attendances WHERE attendances.student_id=students.id AND attendances.date >= "'.$thirtyDaysAgo->toDateString().'" ) as attendance_rate'),
-                \DB::raw('(SELECT status FROM attendances WHERE attendances.student_id=students.id ORDER BY date DESC, id DESC LIMIT 1) as last_attendance_status')
+                \DB::raw('(SELECT status FROM attendances WHERE attendances.student_id=students.id ORDER BY date DESC, id DESC LIMIT 1) as last_attendance_status'),
             ])
             ->join('classrooms', 'students.classroom_id', '=', 'classrooms.id')
             ->where('students.school_id', $schoolId);
-        if ($grade) $query->where('classrooms.grade', $grade);
-        if ($classId) $query->where('classrooms.id', $classId);
-        if ($status) $query->where('students.status', $status);
+        if ($grade) {
+            $query->where('classrooms.grade', $grade);
+        }
+        if ($classId) {
+            $query->where('classrooms.id', $classId);
+        }
+        if ($status) {
+            $query->where('students.status', $status);
+        }
         if ($search) {
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('students.name', 'like', "%$search%")
-                  ->orWhere('students.nisn', 'like', "%$search%");
+                    ->orWhere('students.nisn', 'like', "%$search%");
             });
         }
         $students = $query->orderBy('students.name')->paginate($perPage);
+
         return response()->json([
             'data' => $students->items(),
             'meta' => [
@@ -188,7 +204,7 @@ class SchoolAdminDashboardController extends Controller
                 'last_page' => $students->lastPage(),
                 'per_page' => $students->perPage(),
                 'total' => $students->total(),
-            ]
+            ],
         ]);
     }
 
@@ -197,7 +213,7 @@ class SchoolAdminDashboardController extends Controller
     {
         $schoolId = $request->user()->school_id;
         $teachers = Teacher::where('school_id', $schoolId)->get();
-        $result = $teachers->map(function($teacher) {
+        $result = $teachers->map(function ($teacher) {
             $classIds = $teacher->classrooms()->pluck('id');
             $classesTaught = $classIds->count();
             $attendanceSessions = Attendance::whereIn('classroom_id', $classIds)
@@ -218,6 +234,7 @@ class SchoolAdminDashboardController extends Controller
                     ->where('is_late', true)
                     ->count();
             }
+
             return [
                 'teacher_id' => $teacher->id,
                 'teacher_name' => $teacher->name,
@@ -227,8 +244,9 @@ class SchoolAdminDashboardController extends Controller
                 'late_class_starts' => $lateStarts,
             ];
         });
+
         return response()->json([
-            'data' => $result
+            'data' => $result,
         ]);
     }
 
@@ -240,14 +258,14 @@ class SchoolAdminDashboardController extends Controller
         $classes = Classroom::where('school_id', $schoolId)
             ->withCount('students')
             ->get();
-        $result = $classes->map(function($class) use ($thirtyDaysAgo) {
+        $result = $classes->map(function ($class) use ($thirtyDaysAgo) {
             $totalStudents = $class->students_count;
             $attendanceStats = Attendance::where('classroom_id', $class->id)
                 ->where('date', '>=', $thirtyDaysAgo)
                 ->selectRaw('student_id, SUM(status="present" OR status="late") as hadir, COUNT(*) as total')
                 ->groupBy('student_id')
                 ->get();
-            $rates = $attendanceStats->map(function($row) {
+            $rates = $attendanceStats->map(function ($row) {
                 return $row->total > 0 ? $row->hadir / $row->total : 0;
             });
             $avgAttendanceRate = $rates->count() ? round($rates->avg() * 100, 2) : null;
@@ -259,10 +277,11 @@ class SchoolAdminDashboardController extends Controller
                 ->orderByDesc('total')
                 ->first();
             $mostAbsentDay = $absenceByDay ? $absenceByDay->day_name : null;
-            $lowAttendanceStudents = $attendanceStats->filter(function($row) {
+            $lowAttendanceStudents = $attendanceStats->filter(function ($row) {
                 return $row->total > 0 && ($row->hadir / $row->total) < 0.75;
             })->pluck('student_id');
             $studentsLow = Student::whereIn('id', $lowAttendanceStudents)->pluck('name');
+
             return [
                 'class_id' => $class->id,
                 'class_name' => $class->name,
@@ -272,8 +291,9 @@ class SchoolAdminDashboardController extends Controller
                 'students_below_75' => $studentsLow,
             ];
         });
+
         return response()->json([
-            'data' => $result
+            'data' => $result,
         ]);
     }
 
@@ -337,8 +357,9 @@ class SchoolAdminDashboardController extends Controller
                 'items' => $failedScanNames,
             ],
         ];
+
         return response()->json([
-            'alerts' => $alerts
+            'alerts' => $alerts,
         ]);
     }
 
@@ -352,11 +373,12 @@ class SchoolAdminDashboardController extends Controller
             ->selectRaw('classroom_id, SUM(status="present" OR status="late") as hadir, COUNT(*) as total')
             ->groupBy('classroom_id')
             ->get()
-            ->map(function($row) {
+            ->map(function ($row) {
                 $rate = $row->total > 0 ? round($row->hadir / $row->total * 100, 2) : null;
+
                 return [
                     'classroom_id' => $row->classroom_id,
-                    'attendance_rate' => $rate
+                    'attendance_rate' => $rate,
                 ];
             });
         $topStudents = Attendance::where('school_id', $schoolId)
@@ -367,13 +389,14 @@ class SchoolAdminDashboardController extends Controller
             ->orderByRaw('hadir/total DESC')
             ->limit(10)
             ->get()
-            ->map(function($row) {
+            ->map(function ($row) {
                 $rate = round($row->hadir / $row->total * 100, 2);
                 $student = Student::find($row->student_id);
+
                 return [
                     'student_id' => $row->student_id,
                     'student_name' => $student ? $student->name : null,
-                    'attendance_rate' => $rate
+                    'attendance_rate' => $rate,
                 ];
             });
         $worstStudents = Attendance::where('school_id', $schoolId)
@@ -384,13 +407,14 @@ class SchoolAdminDashboardController extends Controller
             ->orderByRaw('hadir/total ASC')
             ->limit(10)
             ->get()
-            ->map(function($row) {
+            ->map(function ($row) {
                 $rate = round($row->hadir / $row->total * 100, 2);
                 $student = Student::find($row->student_id);
+
                 return [
                     'student_id' => $row->student_id,
                     'student_name' => $student ? $student->name : null,
-                    'attendance_rate' => $rate
+                    'attendance_rate' => $rate,
                 ];
             });
         $trend = Attendance::where('school_id', $schoolId)
@@ -399,11 +423,12 @@ class SchoolAdminDashboardController extends Controller
             ->groupBy('date')
             ->orderBy('date')
             ->get();
+
         return response()->json([
             'class_attendance_rates' => $classRates,
             'top_students' => $topStudents,
             'worst_students' => $worstStudents,
-            'trend' => $trend
+            'trend' => $trend,
         ]);
     }
 
@@ -418,7 +443,7 @@ class SchoolAdminDashboardController extends Controller
             ->whereDate('date', $today)
             ->orderBy('start_time')
             ->get();
-        $result = $schedules->map(function($schedule) use ($now) {
+        $result = $schedules->map(function ($schedule) use ($now) {
             if ($now->lt(Carbon::parse($schedule->start_time))) {
                 $status = 'not_started';
             } elseif ($now->between(Carbon::parse($schedule->start_time), Carbon::parse($schedule->end_time))) {
@@ -429,6 +454,7 @@ class SchoolAdminDashboardController extends Controller
             $attendanceExists = Attendance::where('classroom_id', $schedule->classroom_id)
                 ->where('date', $schedule->date)
                 ->exists();
+
             return [
                 'schedule_id' => $schedule->id,
                 'class_name' => $schedule->classroom->name,
@@ -441,9 +467,10 @@ class SchoolAdminDashboardController extends Controller
                 'attendance_taken' => $attendanceExists,
             ];
         });
+
         return response()->json([
             'date' => $today,
-            'timeline' => $result
+            'timeline' => $result,
         ]);
     }
 }

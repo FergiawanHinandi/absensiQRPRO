@@ -1,0 +1,142 @@
+# Loki Alerting Rules for AbsensiQRPro
+# Place in /loki/rules/absensi/alerts.yaml
+
+groups:
+  - name: absensi-error-alerts
+    interval: 1m
+    rules:
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: |
+          sum(rate({app="absensi",level=~"ERROR|CRITICAL"}[5m])) 
+          / 
+          sum(rate({app="absensi"}[5m])) 
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High error rate in AbsensiQRPro"
+          description: "Error rate is above 5% for the last 5 minutes"
+
+      # Critical errors
+      - alert: CriticalError
+        expr: |
+          count_over_time({app="absensi",level="CRITICAL"}[5m]) > 0
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Critical error in AbsensiQRPro"
+          description: "A critical error has occurred"
+
+  - name: absensi-security-alerts
+    interval: 1m
+    rules:
+      # Multiple failed logins
+      - alert: MultipleFailedLogins
+        expr: |
+          sum by (ip) (
+            count_over_time({app="absensi",channel="auth"} |= "login.failure"[5m])
+          ) > 10
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Multiple failed login attempts"
+          description: "{{ $labels.ip }} has {{ $value }} failed login attempts in 5 minutes"
+
+      # Invalid QR attempts
+      - alert: HighInvalidQrRate
+        expr: |
+          sum(rate({app="absensi",channel="security"} |= "qr.invalid"[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High rate of invalid QR attempts"
+          description: "More than 1 invalid QR attempt per second"
+
+      # Suspicious activity
+      - alert: SuspiciousActivity
+        expr: |
+          count_over_time({app="absensi",channel="security"} |= "suspicious"[5m]) > 5
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Suspicious activity detected"
+          description: "Multiple suspicious activities detected in the last 5 minutes"
+
+      # Unauthorized access attempts
+      - alert: UnauthorizedAccessAttempts
+        expr: |
+          sum(count_over_time({app="absensi",channel="security"} |= "unauthorized"[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Multiple unauthorized access attempts"
+          description: "{{ $value }} unauthorized access attempts in 5 minutes"
+
+  - name: absensi-performance-alerts
+    interval: 1m
+    rules:
+      # Slow response time
+      - alert: SlowResponseTime
+        expr: |
+          avg(
+            avg_over_time(
+              {app="absensi",channel="request"} 
+              | json 
+              | unwrap response_time_ms [5m]
+            )
+          ) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Slow API response time"
+          description: "Average response time is above 1 second"
+
+      # High request volume
+      - alert: HighRequestVolume
+        expr: |
+          sum(rate({app="absensi",channel="request"}[5m])) > 100
+        for: 10m
+        labels:
+          severity: info
+          team: devops
+        annotations:
+          summary: "High request volume"
+          description: "Request rate is above 100 requests per second"
+
+  - name: absensi-business-alerts
+    interval: 5m
+    rules:
+      # No attendance scans during school hours
+      - alert: NoAttendanceScans
+        expr: |
+          count_over_time({app="absensi",channel="attendance"} |= "scan.success"[30m]) == 0
+        labels:
+          severity: warning
+          team: support
+        annotations:
+          summary: "No attendance scans in 30 minutes"
+          description: "No successful attendance scans recorded - check if schools are operational"
+
+      # Job failures
+      - alert: JobFailures
+        expr: |
+          sum(count_over_time({app="absensi",channel="system"} |= "job.failed"[15m])) > 5
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Multiple job failures"
+          description: "{{ $value }} job failures in the last 15 minutes"

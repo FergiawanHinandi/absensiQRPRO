@@ -24,7 +24,7 @@ class RiskDashboardController extends Controller
 
         // 2. SCHOOL CONTEXT (Admin or Teacher)
         $schoolId = $user->school_id;
-        
+
         // Base Query for LATEST risks
         // We select the latest risk entry for each student in the school
         // Strategy: Subquery to get max ID per student
@@ -42,7 +42,7 @@ class RiskDashboardController extends Controller
 
         // 3. FILTER BY ROLE
         $roleLabel = 'school_admin';
-        
+
         if ($user->hasRole('teacher')) {
             // Check Homeroom
             $academicYearId = DB::table('academic_years')
@@ -54,15 +54,15 @@ class RiskDashboardController extends Controller
                 ->where('academic_year_id', $academicYearId)
                 ->first();
 
-            if (!$teacherRole || !$teacherRole->is_homeroom_teacher) {
+            if (! $teacherRole || ! $teacherRole->is_homeroom_teacher) {
                 return response()->json([
                     'status' => 'success',
                     'role' => 'teacher',
                     'message' => 'Not a homeroom teacher.',
                     'data' => [
                         'summary' => ['high' => 0, 'medium' => 0, 'low' => 0],
-                        'students' => []
-                    ]
+                        'students' => [],
+                    ],
                 ]);
             }
 
@@ -71,8 +71,8 @@ class RiskDashboardController extends Controller
 
             // Filter by Class
             $query->join('class_students', 'users.id', '=', 'class_students.student_id')
-                  ->where('class_students.class_id', $classId)
-                  ->where('class_students.status', 'active');
+                ->where('class_students.class_id', $classId)
+                ->where('class_students.status', 'active');
         }
 
         // Select Fields
@@ -87,30 +87,30 @@ class RiskDashboardController extends Controller
         )->get();
 
         // 4. PREPARE RESPONSE
-        
+
         // Summary Counts
         $high = $results->where('risk_level', 'High')->count(); // Case sensitive match from service? Service uses 'High', 'Medium', 'Low'
         // Actually Service uses 'High' (capitalized). DB migration string.
         // Let's normalize just in case.
         $summary = [
-            'high' => $results->filter(fn($r) => strtolower($r->risk_level) === 'high')->count(),
-            'medium' => $results->filter(fn($r) => strtolower($r->risk_level) === 'medium')->count(),
-            'low' => $results->filter(fn($r) => strtolower($r->risk_level) === 'low')->count(),
+            'high' => $results->filter(fn ($r) => strtolower($r->risk_level) === 'high')->count(),
+            'medium' => $results->filter(fn ($r) => strtolower($r->risk_level) === 'medium')->count(),
+            'low' => $results->filter(fn ($r) => strtolower($r->risk_level) === 'low')->count(),
         ];
 
         // Format Students List
         $students = $results->map(function ($row) {
-             return [
-                 'id' => $row->student_id,
-                 'name' => $row->student_name,
-                 'photo' => $row->profile_photo_url,
-                 'risk' => [
-                     'score' => $row->risk_score,
-                     'level' => $row->risk_level, // Keep original casing
-                     'last_updated' => $row->calculated_at,
-                     'factors_count' => count(json_decode($row->factors_json) ?? [])
-                 ]
-             ];
+            return [
+                'id' => $row->student_id,
+                'name' => $row->student_name,
+                'photo' => $row->profile_photo_url,
+                'risk' => [
+                    'score' => $row->risk_score,
+                    'level' => $row->risk_level, // Keep original casing
+                    'last_updated' => $row->calculated_at,
+                    'factors_count' => count(json_decode($row->factors_json) ?? []),
+                ],
+            ];
         })->sortByDesc('risk.score')->values();
 
         return response()->json([
@@ -118,8 +118,8 @@ class RiskDashboardController extends Controller
             'role' => $roleLabel,
             'data' => [
                 'summary' => $summary,
-                'students' => $students
-            ]
+                'students' => $students,
+            ],
         ]);
     }
 
@@ -132,15 +132,15 @@ class RiskDashboardController extends Controller
             // Simplified approach: Join users, join risks.
             // CAUTION: This counts ALL risk history if we aren't careful.
             // We need "Latest Risk Per Student".
-            
+
             // Subquery for latest risks
             ->leftJoin('users', 'schools.id', '=', 'users.school_id')
-            ->leftJoin('student_attendance_risk', function($join) {
+            ->leftJoin('student_attendance_risk', function ($join) {
                 $join->on('users.id', '=', 'student_attendance_risk.student_id')
-                     // Ensure we only get the latest record? 
+                     // Ensure we only get the latest record?
                      // Row_number() is best but complex in basic Eloquent.
                      // Let's use a WHERE In subquery approach or just join the latest ID subquery again.
-                     ->whereRaw('student_attendance_risk.id = (SELECT MAX(id) FROM student_attendance_risk as sar WHERE sar.student_id = users.id)');
+                    ->whereRaw('student_attendance_risk.id = (SELECT MAX(id) FROM student_attendance_risk as sar WHERE sar.student_id = users.id)');
             })
             ->where('users.role_type', 'student')
             ->select(
@@ -155,16 +155,17 @@ class RiskDashboardController extends Controller
         return response()->json([
             'status' => 'success',
             'role' => 'super_admin',
-            'data' => $stats
+            'data' => $stats,
         ]);
     }
+
     /**
      * Analyze student arrival (punctuality) patterns.
      */
     public function getStudentArrivalAnalytics(Request $request, $studentId)
     {
         $user = $request->user();
-        
+
         // Ensure access (School Admin or Teacher)
         // Basic check: must be same school
         $targetStudent = User::where('id', $studentId)
@@ -186,15 +187,15 @@ class RiskDashboardController extends Controller
                 'data' => [
                     'avg_arrival' => 'N/A',
                     'most_frequent_range' => 'N/A',
-                    'weekday_breakdown' => []
-                ]
+                    'weekday_breakdown' => [],
+                ],
             ]);
         }
 
         // 1. Average Arrival Time
         $totalSeconds = 0;
         $count = 0;
-        
+
         // 2. Frequency Buckets (10 mins)
         // Ranges: 06:00-06:10, etc.
         $buckets = [];
@@ -213,7 +214,7 @@ class RiskDashboardController extends Controller
         foreach ($records as $rec) {
             $time = \Carbon\Carbon::parse($rec->check_in_time);
             $seconds = $time->secondsSinceMidnight();
-            
+
             // Avg calc
             $totalSeconds += $seconds;
             $count++;
@@ -223,9 +224,9 @@ class RiskDashboardController extends Controller
             $minute = $time->minute;
             $bucketStartMinute = floor($minute / 10) * 10;
             $bucketTime = $time->copy()->setMinute($bucketStartMinute)->setSecond(0);
-            $bucketLabel = $bucketTime->format('H:i') . ' - ' . $bucketTime->addMinutes(10)->format('H:i');
-            
-            if (!isset($buckets[$bucketLabel])) {
+            $bucketLabel = $bucketTime->format('H:i').' - '.$bucketTime->addMinutes(10)->format('H:i');
+
+            if (! isset($buckets[$bucketLabel])) {
                 $buckets[$bucketLabel] = 0;
             }
             $buckets[$bucketLabel]++;
@@ -256,7 +257,7 @@ class RiskDashboardController extends Controller
                 $breakdown[$day] = [
                     'late_probability' => $prob,
                     'total_visits' => $stats['total'],
-                    'late_count' => $stats['late']
+                    'late_count' => $stats['late'],
                 ];
             }
         }
@@ -266,10 +267,11 @@ class RiskDashboardController extends Controller
             'data' => [
                 'avg_arrival' => $avgArrival,
                 'most_frequent_range' => $topRange ?? 'N/A',
-                'weekday_breakdown' => $breakdown
-            ]
+                'weekday_breakdown' => $breakdown,
+            ],
         ]);
     }
+
     /**
      * Detect time-based risk patterns (Morning vs Afternoon).
      */
@@ -283,11 +285,11 @@ class RiskDashboardController extends Controller
 
         // 30 Days Lookback
         $startDate = \Carbon\Carbon::now()->subDays(30)->toDateString();
-        
+
         // We need schedule start times. Join attendances with schedules.
         // If schedule_id is null, we can't determine "planned" time for absences easily.
         // Assuming session-based attendance where schedule_id is populated.
-        
+
         $records = DB::table('attendances')
             ->join('schedules', 'attendances.schedule_id', '=', 'schedules.id')
             ->where('attendances.student_id', $studentId)
@@ -305,20 +307,20 @@ class RiskDashboardController extends Controller
 
         foreach ($records as $rec) {
             $startTime = $rec->start_time; // HH:mm:ss
-            
+
             // Morning: Starts before 09:00
             if ($startTime < '09:00:00') {
                 $morningStats['total']++;
                 if ($rec->status === 'late') {
                     $morningStats['late']++;
                 }
-            } 
+            }
             // Afternoon: Starts after 12:00
             elseif ($startTime >= '12:00:00') {
                 $afternoonStats['total']++;
                 if (in_array($rec->status, ['absent', 'alpha', 'sick', 'permit'])) {
-                    // Treating all 'not present' as absence for disengagement check? 
-                    // Prompt says "Absent", usually implies Alpha/Absent. 
+                    // Treating all 'not present' as absence for disengagement check?
+                    // Prompt says "Absent", usually implies Alpha/Absent.
                     // Let's stick to strict Absent/Alpha for "Disengagement".
                     if (in_array($rec->status, ['absent', 'alpha'])) {
                         $afternoonStats['absent']++;
@@ -335,12 +337,12 @@ class RiskDashboardController extends Controller
         if ($morningStats['total'] > 0) {
             $morningLateRate = round(($morningStats['late'] / $morningStats['total']) * 100, 1);
         }
-        
+
         if ($morningLateRate >= 20 || $morningStats['late'] >= 3) {
             $flags[] = [
                 'pattern' => 'morning_discipline',
                 'label' => 'Morning Discipline Issue',
-                'detail' => "Frequently late in morning sessions (< 09:00). Rate: {$morningLateRate}% ({$morningStats['late']} times)"
+                'detail' => "Frequently late in morning sessions (< 09:00). Rate: {$morningLateRate}% ({$morningStats['late']} times)",
             ];
         }
 
@@ -351,10 +353,10 @@ class RiskDashboardController extends Controller
         }
 
         if ($afternoonAbsenceRate >= 15 || $afternoonStats['absent'] >= 2) {
-             $flags[] = [
+            $flags[] = [
                 'pattern' => 'afternoon_disengagement',
                 'label' => 'Afternoon Disengagement',
-                'detail' => "Frequently absent after lunch (> 12:00). Rate: {$afternoonAbsenceRate}% ({$afternoonStats['absent']} times)"
+                'detail' => "Frequently absent after lunch (> 12:00). Rate: {$afternoonAbsenceRate}% ({$afternoonStats['absent']} times)",
             ];
         }
 
@@ -364,15 +366,15 @@ class RiskDashboardController extends Controller
                 'morning_session' => [
                     'total' => $morningStats['total'],
                     'late_count' => $morningStats['late'],
-                    'late_rate' => $morningLateRate
+                    'late_rate' => $morningLateRate,
                 ],
                 'afternoon_session' => [
                     'total' => $afternoonStats['total'],
                     'absent_count' => $afternoonStats['absent'],
-                    'absent_rate' => $afternoonAbsenceRate
+                    'absent_rate' => $afternoonAbsenceRate,
                 ],
-                'risk_flags' => $flags
-            ]
+                'risk_flags' => $flags,
+            ],
         ]);
     }
 
@@ -401,16 +403,16 @@ class RiskDashboardController extends Controller
                     sum(case when status = 'late' then 1 else 0 end) as late
                 ")
                 ->first();
-            
+
             $rate = ($stats->total > 0) ? round(($stats->present / $stats->total) * 100, 1) : 0;
             // Handle edge case: if no records in prev period, assume 100% rate to detect drops if they suddenly start skipping?
             // Or assume 0? Usually 100 is safer baseline to detect "Drop" if they were previously good (or unrecorded).
             // But if total is 0, it means no data. Let's keep 0 and handle comparisons carefully.
-            
+
             return [
                 'rate' => $rate,
                 'late' => (int) $stats->late,
-                'total_records' => $stats->total
+                'total_records' => $stats->total,
             ];
         };
 
@@ -449,7 +451,7 @@ class RiskDashboardController extends Controller
 
         // Determine Primary Flag
         $behaviorFlag = null;
-        if (!empty($flags)) {
+        if (! empty($flags)) {
             // Priority: Plummet > Spike
             if (in_array('ATTENDANCE_PLUMMET', $flags)) {
                 $behaviorFlag = 'ATTENDANCE_PLUMMET';
@@ -465,11 +467,11 @@ class RiskDashboardController extends Controller
                 'previous_period' => $previous,
                 'changes' => [
                     'attendance_drop_points' => $attendanceDrop,
-                    'late_increase_pct' => round($lateIncreasePct, 1)
+                    'late_increase_pct' => round($lateIncreasePct, 1),
                 ],
                 'behavior_change_flag' => $behaviorFlag,
-                'details' => $flags // Full list
-            ]
+                'details' => $flags, // Full list
+            ],
         ]);
     }
 
@@ -521,7 +523,7 @@ class RiskDashboardController extends Controller
                     $predictions[] = [
                         'day' => $day,
                         'risk' => 'High',
-                        'message' => "High {$day} Late Risk (> 40% probability)"
+                        'message' => "High {$day} Late Risk (> 40% probability)",
                     ];
                 }
             }
@@ -531,8 +533,8 @@ class RiskDashboardController extends Controller
             'status' => 'success',
             'data' => [
                 'predictions' => $predictions,
-                'weekday_late_probabilities' => $breakdown
-            ]
+                'weekday_late_probabilities' => $breakdown,
+            ],
         ]);
     }
 
@@ -550,7 +552,7 @@ class RiskDashboardController extends Controller
 
         // 1. DATA: Last 60 Days
         $sixtyDaysAgo = \Carbon\Carbon::now()->subDays(60)->toDateString();
-        
+
         $records = DB::table('attendances')
             ->leftJoin('schedules', 'attendances.schedule_id', '=', 'schedules.id') // Join optional
             ->leftJoin('subjects', 'schedules.subject_id', '=', 'subjects.id')     // Join optional
@@ -577,7 +579,9 @@ class RiskDashboardController extends Controller
 
             // Late Day
             if ($rec->status === 'late') {
-                if (!isset($latesByDay[$day])) $latesByDay[$day] = 0;
+                if (! isset($latesByDay[$day])) {
+                    $latesByDay[$day] = 0;
+                }
                 $latesByDay[$day]++;
             }
 
@@ -585,7 +589,9 @@ class RiskDashboardController extends Controller
             // Usually "Problematic" implies missing class.
             if (in_array($rec->status, ['absent', 'alpha', 'late']) && $rec->subject_name) {
                 $sub = $rec->subject_name;
-                if (!isset($absencesBySubject[$sub])) $absencesBySubject[$sub] = 0;
+                if (! isset($absencesBySubject[$sub])) {
+                    $absencesBySubject[$sub] = 0;
+                }
                 $absencesBySubject[$sub]++;
             }
 
@@ -598,21 +604,21 @@ class RiskDashboardController extends Controller
 
         // A. Frequent Late Day
         $mostFrequentLateDay = 'None';
-        if (!empty($latesByDay)) {
+        if (! empty($latesByDay)) {
             arsort($latesByDay);
-            $mostFrequentLateDay = array_key_first($latesByDay) . " (" . current($latesByDay) . ")";
+            $mostFrequentLateDay = array_key_first($latesByDay).' ('.current($latesByDay).')';
         }
 
         // B. Problematic Subject
         $mostProblematicSubject = 'None';
-        if (!empty($absencesBySubject)) {
+        if (! empty($absencesBySubject)) {
             arsort($absencesBySubject);
-            $mostProblematicSubject = array_key_first($absencesBySubject) . " (" . current($absencesBySubject) . " issues)";
+            $mostProblematicSubject = array_key_first($absencesBySubject).' ('.current($absencesBySubject).' issues)';
         }
 
         // C. Consistency Score (Standard Deviation of Arrival Time)
         // Lower std dev = Higher consistency.
-        // Map 0-30m std dev to 0-100 score? 
+        // Map 0-30m std dev to 0-100 score?
         // 0 variance = 100 score. 60 min variance = 0 score.
         $consistencyScore = 100; // Default perfect
         if (count($times) > 1) {
@@ -622,7 +628,7 @@ class RiskDashboardController extends Controller
             }
             $stdDevSeconds = sqrt($varianceSum / count($times));
             $stdDevMinutes = $stdDevSeconds / 60;
-            
+
             // Formula: 100 - (StdDevMins * 2). If deviation is 10 mins, score 80. 30 mins, score 40.
             $consistencyScore = max(0, 100 - ($stdDevMinutes * 2));
         } elseif (count($times) == 0 && $records->count() > 0) {
@@ -635,12 +641,12 @@ class RiskDashboardController extends Controller
         $days30 = \Carbon\Carbon::now()->subDays(30);
         $recentLates = $records->where('attendance_date', '>=', $days30->toDateString())->where('status', 'late')->count();
         $oldLates = $records->where('attendance_date', '<', $days30->toDateString())->where('status', 'late')->count();
-        
+
         $changeFlag = 'Stable';
         if ($recentLates > $oldLates && $recentLates >= 3) {
             $changeFlag = 'Degrading (More Lates)';
         } elseif ($recentLates < $oldLates && $oldLates >= 3) {
-             $changeFlag = 'Improving';
+            $changeFlag = 'Improving';
         }
 
         return response()->json([
@@ -652,17 +658,26 @@ class RiskDashboardController extends Controller
                 'most_problematic_subject' => $mostProblematicSubject,
                 'consistency_score' => round($consistencyScore, 1),
                 'consistency_label' => $this->getConsistencyLabel($consistencyScore),
-                'behavior_trend' => $changeFlag
-            ]
+                'behavior_trend' => $changeFlag,
+            ],
         ]);
     }
 
-    private function getConsistencyLabel($score) {
-        if ($score >= 90) return 'Very Consistent';
-        if ($score >= 75) return 'Consistent';
-        if ($score >= 50) return 'Variable';
+    private function getConsistencyLabel($score)
+    {
+        if ($score >= 90) {
+            return 'Very Consistent';
+        }
+        if ($score >= 75) {
+            return 'Consistent';
+        }
+        if ($score >= 50) {
+            return 'Variable';
+        }
+
         return 'Erratic';
     }
+
     /**
      * Get School-Wide Behavior Analytics (Admin)
      */
@@ -686,13 +701,15 @@ class RiskDashboardController extends Controller
             $minute = $time->minute;
             $bucketStartMinute = floor($minute / 10) * 10;
             $bucketTime = $time->copy()->setMinute($bucketStartMinute)->setSecond(0);
-            $bucketLabel = $bucketTime->format('H:i') . ' - ' . $bucketTime->addMinutes(10)->format('H:i');
-            
-            if (!isset($buckets[$bucketLabel])) $buckets[$bucketLabel] = 0;
+            $bucketLabel = $bucketTime->format('H:i').' - '.$bucketTime->addMinutes(10)->format('H:i');
+
+            if (! isset($buckets[$bucketLabel])) {
+                $buckets[$bucketLabel] = 0;
+            }
             $buckets[$bucketLabel]++;
         }
         arsort($buckets);
-        $commonLateTime = !empty($buckets) ? array_key_first($buckets) . " (".current($buckets)." students)" : "N/A";
+        $commonLateTime = ! empty($buckets) ? array_key_first($buckets).' ('.current($buckets).' students)' : 'N/A';
 
         // 2. Weekday with Highest Absence Rate
         // Logic: Count absences per weekday / Total records per weekday
@@ -706,11 +723,11 @@ class RiskDashboardController extends Controller
                 sum(case when status in ('absent', 'alpha', 'sick') then 1 else 0 end) as absent_count
             ")
             ->groupBy('day_name') // Function depends on DB driver. DAYNAME() is MySQL.
-            // Safe fallback if not MySQL: get all and process PHP side? 
+            // Safe fallback if not MySQL: get all and process PHP side?
             // Assuming MySQL/MariaDB for this specific project context usually.
             // If SQLite (testing), this fails. Let's use PHP aggregation for safety.
             ->get();
-            
+
         // Use PHP aggregation instead of DAYNAME to be safe
         $dayStats = [];
         $records = DB::table('attendances')
@@ -718,26 +735,28 @@ class RiskDashboardController extends Controller
             ->where('attendance_date', '>=', $thirtyDaysAgo)
             ->select('attendance_date', 'status')
             ->get(); // Could be large, but "get" is memory heavy if huge school.
-                     // But for "school-wide" usually acceptable. 
-        
+        // But for "school-wide" usually acceptable.
+
         foreach ($records as $rec) {
-             $day = \Carbon\Carbon::parse($rec->attendance_date)->englishDayOfWeek;
-             if (!isset($dayStats[$day])) $dayStats[$day] = ['total' => 0, 'absent' => 0];
-             $dayStats[$day]['total']++;
-             if (in_array($rec->status, ['absent', 'alpha', 'sick'])) {
-                 $dayStats[$day]['absent']++;
-             }
+            $day = \Carbon\Carbon::parse($rec->attendance_date)->englishDayOfWeek;
+            if (! isset($dayStats[$day])) {
+                $dayStats[$day] = ['total' => 0, 'absent' => 0];
+            }
+            $dayStats[$day]['total']++;
+            if (in_array($rec->status, ['absent', 'alpha', 'sick'])) {
+                $dayStats[$day]['absent']++;
+            }
         }
-        
+
         $highestAbsenceDay = 'N/A';
         $maxRate = -1;
-        
+
         foreach ($dayStats as $day => $s) {
             if ($s['total'] > 0) {
                 $rate = ($s['absent'] / $s['total']) * 100;
                 if ($rate > $maxRate) {
                     $maxRate = $rate;
-                    $highestAbsenceDay = $day . ' (' . round($rate, 1) . '%)';
+                    $highestAbsenceDay = $day.' ('.round($rate, 1).'%)';
                 }
             }
         }
@@ -758,12 +777,13 @@ class RiskDashboardController extends Controller
             ->orderByRaw("(sum(case when attendances.status = 'present' then 1 else 0 end) / count(*)) ASC")
             ->limit(5)
             ->get();
-            
-        $lowestSubjects = $subjectStats->map(function($s) {
+
+        $lowestSubjects = $subjectStats->map(function ($s) {
             $rate = $s->total > 0 ? ($s->present / $s->total) * 100 : 0;
+
             return [
                 'subject' => $s->subject,
-                'rate' => round($rate, 1)
+                'rate' => round($rate, 1),
             ];
         });
 
@@ -772,7 +792,7 @@ class RiskDashboardController extends Controller
         // Simplified approach: Use 'student_attendance_risk' table and count Risk 'High' or 'Medium' increases?
         // Or check 'late' trends per class using aggregate query.
         // Let's count "Total Lates Last 30 Days" per Class vs "Total Lates 31-60 Days Ago".
-        
+
         $classLates = DB::table('class_students')
             ->join('users', 'class_students.student_id', '=', 'users.id')
             ->join('classes', 'class_students.class_id', '=', 'classes.id')
@@ -790,19 +810,20 @@ class RiskDashboardController extends Controller
             ->limit(5)
             ->get();
 
-        $degradingClasses = $classLates->map(function($c) {
+        $degradingClasses = $classLates->map(function ($c) {
             $diff = $c->recent_lates - $c->old_lates;
+
             return [
                 'class' => $c->class_name,
-                'late_increase' => "+{$diff} lates"
+                'late_increase' => "+{$diff} lates",
             ];
         });
 
         // If no records found but logic ran
         if ($degradingClasses->isEmpty()) {
-             // Fallback to top classes by Raw Late count if no increase found?
-             // Prompt asks for "Behavior Change Flags".
-             // If no degrading classes, return empty.
+            // Fallback to top classes by Raw Late count if no increase found?
+            // Prompt asks for "Behavior Change Flags".
+            // If no degrading classes, return empty.
         }
 
         return response()->json([
@@ -811,8 +832,8 @@ class RiskDashboardController extends Controller
                 'common_late_time' => $commonLateTime,
                 'highest_absence_day' => $highestAbsenceDay,
                 'lowest_attendance_subjects' => $lowestSubjects,
-                'classes_with_behavior_issues' => $degradingClasses
-            ]
+                'classes_with_behavior_issues' => $degradingClasses,
+            ],
         ]);
     }
 }

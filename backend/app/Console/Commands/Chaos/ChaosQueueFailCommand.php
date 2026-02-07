@@ -40,6 +40,7 @@ class ChaosQueueFailCommand extends Command
         if (app()->environment('production')) {
             $this->error('❌ Chaos testing is DISABLED in production environment!');
             $this->error('   This command can only be run in staging, testing, or local environments.');
+
             return Command::FAILURE;
         }
 
@@ -50,22 +51,24 @@ class ChaosQueueFailCommand extends Command
 
         $this->newLine();
         $this->warn('💥 CHAOS ENGINEERING: Queue Failure Simulation');
-        $this->warn('   Environment: ' . app()->environment());
-        $this->warn('   Duration: ' . $duration . ' seconds');
-        $this->warn('   Backlog size: ' . $backlogSize . ' jobs');
-        $this->warn('   Fail rate: ' . $failRate . '%');
+        $this->warn('   Environment: '.app()->environment());
+        $this->warn('   Duration: '.$duration.' seconds');
+        $this->warn('   Backlog size: '.$backlogSize.' jobs');
+        $this->warn('   Fail rate: '.$failRate.'%');
         $this->newLine();
 
         if ($dryRun) {
             $this->info('🔍 DRY RUN MODE - No changes will be made');
             $this->newLine();
             $this->showExpectedBehavior($backlogSize, $failRate);
+
             return Command::SUCCESS;
         }
 
         // Confirm before proceeding
-        if (!$this->confirm('⚠️  This will simulate queue failures and create backlog. Continue?')) {
+        if (! $this->confirm('⚠️  This will simulate queue failures and create backlog. Continue?')) {
             $this->info('Cancelled.');
+
             return Command::SUCCESS;
         }
 
@@ -144,8 +147,8 @@ class ChaosQueueFailCommand extends Command
             }
 
             $this->newLine();
-            $this->info('   - System state: ' . $failSecureService->getSystemState());
-            $this->info('   - Queue backlog threshold: ' . FailSecureService::QUEUE_BACKLOG_THRESHOLD);
+            $this->info('   - System state: '.$failSecureService->getSystemState());
+            $this->info('   - Queue backlog threshold: '.FailSecureService::QUEUE_BACKLOG_THRESHOLD);
             $this->newLine();
 
             // Show progress bar
@@ -232,7 +235,7 @@ class ChaosQueueFailCommand extends Command
 
         } catch (\Throwable $e) {
             $this->newLine();
-            $this->error('❌ Chaos test failed: ' . $e->getMessage());
+            $this->error('❌ Chaos test failed: '.$e->getMessage());
 
             // Cleanup
             try {
@@ -244,7 +247,7 @@ class ChaosQueueFailCommand extends Command
                 $failSecureService->forceDegradedMode(false);
                 $failSecureService->clearStateCache();
             } catch (\Throwable $cleanupError) {
-                $this->warn('   Could not fully restore state: ' . $cleanupError->getMessage());
+                $this->warn('   Could not fully restore state: '.$cleanupError->getMessage());
             }
 
             return Command::FAILURE;
@@ -260,8 +263,9 @@ class ChaosQueueFailCommand extends Command
 
         // Check if jobs table exists
         try {
-            if (!DB::getSchemaBuilder()->hasTable('jobs')) {
+            if (! DB::getSchemaBuilder()->hasTable('jobs')) {
                 $this->warn('   Jobs table does not exist, creating simulated records in memory only');
+
                 return 0;
             }
 
@@ -293,7 +297,7 @@ class ChaosQueueFailCommand extends Command
                 $created += count($jobs);
             }
         } catch (\Throwable $e) {
-            $this->warn('   Could not create simulated jobs: ' . $e->getMessage());
+            $this->warn('   Could not create simulated jobs: '.$e->getMessage());
         }
 
         return $created;
@@ -307,8 +311,9 @@ class ChaosQueueFailCommand extends Command
         $created = 0;
 
         try {
-            if (!DB::getSchemaBuilder()->hasTable('failed_jobs')) {
+            if (! DB::getSchemaBuilder()->hasTable('failed_jobs')) {
                 $this->warn('   Failed jobs table does not exist');
+
                 return 0;
             }
 
@@ -338,7 +343,7 @@ class ChaosQueueFailCommand extends Command
                 $created += count($jobs);
             }
         } catch (\Throwable $e) {
-            $this->warn('   Could not create simulated failed jobs: ' . $e->getMessage());
+            $this->warn('   Could not create simulated failed jobs: '.$e->getMessage());
         }
 
         return $created;
@@ -363,7 +368,7 @@ class ChaosQueueFailCommand extends Command
             $this->info("   Removed {$deletedFailed} simulated failed jobs");
 
         } catch (\Throwable $e) {
-            $this->warn('   Cleanup error: ' . $e->getMessage());
+            $this->warn('   Cleanup error: '.$e->getMessage());
         }
     }
 
@@ -379,13 +384,13 @@ class ChaosQueueFailCommand extends Command
 
         $this->line('   <fg=yellow>1. Queue Backlog</fg=yellow>');
         $this->line("      - Simulated backlog: {$backlogSize} jobs");
-        $this->line('      - Threshold for degraded: ' . FailSecureService::QUEUE_BACKLOG_THRESHOLD . ' jobs');
-        $this->line('      - Will trigger degraded mode: ' . ($willTriggerDegraded ? '<fg=red>YES</fg=red>' : '<fg=green>NO</fg=green>'));
+        $this->line('      - Threshold for degraded: '.FailSecureService::QUEUE_BACKLOG_THRESHOLD.' jobs');
+        $this->line('      - Will trigger degraded mode: '.($willTriggerDegraded ? '<fg=red>YES</fg=red>' : '<fg=green>NO</fg=green>'));
         $this->newLine();
 
         $this->line('   <fg=yellow>2. Failed Jobs</fg=yellow>');
         $this->line("      - Simulated fail rate: {$failRate}%");
-        $this->line("      - Expected failed jobs: " . (int) ($backlogSize * ($failRate / 100)));
+        $this->line('      - Expected failed jobs: '.(int) ($backlogSize * ($failRate / 100)));
         $this->newLine();
 
         if ($willTriggerDegraded) {
@@ -449,7 +454,7 @@ class ChaosQueueFailCommand extends Command
         $this->line("      - Duration: <fg=cyan>{$duration}s</fg=cyan>");
         $this->line("      - Jobs created: <fg=cyan>{$testResults['jobs_created']}</fg=cyan>");
         $this->line("      - Failed jobs created: <fg=cyan>{$testResults['failed_jobs_created']}</fg=cyan>");
-        $this->line('      - Degraded mode activated: ' .
+        $this->line('      - Degraded mode activated: '.
             ($testResults['degraded_mode_activated'] ? '<fg=yellow>Yes</fg=yellow>' : '<fg=green>No</fg=green>'));
         $this->newLine();
 
@@ -461,13 +466,13 @@ class ChaosQueueFailCommand extends Command
 
             $this->line("   Fallback events recorded: <fg=cyan>{$fallbackEvents}</fg=cyan>");
         } catch (\Throwable $e) {
-            $this->line("   Fallback events: <fg=red>Could not retrieve</fg=red>");
+            $this->line('   Fallback events: <fg=red>Could not retrieve</fg=red>');
         }
 
         $this->newLine();
         $this->line('   Current State:');
-        $this->line('      - System state: <fg=green>' . $failSecureService->getSystemState() . '</fg=green>');
-        $this->line('      - Degraded mode: ' . ($failSecureService->isDegraded() ? '<fg=yellow>Yes</fg=yellow>' : '<fg=green>No</fg=green>'));
+        $this->line('      - System state: <fg=green>'.$failSecureService->getSystemState().'</fg=green>');
+        $this->line('      - Degraded mode: '.($failSecureService->isDegraded() ? '<fg=yellow>Yes</fg=yellow>' : '<fg=green>No</fg=green>'));
 
         // Current queue status
         try {

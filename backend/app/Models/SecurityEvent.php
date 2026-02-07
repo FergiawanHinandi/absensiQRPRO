@@ -14,24 +14,38 @@ class SecurityEvent extends Model
      * Event type constants
      */
     public const EVENT_OUTSIDE_SCHEDULE = 'outside_schedule';
+
     public const EVENT_OUTSIDE_RADIUS = 'outside_radius';
+
     public const EVENT_UNAPPROVED_DEVICE = 'unapproved_device';
+
     public const EVENT_DUPLICATE_ATTEMPT = 'duplicate_attempt';
+
     public const EVENT_MOCK_LOCATION = 'mock_location';
+
     public const EVENT_QR_REPLAY = 'qr_replay';
+
     public const EVENT_QR_OWNERSHIP_VIOLATION = 'qr_ownership_violation';
+
     public const EVENT_POOR_GPS_ACCURACY = 'poor_gps_accuracy';
+
     public const EVENT_SUSPICIOUS_DEVICE_CHANGE = 'suspicious_device_change';
+
     public const EVENT_IMPOSSIBLE_TRAVEL = 'impossible_travel';
+
     public const EVENT_UNAUTHORIZED_ACCESS = 'unauthorized_access';
+
     public const EVENT_RATE_LIMIT_EXCEEDED = 'rate_limit_exceeded';
 
     /**
      * Severity constants
      */
     public const SEVERITY_LOW = 'low';
+
     public const SEVERITY_MEDIUM = 'medium';
+
     public const SEVERITY_HIGH = 'high';
+
     public const SEVERITY_CRITICAL = 'critical';
 
     protected $fillable = [
@@ -70,6 +84,11 @@ class SecurityEvent extends Model
     public function resolver()
     {
         return $this->belongsTo(User::class, 'resolved_by');
+    }
+
+    public function student()
+    {
+        return $this->belongsTo(User::class, 'student_id');
     }
 
     // Scopes

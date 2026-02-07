@@ -75,8 +75,21 @@ export const useSecuritySummary = () => {
     return useQuery({
         queryKey: ['securityDashboard', 'summary'],
         queryFn: async () => {
-            const response = await apiClient.get('/admin/security-dashboard/summary');
-            return response.data.data as SecuritySummary;
+            try {
+                const response = await apiClient.get('/admin/security/summary');
+                return response.data.data as SecuritySummary;
+            } catch (error) {
+                // Fallback empty data to avoid dashboard crash
+                return {
+                    alerts_last_24h: 0,
+                    critical_alerts: 0,
+                    high_severity_alerts: 0,
+                    schools_with_alerts: 0,
+                    most_common_event: null,
+                    most_common_event_count: 0,
+                    unresolved_alerts: 0,
+                } as SecuritySummary;
+            }
         },
         refetchInterval: 30000, // 30 seconds
     });
@@ -89,10 +102,15 @@ export const useSecurityTrend = (range: '7d' | '30d' = '7d') => {
     return useQuery({
         queryKey: ['securityDashboard', 'trend', range],
         queryFn: async () => {
-            const response = await apiClient.get('/admin/security-dashboard/trend', {
-                params: { range },
-            });
-            return response.data.data as TrendDataPoint[];
+            try {
+                const response = await apiClient.get('/admin/security/trend', {
+                    params: { range },
+                });
+                return response.data.data as TrendDataPoint[];
+            } catch (error) {
+                // Fallback empty array to avoid dashboard crash
+                return [] as TrendDataPoint[];
+            }
         },
         refetchInterval: 60000, // 1 minute
     });
@@ -105,10 +123,15 @@ export const useSecurityByType = (range: '7d' | '30d' = '7d') => {
     return useQuery({
         queryKey: ['securityDashboard', 'byType', range],
         queryFn: async () => {
-            const response = await apiClient.get('/admin/security-dashboard/by-type', {
-                params: { range },
-            });
-            return response.data.data as AlertByType[];
+            try {
+                const response = await apiClient.get('/admin/security/by-type', {
+                    params: { range },
+                });
+                return response.data.data as AlertByType[];
+            } catch (error) {
+                // Fallback empty array to avoid dashboard crash
+                return [] as AlertByType[];
+            }
         },
         refetchInterval: 60000,
     });
@@ -121,10 +144,15 @@ export const useSecurityBySchool = (range: '7d' | '30d' = '7d') => {
     return useQuery({
         queryKey: ['securityDashboard', 'bySchool', range],
         queryFn: async () => {
-            const response = await apiClient.get('/admin/security-dashboard/by-school', {
-                params: { range },
-            });
-            return response.data.data as AlertBySchool[];
+            try {
+                const response = await apiClient.get('/admin/security/by-school', {
+                    params: { range },
+                });
+                return response.data.data as AlertBySchool[];
+            } catch (error) {
+                // Fallback empty array to avoid dashboard crash
+                return [] as AlertBySchool[];
+            }
         },
         refetchInterval: 60000,
     });
@@ -137,10 +165,15 @@ export const useSecurityBySeverity = (range: '7d' | '30d' = '7d') => {
     return useQuery({
         queryKey: ['securityDashboard', 'bySeverity', range],
         queryFn: async () => {
-            const response = await apiClient.get('/admin/security-dashboard/by-severity', {
-                params: { range },
-            });
-            return response.data.data as AlertBySeverity[];
+            try {
+                const response = await apiClient.get('/admin/security/by-severity', {
+                    params: { range },
+                });
+                return response.data.data as AlertBySeverity[];
+            } catch (error) {
+                // Fallback empty array to avoid dashboard crash
+                return [] as AlertBySeverity[];
+            }
         },
         refetchInterval: 60000,
     });
@@ -153,10 +186,15 @@ export const useCriticalAlerts = (limit: number = 20) => {
     return useQuery({
         queryKey: ['securityDashboard', 'criticalRecent', limit],
         queryFn: async () => {
-            const response = await apiClient.get('/admin/security-dashboard/critical-recent', {
-                params: { limit },
-            });
-            return response.data.data as CriticalAlert[];
+            try {
+                const response = await apiClient.get('/admin/security/critical-recent', {
+                    params: { limit },
+                });
+                return response.data.data as CriticalAlert[];
+            } catch (error) {
+                // Fallback empty array to avoid dashboard crash
+                return [] as CriticalAlert[];
+            }
         },
         refetchInterval: 30000, // 30 seconds for live feed
     });
@@ -170,8 +208,13 @@ export const useAcknowledgeAlert = () => {
 
     return useMutation({
         mutationFn: async (alertId: number) => {
-            const response = await apiClient.patch(`/admin/security-alerts/${alertId}/ack`);
-            return response.data;
+            try {
+                const response = await apiClient.patch(`/admin/security-alerts/${alertId}/ack`);
+                return response.data;
+            } catch (error) {
+                // Re-throw error for mutation error handling
+                throw error;
+            }
         },
         onSuccess: () => {
             // Invalidate all security dashboard queries

@@ -47,9 +47,10 @@ class TestBackupRestore extends Command
             // Step 1: Find latest backup
             $this->info('Step 1: Finding latest backup...');
             $backup = $this->findLatestBackup($diskName);
-            
-            if (!$backup) {
-                $this->error('No backup found on disk: ' . $diskName);
+
+            if (! $backup) {
+                $this->error('No backup found on disk: '.$diskName);
+
                 return Command::FAILURE;
             }
 
@@ -66,7 +67,7 @@ class TestBackupRestore extends Command
 
             // Step 3: Verify archive integrity
             $this->info('Step 3: Verifying archive integrity...');
-            if (!$this->verifyArchiveIntegrity($localPath)) {
+            if (! $this->verifyArchiveIntegrity($localPath)) {
                 throw new \Exception('Archive integrity check failed');
             }
             $this->line('   ✅ Archive is valid ZIP');
@@ -74,14 +75,14 @@ class TestBackupRestore extends Command
 
             // Step 4: Extract and verify contents
             $this->info('Step 4: Extracting and verifying contents...');
-            $extractPath = $this->tempPath . '/extracted_' . time();
+            $extractPath = $this->tempPath.'/extracted_'.time();
             $this->extractBackup($localPath, $extractPath);
-            
+
             $verification = $this->verifyBackupContents($extractPath);
             $this->displayVerificationResults($verification);
 
             // Step 5: Cleanup
-            if (!$keepFiles) {
+            if (! $keepFiles) {
                 $this->info('Step 5: Cleaning up temp files...');
                 $this->cleanup();
                 $this->line('   ✅ Temp files removed');
@@ -90,7 +91,7 @@ class TestBackupRestore extends Command
             }
 
             $this->newLine();
-            
+
             if ($verification['overall_status']) {
                 $this->info('✅ BACKUP RESTORE TEST PASSED');
                 $this->table(
@@ -103,7 +104,7 @@ class TestBackupRestore extends Command
                         ['Status', 'VERIFIED'],
                     ]
                 );
-                
+
                 Log::channel('security')->info('Backup restore test passed', [
                     'backup_path' => $backup->path(),
                     'verification' => $verification,
@@ -113,11 +114,12 @@ class TestBackupRestore extends Command
             }
 
             $this->error('❌ BACKUP RESTORE TEST FAILED');
+
             return Command::FAILURE;
 
         } catch (\Exception $e) {
             $this->error("❌ Test failed: {$e->getMessage()}");
-            
+
             Log::channel('security')->error('Backup restore test failed', [
                 'error' => $e->getMessage(),
                 'disk' => $diskName,
@@ -136,12 +138,14 @@ class TestBackupRestore extends Command
     protected function findLatestBackup(string $diskName): ?Backup
     {
         $backupName = config('backup.backup.name', 'AbsensiQRPro');
-        
+
         try {
             $destination = BackupDestination::create($diskName, $backupName);
+
             return $destination->newestBackup();
         } catch (\Exception $e) {
             $this->warn("Could not access backup destination: {$e->getMessage()}");
+
             return null;
         }
     }
@@ -152,15 +156,15 @@ class TestBackupRestore extends Command
     protected function downloadBackup(Backup $backup, string $diskName): string
     {
         // Ensure temp directory exists
-        if (!File::isDirectory($this->tempPath)) {
+        if (! File::isDirectory($this->tempPath)) {
             File::makeDirectory($this->tempPath, 0755, true);
         }
 
-        $localPath = $this->tempPath . '/' . basename($backup->path());
+        $localPath = $this->tempPath.'/'.basename($backup->path());
 
         // If disk is local, just copy
         if ($diskName === 'local') {
-            $sourcePath = config('filesystems.disks.local.root') . '/' . $backup->path();
+            $sourcePath = config('filesystems.disks.local.root').'/'.$backup->path();
             File::copy($sourcePath, $localPath);
         } else {
             // Download from remote disk
@@ -177,15 +181,17 @@ class TestBackupRestore extends Command
      */
     protected function verifyArchiveIntegrity(string $path): bool
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         $result = $zip->open($path, ZipArchive::CHECKCONS);
-        
+
         if ($result !== true) {
             $this->error("   ZIP error code: {$result}");
+
             return false;
         }
 
         $zip->close();
+
         return true;
     }
 
@@ -194,12 +200,12 @@ class TestBackupRestore extends Command
      */
     protected function extractBackup(string $archivePath, string $extractPath): void
     {
-        if (!File::isDirectory($extractPath)) {
+        if (! File::isDirectory($extractPath)) {
             File::makeDirectory($extractPath, 0755, true);
         }
 
-        $zip = new ZipArchive();
-        
+        $zip = new ZipArchive;
+
         if ($zip->open($archivePath) !== true) {
             throw new \Exception('Could not open ZIP archive');
         }
@@ -213,7 +219,7 @@ class TestBackupRestore extends Command
         $extracted = $zip->extractTo($extractPath);
         $zip->close();
 
-        if (!$extracted) {
+        if (! $extracted) {
             throw new \Exception('Failed to extract backup archive. Check encryption password.');
         }
     }
@@ -240,7 +246,7 @@ class TestBackupRestore extends Command
                 $result['has_database'] = true;
                 $result['database_files'][] = $file;
             }
-            
+
             $result['file_count']++;
         }
 
@@ -259,13 +265,13 @@ class TestBackupRestore extends Command
     protected function scanDirectory(string $path): array
     {
         $files = [];
-        
-        if (!File::isDirectory($path)) {
+
+        if (! File::isDirectory($path)) {
             return $files;
         }
 
         $items = File::allFiles($path);
-        
+
         foreach ($items as $item) {
             $files[] = $item->getRelativePathname();
         }
@@ -281,9 +287,9 @@ class TestBackupRestore extends Command
         $dbStatus = $verification['has_database'] ? '✅' : '❌';
         $filesStatus = $verification['has_files'] ? '✅' : '⚠️';
 
-        $this->line("   {$dbStatus} Database dump: " . ($verification['has_database'] ? 'Found' : 'Missing'));
-        
-        if (!empty($verification['database_files'])) {
+        $this->line("   {$dbStatus} Database dump: ".($verification['has_database'] ? 'Found' : 'Missing'));
+
+        if (! empty($verification['database_files'])) {
             foreach ($verification['database_files'] as $dbFile) {
                 $this->line("      - {$dbFile}");
             }
@@ -314,6 +320,6 @@ class TestBackupRestore extends Command
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
 
-        return round($bytes, 2) . ' ' . $units[$pow];
+        return round($bytes, 2).' '.$units[$pow];
     }
 }

@@ -4,19 +4,19 @@ namespace App\Services;
 
 use App\Models\TeacherDevice;
 use App\Models\User;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Teacher Device Service
- * 
+ *
  * Handles device registration, approval, and management logic.
  */
 class TeacherDeviceService
 {
     /**
      * Register device during login
-     * 
+     *
      * @return array{device: TeacherDevice, is_new: bool, can_proceed: bool, message: string}
      */
     public function registerOnLogin(
@@ -46,7 +46,7 @@ class TeacherDeviceService
                 'teacher_id' => $teacher->id,
                 'teacher_name' => $teacher->name,
                 'school_id' => $teacher->school_id,
-                'device_id' => substr($deviceId, 0, 10) . '...',
+                'device_id' => substr($deviceId, 0, 10).'...',
                 'device_name' => $deviceName,
                 'ip' => request()->ip(),
             ]);
@@ -54,10 +54,10 @@ class TeacherDeviceService
 
         // Determine if teacher can proceed with attendance
         $canProceed = $device->canUseForAttendance();
-        
+
         $message = match (true) {
             $device->revoked_at !== null => 'Perangkat ini telah dicabut aksesnya.',
-            !$device->is_approved => 'Perangkat baru. Menunggu persetujuan admin untuk absensi.',
+            ! $device->is_approved => 'Perangkat baru. Menunggu persetujuan admin untuk absensi.',
             default => 'Perangkat terverifikasi.',
         };
 
@@ -79,7 +79,7 @@ class TeacherDeviceService
             ->where('device_id', $deviceId)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return [
                 'registered' => false,
                 'status' => 'unknown',
@@ -92,8 +92,8 @@ class TeacherDeviceService
             'registered' => true,
             'status' => TeacherDevice::getDeviceStatus($teacherId, $deviceId),
             'can_use' => $device->canUseForAttendance(),
-            'message' => $device->canUseForAttendance() 
-                ? 'Perangkat terverifikasi.' 
+            'message' => $device->canUseForAttendance()
+                ? 'Perangkat terverifikasi.'
                 : ($device->revoked_at ? 'Perangkat dicabut.' : 'Menunggu persetujuan.'),
             'device' => [
                 'id' => $device->id,
@@ -218,6 +218,7 @@ class TeacherDeviceService
                 ]);
             }
         }
+
         return $count;
     }
 
@@ -238,6 +239,7 @@ class TeacherDeviceService
                 ]);
             }
         }
+
         return $count;
     }
 }

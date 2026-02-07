@@ -24,7 +24,7 @@ class LeaderboardController extends Controller
             ->where('status', 'active')
             ->first();
 
-        if (!$classMembership) {
+        if (! $classMembership) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'You are not assigned to any active class.',
@@ -37,7 +37,7 @@ class LeaderboardController extends Controller
         $topPoints = User::select('id', 'name', 'total_points', 'current_streak')
             ->whereHas('classStudents', function ($q) use ($classId) {
                 $q->where('class_id', $classId)
-                  ->where('status', 'active');
+                    ->where('status', 'active');
             })
             ->orderByDesc('total_points')
             ->limit(10)
@@ -47,7 +47,7 @@ class LeaderboardController extends Controller
         $topStreak = User::select('id', 'name', 'total_points', 'current_streak')
             ->whereHas('classStudents', function ($q) use ($classId) {
                 $q->where('class_id', $classId)
-                  ->where('status', 'active');
+                    ->where('status', 'active');
             })
             ->orderByDesc('current_streak')
             ->limit(10)
@@ -56,8 +56,8 @@ class LeaderboardController extends Controller
         // 4. Get Current User Rank (Optional but good for UX)
         // Calculating rank efficiently: Count how many have more points.
         $myRankPoints = User::whereHas('classStudents', function ($q) use ($classId) {
-                $q->where('class_id', $classId)->where('status', 'active');
-            })
+            $q->where('class_id', $classId)->where('status', 'active');
+        })
             ->where('total_points', '>', $user->total_points)
             ->count() + 1;
 
@@ -76,9 +76,10 @@ class LeaderboardController extends Controller
                 ],
                 'leaderboard_points' => $topPoints,
                 'leaderboard_streak' => $topStreak,
-            ]
+            ],
         ]);
     }
+
     /**
      * Get Class vs Class competition leaderboard.
      * Ranks classes within their grade level based on monthly attendance rate.
@@ -87,13 +88,13 @@ class LeaderboardController extends Controller
     {
         $user = $request->user();
         $schoolId = $user->school_id;
-        
+
         $startOfMonth = now()->startOfMonth()->toDateString();
         $today = now()->toDateString();
 
         // 1. Calculate Stats per Class
         // We need: Class ID, Name, Grade, Attendance Rate
-        
+
         $stats = DB::table('attendances')
             ->join('classes', 'attendances.class_id', '=', 'classes.id')
             ->where('classes.school_id', $schoolId)
@@ -110,10 +111,10 @@ class LeaderboardController extends Controller
 
         // 2. Process and Group by Grade
         $grouped = $stats->map(function ($stat) {
-            $rate = $stat->total_records > 0 
-                ? round(($stat->present_count / $stat->total_records) * 100, 1) 
+            $rate = $stat->total_records > 0
+                ? round(($stat->present_count / $stat->total_records) * 100, 1)
                 : 0;
-            
+
             return [
                 'class_id' => $stat->class_id,
                 'class_name' => $stat->class_name,
@@ -126,27 +127,29 @@ class LeaderboardController extends Controller
         $result = [];
         foreach ($grouped as $grade => $classes) {
             $sorted = $classes->sortByDesc('attendance_rate')->values();
-            
+
             // Assign rank
             $ranked = $sorted->map(function ($item, $index) {
                 $item['rank'] = $index + 1;
+
                 return $item;
             });
 
             $result[] = [
                 'grade_level' => $grade,
-                'classes' => $ranked
+                'classes' => $ranked,
             ];
         }
 
         // Sort grades numerically if needed
-        usort($result, fn($a, $b) => $a['grade_level'] <=> $b['grade_level']);
+        usort($result, fn ($a, $b) => $a['grade_level'] <=> $b['grade_level']);
 
         return response()->json([
             'status' => 'success',
-            'data' => $result
+            'data' => $result,
         ]);
     }
+
     /**
      * Get Official School Leaderboard (Snapshots)
      */
@@ -154,7 +157,7 @@ class LeaderboardController extends Controller
     {
         $user = $request->user();
         $schoolId = $user->school_id;
-        
+
         $year = $request->input('year', now()->year);
         $month = $request->input('month', now()->month);
         $periodKey = sprintf('%04d-%02d', $year, $month);
@@ -175,10 +178,11 @@ class LeaderboardController extends Controller
                     'student_rate' => $leaderboards->get('student_rate', []),
                     'student_streak' => $leaderboards->get('student_streak', []),
                     'class_rate' => $leaderboards->get('class_rate', []),
-                ]
-            ]
+                ],
+            ],
         ]);
     }
+
     /**
      * Get Hall of Fame (All-Time Records)
      */
@@ -197,50 +201,50 @@ class LeaderboardController extends Controller
 
         // 2. Perfect Attendance (Current Semester)
         // Logic: Students with 100% attendance rate in the active academic semester
-        // This can be heavy, so we might rely on the 'reward_eligible' flag or similar, 
+        // This can be heavy, so we might rely on the 'reward_eligible' flag or similar,
         // OR filtering by those who have NO 'absent' records in the period.
-        
+
         $academicYear = \App\Models\AcademicYear::where('school_id', $schoolId)
             ->where('is_active', true)
             ->first();
 
         $perfectAttendance = [];
-        
-        if ($academicYear) {
-             // Find students with NO absences in this period
-             // Strategy: Get all students, exclude those with ANY absence record.
-             // Optimize: Check users who have attendance records but NO 'absent' records.
-             
-             $startDate = $academicYear->start_date;
-             $endDate = now()->min($academicYear->end_date)->toDateString();
 
-             $studentsWithAbsences = DB::table('attendances')
+        if ($academicYear) {
+            // Find students with NO absences in this period
+            // Strategy: Get all students, exclude those with ANY absence record.
+            // Optimize: Check users who have attendance records but NO 'absent' records.
+
+            $startDate = $academicYear->start_date;
+            $endDate = now()->min($academicYear->end_date)->toDateString();
+
+            $studentsWithAbsences = DB::table('attendances')
                 ->whereBetween('attendance_date', [$startDate, $endDate])
                 ->where('status', 'absent')
                 ->where('school_id', $schoolId)
                 ->distinct('student_id')
                 ->pluck('student_id');
-                
-             // Get top students who are NOT in the absence list, sorted by total present days
-             $perfectAttendance = User::where('school_id', $schoolId)
+
+            // Get top students who are NOT in the absence list, sorted by total present days
+            $perfectAttendance = User::where('school_id', $schoolId)
                 ->where('role', 'student')
                 ->whereNotIn('id', $studentsWithAbsences)
-                ->whereHas('attendances', function($q) use ($startDate, $endDate) {
+                ->whereHas('attendances', function ($q) use ($startDate, $endDate) {
                     $q->whereBetween('attendance_date', [$startDate, $endDate]);
                 })
-                ->withCount(['attendances as total_attended' => function($q) use ($startDate, $endDate) {
-                     $q->whereBetween('attendance_date', [$startDate, $endDate])
-                       ->whereIn('status', ['present', 'late']);
+                ->withCount(['attendances as total_attended' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('attendance_date', [$startDate, $endDate])
+                        ->whereIn('status', ['present', 'late']);
                 }])
                 ->orderByDesc('total_attended')
                 ->limit(20)
                 ->get()
-                ->map(function($u) {
+                ->map(function ($u) {
                     return [
                         'id' => $u->id,
                         'name' => $u->name,
                         'photo' => $u->profile_photo_url,
-                        'days_perfect' => $u->total_attended
+                        'days_perfect' => $u->total_attended,
                     ];
                 });
         }
@@ -249,8 +253,8 @@ class LeaderboardController extends Controller
             'status' => 'success',
             'data' => [
                 'longest_streaks_ever' => $longestStreaks,
-                'perfect_semester' => $perfectAttendance
-            ]
+                'perfect_semester' => $perfectAttendance,
+            ],
         ]);
     }
 }

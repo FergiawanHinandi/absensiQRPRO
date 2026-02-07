@@ -34,7 +34,7 @@ class SendStreakNotification implements ShouldQueue
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Failed to send streak notification: " . $e->getMessage());
+            Log::error('Failed to send streak notification: '.$e->getMessage());
         }
     }
 

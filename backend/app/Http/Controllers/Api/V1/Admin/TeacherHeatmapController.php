@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 
 /**
  * Teacher Heatmap Controller
- * 
+ *
  * Provides geospatial visualization data for teacher scan locations.
  */
 class TeacherHeatmapController extends Controller
@@ -21,7 +21,7 @@ class TeacherHeatmapController extends Controller
 
     /**
      * GET /api/v1/admin/security-dashboard/teacher-heatmap
-     * 
+     *
      * Get clustered heatmap data for visualization
      */
     public function index(Request $request): JsonResponse
@@ -35,7 +35,7 @@ class TeacherHeatmapController extends Controller
         $user = $request->user();
         $schoolId = $this->getSchoolId($user, $request);
 
-        if (!$schoolId) {
+        if (! $schoolId) {
             return response()->json([
                 'success' => false,
                 'message' => 'School ID required',
@@ -50,7 +50,7 @@ class TeacherHeatmapController extends Controller
                 ->where('role_type', 'teacher')
                 ->first();
 
-            if (!$teacher) {
+            if (! $teacher) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Teacher not found in this school',
@@ -73,7 +73,7 @@ class TeacherHeatmapController extends Controller
 
     /**
      * GET /api/v1/admin/security-dashboard/teacher-heatmap/cluster-details
-     * 
+     *
      * Get detailed information for a specific cluster location
      */
     public function clusterDetails(Request $request): JsonResponse
@@ -88,7 +88,7 @@ class TeacherHeatmapController extends Controller
         $user = $request->user();
         $schoolId = $this->getSchoolId($user, $request);
 
-        if (!$schoolId) {
+        if (! $schoolId) {
             return response()->json([
                 'success' => false,
                 'message' => 'School ID required',
@@ -111,7 +111,7 @@ class TeacherHeatmapController extends Controller
 
     /**
      * GET /api/v1/admin/security-dashboard/teacher-heatmap/teachers
-     * 
+     *
      * Get list of teachers with scan summaries for filtering
      */
     public function teacherSummary(Request $request): JsonResponse
@@ -124,7 +124,7 @@ class TeacherHeatmapController extends Controller
         $user = $request->user();
         $schoolId = $this->getSchoolId($user, $request);
 
-        if (!$schoolId) {
+        if (! $schoolId) {
             return response()->json([
                 'success' => false,
                 'message' => 'School ID required',
@@ -147,7 +147,7 @@ class TeacherHeatmapController extends Controller
 
     /**
      * GET /api/v1/admin/security-dashboard/teacher-heatmap/anomalies
-     * 
+     *
      * Get scans that occurred outside the allowed zone
      */
     public function anomalies(Request $request): JsonResponse
@@ -160,7 +160,7 @@ class TeacherHeatmapController extends Controller
         $user = $request->user();
         $schoolId = $this->getSchoolId($user, $request);
 
-        if (!$schoolId) {
+        if (! $schoolId) {
             return response()->json([
                 'success' => false,
                 'message' => 'School ID required',
@@ -176,7 +176,7 @@ class TeacherHeatmapController extends Controller
 
         // Filter only outside zone clusters
         $anomalies = collect($data['points'])
-            ->filter(fn($p) => $p['outside_zone'] ?? false)
+            ->filter(fn ($p) => $p['outside_zone'] ?? false)
             ->values()
             ->all();
 
@@ -208,6 +208,7 @@ class TeacherHeatmapController extends Controller
             if ($schoolId) {
                 return (int) $schoolId;
             }
+
             // If no school_id specified, return null (super admin must specify)
             return null;
         }

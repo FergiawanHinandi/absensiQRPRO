@@ -17,7 +17,7 @@ class NotificationController extends Controller
         return response()->json([
             'success' => true,
             'data' => $notifications,
-            'message' => 'Notifications retrieved successfully'
+            'message' => 'Notifications retrieved successfully',
         ]);
     }
 
@@ -31,7 +31,7 @@ class NotificationController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Notification marked as read'
+            'message' => 'Notification marked as read',
         ]);
     }
 }

@@ -6,16 +6,23 @@ use App\Models\Attendance;
 use App\Models\School;
 use App\Models\User;
 use Exception;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
-
+/**
+ * @deprecated This service is deprecated and will be removed in a future version.
+ * Use App\Services\AttendanceCheckInService for student attendance.
+ * Use App\Core\Services\Attendance\TeacherAttendanceService for teacher attendance.
+ */
 class AttendanceService
 {
     protected $qrCodeService;
+
     protected $attendanceRepo;
+
     protected $replayPreventionService;
+
     protected $anomalyService;
 
     public function __construct(
@@ -33,7 +40,7 @@ class AttendanceService
     public function processScan(User $student, array $data)
     {
         $schoolId = $student->school_id;
-        
+
         // 1. Decrypt & Validate Token
         $payload = $this->qrCodeService->decryptAndValidate($data['qr_token']);
         $scheduleId = $payload['id'];
@@ -78,7 +85,7 @@ class AttendanceService
 
         // 6. Time Window Validation (Moved up to avoid locking invalid attempts)
         $schedule = \App\Models\Schedule::find($scheduleId);
-        if (!$schedule) {
+        if (! $schedule) {
             throw new Exception('Jadwal tidak ditemukan.');
         }
 
@@ -90,11 +97,11 @@ class AttendanceService
 
         // 7. ATOMIC PROCESSING (Cache Lock + DB Transaction)
         // Prevent parallel requests for same student
-        return Cache::lock("attendance_scan_student_{$student->id}", 5)->block(3, function () use ($student, $scheduleId, $schoolId, $attendanceStatus, $data, $requestId, $nonce, $schedule) {
-            
+        return Cache::lock("attendance_scan_student_{$student->id}", 5)->block(3, function () use ($student, $scheduleId, $schoolId, $attendanceStatus, $data, $requestId, $nonce) {
+
             // Start DB Transaction
             return DB::transaction(function () use ($student, $scheduleId, $schoolId, $attendanceStatus, $data, $requestId, $nonce) {
-                
+
                 // 0. ATOMIC NONCE CHECK (Prevent Replay)
                 if ($nonce) {
                     $nonceUsed = \App\Models\QrNonce::where('school_id', $schoolId)
@@ -127,7 +134,7 @@ class AttendanceService
                 if ($existing) {
                     // Update cache to reflect DB state
                     $this->replayPreventionService->markStudentScanned($student->id, $scheduleId, $schoolId);
-                    
+
                     // Idempotency check: If same request ID, return original success
                     if ($requestId && $existing->request_id === $requestId) {
                         return $existing;
@@ -160,7 +167,7 @@ class AttendanceService
                     $this->anomalyService->checkAndFlag($attendance, $data);
                 } catch (\Exception $e) {
                     // Log and rethrow to ensure atomic rollback
-                    \Illuminate\Support\Facades\Log::error('Anomaly check failed, rolling back attendance: ' . $e->getMessage());
+                    \Illuminate\Support\Facades\Log::error('Anomaly check failed, rolling back attendance: '.$e->getMessage());
                     throw $e;
                 }
 
@@ -252,10 +259,10 @@ class AttendanceService
     private function validateAttendanceTime($schedule, $school): array
     {
         $now = now();
-        
+
         // Parse Schedule Times (Assuming format H:i:s)
-        $startTime = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $schedule->start_time);
-        $endTime = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $schedule->end_time);
+        $startTime = \Carbon\Carbon::parse($now->format('Y-m-d').' '.$schedule->start_time);
+        $endTime = \Carbon\Carbon::parse($now->format('Y-m-d').' '.$schedule->end_time);
 
         // Get Configs (Defaults: 15 mins early, 15 mins late tolerance)
         $settings = $school->settings ?? [];

@@ -29,97 +29,82 @@ class SecurityPolicyService
      */
     public const DEFAULTS = [
         // Attendance & Geofence
-        "attendance.geofence_radius_meters" => 50,
-        "attendance.teacher_geofence_radius_meters" => 200,
-        "attendance.max_scan_per_minute" => 30,
-        "attendance.max_failed_scans_per_2min" => 5,
-        "attendance.qr_expiry_minutes" => 10,
-        "attendance.schedule_tolerance_before_minutes" => 10,
-        "attendance.schedule_tolerance_after_minutes" => 10,
-        "attendance.late_threshold_minutes" => 15,
+        'attendance.geofence_radius_meters' => 50,
+        'attendance.teacher_geofence_radius_meters' => 200,
+        'attendance.max_scan_per_minute' => 30,
+        'attendance.max_failed_scans_per_2min' => 5,
+        'attendance.qr_expiry_minutes' => 10,
+        'attendance.schedule_tolerance_before_minutes' => 10,
+        'attendance.schedule_tolerance_after_minutes' => 10,
+        'attendance.late_threshold_minutes' => 15,
 
         // Behavior & Anomaly Detection
-        "behavior.anomaly_score_suspicious" => 3,
-        "behavior.anomaly_score_high" => 6,
-        "behavior.anomaly_score_critical" => 9,
-        "behavior.max_anomalies_before_flag" => 5,
-        "behavior.anomaly_window_hours" => 24,
+        'behavior.anomaly_score_suspicious' => 3,
+        'behavior.anomaly_score_high' => 6,
+        'behavior.anomaly_score_critical' => 9,
+        'behavior.max_anomalies_before_flag' => 5,
+        'behavior.anomaly_window_hours' => 24,
 
         // Security & Sessions
-        "security.admin_session_max_ip_change" => 1,
-        "security.max_devices_per_teacher" => 2,
-        "security.session_timeout_minutes" => 480,
-        "security.require_device_approval" => true,
-        "security.enable_geofence_check" => true,
-        "security.enable_impossible_travel_check" => true,
+        'security.admin_session_max_ip_change' => 1,
+        'security.max_devices_per_teacher' => 2,
+        'security.session_timeout_minutes' => 480,
+        'security.require_device_approval' => true,
+        'security.enable_geofence_check' => true,
+        'security.enable_impossible_travel_check' => true,
 
         // Rate Limiting
-        "rate_limit.login_attempts" => 5,
-        "rate_limit.login_decay_minutes" => 5,
-        "rate_limit.api_per_minute" => 60,
-        "rate_limit.scan_per_minute" => 10,
-        "rate_limit.export_per_hour" => 5,
+        'rate_limit.login_attempts' => 5,
+        'rate_limit.login_decay_minutes' => 5,
+        'rate_limit.api_per_minute' => 60,
+        'rate_limit.scan_per_minute' => 10,
+        'rate_limit.export_per_hour' => 5,
 
         // QR Code
-        "qr.max_age_hours" => 24,
-        "qr.student_card_max_age_days" => 365,
-        "qr.nonce_ttl_seconds" => 3600,
+        'qr.max_age_hours' => 24,
+        'qr.student_card_max_age_days' => 365,
+        'qr.nonce_ttl_seconds' => 3600,
     ];
 
     /**
      * Policy descriptions for documentation
      */
     public const DESCRIPTIONS = [
-        "attendance.geofence_radius_meters" =>
-            "Radius geofence untuk siswa dalam meter",
-        "attendance.teacher_geofence_radius_meters" =>
-            "Radius geofence untuk guru dalam meter",
-        "attendance.max_scan_per_minute" =>
-            "Maksimal scan absensi per menit per sekolah",
-        "attendance.max_failed_scans_per_2min" =>
-            "Maksimal scan gagal dalam 2 menit sebelum alert",
-        "attendance.qr_expiry_minutes" => "Masa berlaku QR code dalam menit",
-        "attendance.schedule_tolerance_before_minutes" =>
-            "Toleransi waktu sebelum jadwal mulai (menit)",
-        "attendance.schedule_tolerance_after_minutes" =>
-            "Toleransi waktu setelah jadwal selesai (menit)",
-        "attendance.late_threshold_minutes" =>
-            "Threshold keterlambatan (menit setelah jadwal mulai)",
-        "behavior.anomaly_score_suspicious" =>
-            'Skor anomali untuk level "mencurigakan"',
-        "behavior.anomaly_score_high" => 'Skor anomali untuk level "tinggi"',
-        "behavior.anomaly_score_critical" =>
-            'Skor anomali untuk level "kritis"',
-        "behavior.max_anomalies_before_flag" =>
-            "Jumlah anomali sebelum user di-flag",
-        "behavior.anomaly_window_hours" =>
-            "Window waktu untuk menghitung anomali (jam)",
-        "security.admin_session_max_ip_change" =>
-            "Maksimal perubahan IP per sesi admin",
-        "security.max_devices_per_teacher" =>
-            "Maksimal perangkat terdaftar per guru",
-        "security.session_timeout_minutes" => "Timeout sesi dalam menit",
-        "security.require_device_approval" => "Wajib approval perangkat guru",
-        "security.enable_geofence_check" => "Aktifkan validasi geofence",
-        "security.enable_impossible_travel_check" =>
-            "Aktifkan deteksi impossible travel",
-        "rate_limit.login_attempts" => "Maksimal percobaan login",
-        "rate_limit.login_decay_minutes" =>
-            "Waktu reset rate limit login (menit)",
-        "rate_limit.api_per_minute" => "Maksimal request API per menit",
-        "rate_limit.scan_per_minute" => "Maksimal scan per menit per user",
-        "rate_limit.export_per_hour" => "Maksimal export laporan per jam",
-        "qr.max_age_hours" => "Maksimal umur QR code (jam)",
-        "qr.student_card_max_age_days" => "Masa berlaku kartu QR siswa (hari)",
-        "qr.nonce_ttl_seconds" => "TTL nonce untuk replay protection (detik)",
+        'attendance.geofence_radius_meters' => 'Radius geofence untuk siswa dalam meter',
+        'attendance.teacher_geofence_radius_meters' => 'Radius geofence untuk guru dalam meter',
+        'attendance.max_scan_per_minute' => 'Maksimal scan absensi per menit per sekolah',
+        'attendance.max_failed_scans_per_2min' => 'Maksimal scan gagal dalam 2 menit sebelum alert',
+        'attendance.qr_expiry_minutes' => 'Masa berlaku QR code dalam menit',
+        'attendance.schedule_tolerance_before_minutes' => 'Toleransi waktu sebelum jadwal mulai (menit)',
+        'attendance.schedule_tolerance_after_minutes' => 'Toleransi waktu setelah jadwal selesai (menit)',
+        'attendance.late_threshold_minutes' => 'Threshold keterlambatan (menit setelah jadwal mulai)',
+        'behavior.anomaly_score_suspicious' => 'Skor anomali untuk level "mencurigakan"',
+        'behavior.anomaly_score_high' => 'Skor anomali untuk level "tinggi"',
+        'behavior.anomaly_score_critical' => 'Skor anomali untuk level "kritis"',
+        'behavior.max_anomalies_before_flag' => 'Jumlah anomali sebelum user di-flag',
+        'behavior.anomaly_window_hours' => 'Window waktu untuk menghitung anomali (jam)',
+        'security.admin_session_max_ip_change' => 'Maksimal perubahan IP per sesi admin',
+        'security.max_devices_per_teacher' => 'Maksimal perangkat terdaftar per guru',
+        'security.session_timeout_minutes' => 'Timeout sesi dalam menit',
+        'security.require_device_approval' => 'Wajib approval perangkat guru',
+        'security.enable_geofence_check' => 'Aktifkan validasi geofence',
+        'security.enable_impossible_travel_check' => 'Aktifkan deteksi impossible travel',
+        'rate_limit.login_attempts' => 'Maksimal percobaan login',
+        'rate_limit.login_decay_minutes' => 'Waktu reset rate limit login (menit)',
+        'rate_limit.api_per_minute' => 'Maksimal request API per menit',
+        'rate_limit.scan_per_minute' => 'Maksimal scan per menit per user',
+        'rate_limit.export_per_hour' => 'Maksimal export laporan per jam',
+        'qr.max_age_hours' => 'Maksimal umur QR code (jam)',
+        'qr.student_card_max_age_days' => 'Masa berlaku kartu QR siswa (hari)',
+        'qr.nonce_ttl_seconds' => 'TTL nonce untuk replay protection (detik)',
     ];
 
     /**
      * Get a security policy value.
      *
-     * @param string $key Policy key
-     * @param int|null $schoolId School ID for school-specific policy
-     * @param mixed $default Custom default (overrides DEFAULTS constant)
+     * @param  string  $key  Policy key
+     * @param  int|null  $schoolId  School ID for school-specific policy
+     * @param  mixed  $default  Custom default (overrides DEFAULTS constant)
      * @return mixed Policy value
      */
     public function get(
@@ -136,10 +121,10 @@ class SecurityPolicyService
         ) {
             // 1. School-specific
             if ($schoolId) {
-                $schoolPolicy = DB::table("security_policies")
-                    ->where("scope_type", "school")
-                    ->where("scope_id", $schoolId)
-                    ->where("key", $key)
+                $schoolPolicy = DB::table('security_policies')
+                    ->where('scope_type', 'school')
+                    ->where('scope_id', $schoolId)
+                    ->where('key', $key)
                     ->first();
 
                 if ($schoolPolicy) {
@@ -148,10 +133,10 @@ class SecurityPolicyService
             }
 
             // 2. Global
-            $globalPolicy = DB::table("security_policies")
-                ->where("scope_type", "global")
-                ->whereNull("scope_id")
-                ->where("key", $key)
+            $globalPolicy = DB::table('security_policies')
+                ->where('scope_type', 'global')
+                ->whereNull('scope_id')
+                ->where('key', $key)
                 ->first();
 
             if ($globalPolicy) {
@@ -169,6 +154,7 @@ class SecurityPolicyService
     protected function decodeValue(string $value): mixed
     {
         $decoded = json_decode($value, true);
+
         return $decoded ?? $value;
     }
 
@@ -177,7 +163,7 @@ class SecurityPolicyService
      */
     protected function cacheKey(string $key, ?int $schoolId): string
     {
-        return "security_policy:{$key}:" . ($schoolId ?? "global");
+        return "security_policy:{$key}:".($schoolId ?? 'global');
     }
 
     /**
@@ -214,7 +200,7 @@ class SecurityPolicyService
 
         // Clear school-specific caches would require knowing all school IDs
         // Consider using cache tags if available
-        Log::info("SecurityPolicyService: All global policy caches cleared");
+        Log::info('SecurityPolicyService: All global policy caches cleared');
     }
 
     // =========================================================================
@@ -226,7 +212,7 @@ class SecurityPolicyService
      */
     public function getGeofenceRadius(?int $schoolId = null): int
     {
-        return (int) $this->get("attendance.geofence_radius_meters", $schoolId);
+        return (int) $this->get('attendance.geofence_radius_meters', $schoolId);
     }
 
     /**
@@ -235,7 +221,7 @@ class SecurityPolicyService
     public function getTeacherGeofenceRadius(?int $schoolId = null): int
     {
         return (int) $this->get(
-            "attendance.teacher_geofence_radius_meters",
+            'attendance.teacher_geofence_radius_meters',
             $schoolId,
         );
     }
@@ -245,7 +231,7 @@ class SecurityPolicyService
      */
     public function getMaxScanPerMinute(?int $schoolId = null): int
     {
-        return (int) $this->get("attendance.max_scan_per_minute", $schoolId);
+        return (int) $this->get('attendance.max_scan_per_minute', $schoolId);
     }
 
     /**
@@ -254,7 +240,7 @@ class SecurityPolicyService
     public function getMaxFailedScans(?int $schoolId = null): int
     {
         return (int) $this->get(
-            "attendance.max_failed_scans_per_2min",
+            'attendance.max_failed_scans_per_2min',
             $schoolId,
         );
     }
@@ -264,7 +250,7 @@ class SecurityPolicyService
      */
     public function getQrExpiryMinutes(?int $schoolId = null): int
     {
-        return (int) $this->get("attendance.qr_expiry_minutes", $schoolId);
+        return (int) $this->get('attendance.qr_expiry_minutes', $schoolId);
     }
 
     /**
@@ -273,7 +259,7 @@ class SecurityPolicyService
     public function getScheduleToleranceBefore(?int $schoolId = null): int
     {
         return (int) $this->get(
-            "attendance.schedule_tolerance_before_minutes",
+            'attendance.schedule_tolerance_before_minutes',
             $schoolId,
         );
     }
@@ -284,7 +270,7 @@ class SecurityPolicyService
     public function getScheduleToleranceAfter(?int $schoolId = null): int
     {
         return (int) $this->get(
-            "attendance.schedule_tolerance_after_minutes",
+            'attendance.schedule_tolerance_after_minutes',
             $schoolId,
         );
     }
@@ -294,7 +280,7 @@ class SecurityPolicyService
      */
     public function getLateThreshold(?int $schoolId = null): int
     {
-        return (int) $this->get("attendance.late_threshold_minutes", $schoolId);
+        return (int) $this->get('attendance.late_threshold_minutes', $schoolId);
     }
 
     /**
@@ -303,16 +289,16 @@ class SecurityPolicyService
     public function getAnomalyThresholds(?int $schoolId = null): array
     {
         return [
-            "suspicious" => (int) $this->get(
-                "behavior.anomaly_score_suspicious",
+            'suspicious' => (int) $this->get(
+                'behavior.anomaly_score_suspicious',
                 $schoolId,
             ),
-            "high" => (int) $this->get(
-                "behavior.anomaly_score_high",
+            'high' => (int) $this->get(
+                'behavior.anomaly_score_high',
                 $schoolId,
             ),
-            "critical" => (int) $this->get(
-                "behavior.anomaly_score_critical",
+            'critical' => (int) $this->get(
+                'behavior.anomaly_score_critical',
                 $schoolId,
             ),
         ];
@@ -324,7 +310,7 @@ class SecurityPolicyService
     public function getMaxSessionIpChanges(?int $schoolId = null): int
     {
         return (int) $this->get(
-            "security.admin_session_max_ip_change",
+            'security.admin_session_max_ip_change',
             $schoolId,
         );
     }
@@ -334,7 +320,7 @@ class SecurityPolicyService
      */
     public function getMaxDevicesPerTeacher(?int $schoolId = null): int
     {
-        return (int) $this->get("security.max_devices_per_teacher", $schoolId);
+        return (int) $this->get('security.max_devices_per_teacher', $schoolId);
     }
 
     /**
@@ -342,7 +328,7 @@ class SecurityPolicyService
      */
     public function isGeofenceEnabled(?int $schoolId = null): bool
     {
-        return (bool) $this->get("security.enable_geofence_check", $schoolId);
+        return (bool) $this->get('security.enable_geofence_check', $schoolId);
     }
 
     /**
@@ -350,7 +336,7 @@ class SecurityPolicyService
      */
     public function isDeviceApprovalRequired(?int $schoolId = null): bool
     {
-        return (bool) $this->get("security.require_device_approval", $schoolId);
+        return (bool) $this->get('security.require_device_approval', $schoolId);
     }
 
     /**
@@ -359,12 +345,12 @@ class SecurityPolicyService
     public function getLoginRateLimit(?int $schoolId = null): array
     {
         return [
-            "attempts" => (int) $this->get(
-                "rate_limit.login_attempts",
+            'attempts' => (int) $this->get(
+                'rate_limit.login_attempts',
                 $schoolId,
             ),
-            "decay_minutes" => (int) $this->get(
-                "rate_limit.login_decay_minutes",
+            'decay_minutes' => (int) $this->get(
+                'rate_limit.login_decay_minutes',
                 $schoolId,
             ),
         ];
@@ -375,7 +361,7 @@ class SecurityPolicyService
      */
     public function getApiRateLimit(?int $schoolId = null): int
     {
-        return (int) $this->get("rate_limit.api_per_minute", $schoolId);
+        return (int) $this->get('rate_limit.api_per_minute', $schoolId);
     }
 
     /**
@@ -383,7 +369,7 @@ class SecurityPolicyService
      */
     public function getScanRateLimit(?int $schoolId = null): int
     {
-        return (int) $this->get("rate_limit.scan_per_minute", $schoolId);
+        return (int) $this->get('rate_limit.scan_per_minute', $schoolId);
     }
 
     // =========================================================================
@@ -399,11 +385,11 @@ class SecurityPolicyService
 
         foreach (self::DEFAULTS as $key => $default) {
             $policies[$key] = [
-                "key" => $key,
-                "value" => $this->get($key, $schoolId),
-                "default" => $default,
-                "description" => self::DESCRIPTIONS[$key] ?? null,
-                "scope" => $this->getPolicyScope($key, $schoolId),
+                'key' => $key,
+                'value' => $this->get($key, $schoolId),
+                'default' => $default,
+                'description' => self::DESCRIPTIONS[$key] ?? null,
+                'scope' => $this->getPolicyScope($key, $schoolId),
             ];
         }
 
@@ -416,24 +402,24 @@ class SecurityPolicyService
     protected function getPolicyScope(string $key, ?int $schoolId): string
     {
         if ($schoolId) {
-            $schoolPolicy = DB::table("security_policies")
-                ->where("scope_type", "school")
-                ->where("scope_id", $schoolId)
-                ->where("key", $key)
+            $schoolPolicy = DB::table('security_policies')
+                ->where('scope_type', 'school')
+                ->where('scope_id', $schoolId)
+                ->where('key', $key)
                 ->exists();
 
             if ($schoolPolicy) {
-                return "school";
+                return 'school';
             }
         }
 
-        $globalPolicy = DB::table("security_policies")
-            ->where("scope_type", "global")
-            ->whereNull("scope_id")
-            ->where("key", $key)
+        $globalPolicy = DB::table('security_policies')
+            ->where('scope_type', 'global')
+            ->whereNull('scope_id')
+            ->where('key', $key)
             ->exists();
 
-        return $globalPolicy ? "global" : "default";
+        return $globalPolicy ? 'global' : 'default';
     }
 
     /**
@@ -445,32 +431,32 @@ class SecurityPolicyService
         ?int $schoolId,
         int $updatedBy,
     ): bool {
-        $scopeType = $schoolId ? "school" : "global";
+        $scopeType = $schoolId ? 'school' : 'global';
 
-        $result = DB::table("security_policies")->updateOrInsert(
+        $result = DB::table('security_policies')->updateOrInsert(
             [
-                "scope_type" => $scopeType,
-                "scope_id" => $schoolId,
-                "key" => $key,
+                'scope_type' => $scopeType,
+                'scope_id' => $schoolId,
+                'key' => $key,
             ],
             [
-                "value" => json_encode($value),
-                "description" => self::DESCRIPTIONS[$key] ?? null,
-                "updated_by" => $updatedBy,
-                "updated_at" => now(),
-                "created_at" => now(),
+                'value' => json_encode($value),
+                'description' => self::DESCRIPTIONS[$key] ?? null,
+                'updated_by' => $updatedBy,
+                'updated_at' => now(),
+                'created_at' => now(),
             ],
         );
 
         // Clear cache
         $this->clearCache($key, $schoolId);
 
-        Log::info("SecurityPolicy updated", [
-            "key" => $key,
-            "value" => $value,
-            "scope_type" => $scopeType,
-            "scope_id" => $schoolId,
-            "updated_by" => $updatedBy,
+        Log::info('SecurityPolicy updated', [
+            'key' => $key,
+            'value' => $value,
+            'scope_type' => $scopeType,
+            'scope_id' => $schoolId,
+            'updated_by' => $updatedBy,
         ]);
 
         return $result;
@@ -481,10 +467,10 @@ class SecurityPolicyService
      */
     public function delete(string $key, ?int $schoolId): bool
     {
-        $result = DB::table("security_policies")
-            ->where("key", $key)
-            ->where("scope_type", $schoolId ? "school" : "global")
-            ->where("scope_id", $schoolId)
+        $result = DB::table('security_policies')
+            ->where('key', $key)
+            ->where('scope_type', $schoolId ? 'school' : 'global')
+            ->where('scope_id', $schoolId)
             ->delete();
 
         $this->clearCache($key, $schoolId);
@@ -501,42 +487,42 @@ class SecurityPolicyService
 
         // Numeric validations
         $numericKeys = [
-            "attendance.geofence_radius_meters" => ["min" => 10, "max" => 5000],
-            "attendance.teacher_geofence_radius_meters" => [
-                "min" => 10,
-                "max" => 5000,
+            'attendance.geofence_radius_meters' => ['min' => 10, 'max' => 5000],
+            'attendance.teacher_geofence_radius_meters' => [
+                'min' => 10,
+                'max' => 5000,
             ],
-            "attendance.max_scan_per_minute" => ["min" => 1, "max" => 1000],
-            "attendance.max_failed_scans_per_2min" => [
-                "min" => 1,
-                "max" => 100,
+            'attendance.max_scan_per_minute' => ['min' => 1, 'max' => 1000],
+            'attendance.max_failed_scans_per_2min' => [
+                'min' => 1,
+                'max' => 100,
             ],
-            "attendance.qr_expiry_minutes" => ["min" => 1, "max" => 60],
-            "behavior.anomaly_score_suspicious" => ["min" => 1, "max" => 10],
-            "behavior.anomaly_score_high" => ["min" => 1, "max" => 20],
-            "behavior.anomaly_score_critical" => ["min" => 1, "max" => 30],
-            "rate_limit.login_attempts" => ["min" => 1, "max" => 20],
-            "rate_limit.api_per_minute" => ["min" => 10, "max" => 1000],
+            'attendance.qr_expiry_minutes' => ['min' => 1, 'max' => 60],
+            'behavior.anomaly_score_suspicious' => ['min' => 1, 'max' => 10],
+            'behavior.anomaly_score_high' => ['min' => 1, 'max' => 20],
+            'behavior.anomaly_score_critical' => ['min' => 1, 'max' => 30],
+            'rate_limit.login_attempts' => ['min' => 1, 'max' => 20],
+            'rate_limit.api_per_minute' => ['min' => 10, 'max' => 1000],
         ];
 
         if (isset($numericKeys[$key])) {
             $rules = $numericKeys[$key];
-            if (!is_numeric($value)) {
-                $errors[] = "Value must be numeric";
-            } elseif ($value < $rules["min"] || $value > $rules["max"]) {
-                $errors[] = "Value must be between {$rules["min"]} and {$rules["max"]}";
+            if (! is_numeric($value)) {
+                $errors[] = 'Value must be numeric';
+            } elseif ($value < $rules['min'] || $value > $rules['max']) {
+                $errors[] = "Value must be between {$rules['min']} and {$rules['max']}";
             }
         }
 
         // Boolean validations
         $booleanKeys = [
-            "security.require_device_approval",
-            "security.enable_geofence_check",
-            "security.enable_impossible_travel_check",
+            'security.require_device_approval',
+            'security.enable_geofence_check',
+            'security.enable_impossible_travel_check',
         ];
 
-        if (in_array($key, $booleanKeys) && !is_bool($value)) {
-            $errors[] = "Value must be boolean";
+        if (in_array($key, $booleanKeys) && ! is_bool($value)) {
+            $errors[] = 'Value must be boolean';
         }
 
         return $errors;

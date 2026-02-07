@@ -27,10 +27,10 @@ return new class extends Migration
 
             // Unique constraint: one device per teacher
             $table->unique(['teacher_id', 'device_id']);
-            
+
             // Unique constraint: device can only belong to one teacher per school
             $table->unique(['school_id', 'device_id'], 'teacher_devices_school_device_unique');
-            
+
             // Index for quick lookups
             $table->index(['school_id', 'teacher_id', 'is_approved']);
         });

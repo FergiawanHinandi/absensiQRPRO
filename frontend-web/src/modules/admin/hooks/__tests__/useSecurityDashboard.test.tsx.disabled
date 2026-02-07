@@ -1,0 +1,588 @@
+import { renderHook, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactNode } from 'react';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+import axios from 'axios';
+import MockAdapter from 'axios-mock-adapter';
+import {
+    useSecuritySummary,
+    useSecurityTrend,
+    useSecurityByType,
+    useSecurityBySeverity,
+    useCriticalAlerts,
+    useAcknowledgeAlert,
+    useBulkAcknowledgeAlerts,
+} from '../useSecurityDashboard';
+import type {
+    SecuritySummary,
+    TrendDataPoint,
+    AlertByType,
+    AlertBySeverity,
+    CriticalAlert,
+} from '../useSecurityDashboard';
+
+// =========================================================================
+// SETUP
+// =========================================================================
+
+let mockAxios: MockAdapter;
+let queryClient: QueryClient;
+
+const createWrapper = () => {
+    queryClient = new QueryClient({
+        defaultOptions: {
+            queries: {
+                retry: false,
+                refetchInterval: false,
+                refetchOnWindowFocus: false,
+            },
+        },
+    });
+
+    return ({ children }: { children: ReactNode }) => (
+        <QueryClientProvider client= { queryClient } > { children } </QueryClientProvider>
+  );
+};
+
+beforeEach(() => {
+    mockAxios = new MockAdapter(axios);
+    queryClient = new QueryClient({
+        defaultOptions: {
+            queries: {
+                retry: false,
+                refetchInterval: false,
+            },
+        },
+    });
+});
+
+afterEach(() => {
+    mockAxios.reset();
+    queryClient.clear();
+});
+
+// =========================================================================
+// MOCK DATA
+// =========================================================================
+
+const mockSummaryData: SecuritySummary = {
+    alerts_last_24h: 15,
+    critical_alerts: 3,
+    high_severity_alerts: 7,
+    schools_with_alerts: 2,
+    most_common_event: 'invalid_qr_attempt',
+    most_common_event_count: 8,
+    unresolved_alerts: 10,
+};
+
+const mockTrendData: TrendDataPoint[] = [
+    {
+        date: '2026-02-01',
+        total: 15,
+        critical: 2,
+        high: 5,
+        medium: 6,
+        low: 2,
+    },
+    {
+        date: '2026-02-02',
+        total: 12,
+        critical: 1,
+        high: 4,
+        medium: 5,
+        low: 2,
+    },
+];
+
+const mockByTypeData: AlertByType[] = [
+    {
+        event_type: 'invalid_qr_attempt',
+        label: 'Invalid QR Attempt',
+        count: 12,
+        critical_count: 2,
+    },
+    {
+        event_type: 'location_mismatch',
+        label: 'Location Mismatch',
+        count: 8,
+        critical_count: 1,
+    },
+];
+
+const mockBySeverityData: AlertBySeverity[] = [
+    { severity: 'critical', count: 3 },
+    { severity: 'high', count: 7 },
+    { severity: 'medium', count: 11 },
+    { severity: 'low', count: 4 },
+];
+
+const mockCriticalAlerts: CriticalAlert[] = [
+    {
+        id: 1,
+        event_type: 'invalid_qr_attempt',
+        event_label: 'Invalid QR Attempt',
+        severity: 'critical',
+        description: 'Multiple failed QR scans detected',
+        user_name: 'Ahmad Rizki',
+        user_email: 'ahmad@school.id',
+        user_role: 'student',
+        school_name: 'SMA Negeri 1',
+        school_id: 1,
+        ip_address: '192.168.1.100',
+        device_id: 'device-123',
+        is_resolved: false,
+        timestamp: '2026-02-02T10:30:00Z',
+        time_ago: '2 hours ago',
+        details: { attempts: 5 },
+    },
+];
+
+// =========================================================================
+// TEST SUITES
+// =========================================================================
+
+describe('useSecurityDashboard Hooks', () => {
+    describe('useSecuritySummary', () => {
+        it('should load summary data successfully', async () => {
+            mockAxios.onGet('/admin/security/summary').reply(200, {
+                success: true,
+                data: mockSummaryData,
+            });
+
+            const { result } = renderHook(() => useSecuritySummary(), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual(mockSummaryData);
+            expect(result.current.data?.alerts_last_24h).toBe(15);
+            expect(result.current.data?.critical_alerts).toBe(3);
+        });
+
+        it('should return fallback empty data on API failure', async () => {
+            mockAxios.onGet('/admin/security/summary').reply(500);
+
+            const { result } = renderHook(() => useSecuritySummary(), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            // Should return fallback data, not crash
+            expect(result.current.data).toEqual({
+                alerts_last_24h: 0,
+                critical_alerts: 0,
+                high_severity_alerts: 0,
+                schools_with_alerts: 0,
+                most_common_event: null,
+                most_common_event_count: 0,
+                unresolved_alerts: 0,
+            });
+        });
+
+        it('should handle network errors gracefully', async () => {
+            mockAxios.onGet('/admin/security/summary').networkError();
+
+            const { result } = renderHook(() => useSecuritySummary(), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toBeDefined();
+            expect(result.current.data?.alerts_last_24h).toBe(0);
+        });
+    });
+
+    describe('useSecurityTrend', () => {
+        it('should load trend data successfully with 7d range', async () => {
+            mockAxios.onGet('/admin/security/trend').reply(200, {
+                success: true,
+                data: mockTrendData,
+            });
+
+            const { result } = renderHook(() => useSecurityTrend('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual(mockTrendData);
+            expect(result.current.data?.length).toBe(2);
+        });
+
+        it('should correctly map trend data to chart format', async () => {
+            mockAxios.onGet('/admin/security/trend').reply(200, {
+                success: true,
+                data: mockTrendData,
+            });
+
+            const { result } = renderHook(() => useSecurityTrend('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            const firstPoint = result.current.data?.[0];
+            expect(firstPoint).toHaveProperty('date');
+            expect(firstPoint).toHaveProperty('total');
+            expect(firstPoint).toHaveProperty('critical');
+            expect(firstPoint).toHaveProperty('high');
+            expect(firstPoint).toHaveProperty('medium');
+            expect(firstPoint).toHaveProperty('low');
+
+            expect(firstPoint?.total).toBe(15);
+            expect(firstPoint?.critical).toBe(2);
+        });
+
+        it('should return empty array on API failure', async () => {
+            mockAxios.onGet('/admin/security/trend').reply(500);
+
+            const { result } = renderHook(() => useSecurityTrend('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual([]);
+        });
+
+        it('should support 30d range parameter', async () => {
+            mockAxios
+                .onGet('/admin/security/trend', { params: { range: '30d' } })
+                .reply(200, {
+                    success: true,
+                    data: mockTrendData,
+                });
+
+            const { result } = renderHook(() => useSecurityTrend('30d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(mockAxios.history.get[0].params).toEqual({ range: '30d' });
+        });
+    });
+
+    describe('useSecurityByType', () => {
+        it('should load alert type breakdown successfully', async () => {
+            mockAxios.onGet('/admin/security/by-type').reply(200, {
+                success: true,
+                data: mockByTypeData,
+            });
+
+            const { result } = renderHook(() => useSecurityByType('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual(mockByTypeData);
+            expect(result.current.data?.length).toBe(2);
+        });
+
+        it('should correctly map type data with labels', async () => {
+            mockAxios.onGet('/admin/security/by-type').reply(200, {
+                success: true,
+                data: mockByTypeData,
+            });
+
+            const { result } = renderHook(() => useSecurityByType('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            const firstType = result.current.data?.[0];
+            expect(firstType?.event_type).toBe('invalid_qr_attempt');
+            expect(firstType?.label).toBe('Invalid QR Attempt');
+            expect(firstType?.count).toBe(12);
+            expect(firstType?.critical_count).toBe(2);
+        });
+
+        it('should return empty array on API failure', async () => {
+            mockAxios.onGet('/admin/security/by-type').reply(404);
+
+            const { result } = renderHook(() => useSecurityByType('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual([]);
+        });
+    });
+
+    describe('useSecurityBySeverity', () => {
+        it('should load severity breakdown successfully', async () => {
+            mockAxios.onGet('/admin/security/by-severity').reply(200, {
+                success: true,
+                data: mockBySeverityData,
+            });
+
+            const { result } = renderHook(() => useSecurityBySeverity('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual(mockBySeverityData);
+        });
+
+        it('should correctly map severity distribution', async () => {
+            mockAxios.onGet('/admin/security/by-severity').reply(200, {
+                success: true,
+                data: mockBySeverityData,
+            });
+
+            const { result } = renderHook(() => useSecurityBySeverity('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            const critical = result.current.data?.find((s) => s.severity === 'critical');
+            const high = result.current.data?.find((s) => s.severity === 'high');
+
+            expect(critical?.count).toBe(3);
+            expect(high?.count).toBe(7);
+        });
+
+        it('should return empty array on API failure', async () => {
+            mockAxios.onGet('/admin/security/by-severity').reply(500);
+
+            const { result } = renderHook(() => useSecurityBySeverity('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual([]);
+        });
+
+        it('should handle malformed response gracefully', async () => {
+            mockAxios.onGet('/admin/security/by-severity').reply(200, {
+                success: true,
+                data: null, // Malformed
+            });
+
+            const { result } = renderHook(() => useSecurityBySeverity('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            // Should fallback to empty array
+            expect(result.current.data).toEqual([]);
+        });
+    });
+
+    describe('useCriticalAlerts', () => {
+        it('should load critical alerts successfully', async () => {
+            mockAxios.onGet('/admin/security/critical-recent').reply(200, {
+                success: true,
+                data: mockCriticalAlerts,
+            });
+
+            const { result } = renderHook(() => useCriticalAlerts(20), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual(mockCriticalAlerts);
+            expect(result.current.data?.length).toBe(1);
+        });
+
+        it('should include all required alert fields', async () => {
+            mockAxios.onGet('/admin/security/critical-recent').reply(200, {
+                success: true,
+                data: mockCriticalAlerts,
+            });
+
+            const { result } = renderHook(() => useCriticalAlerts(20), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            const alert = result.current.data?.[0];
+            expect(alert).toHaveProperty('id');
+            expect(alert).toHaveProperty('event_type');
+            expect(alert).toHaveProperty('severity');
+            expect(alert).toHaveProperty('user_name');
+            expect(alert).toHaveProperty('timestamp');
+            expect(alert?.severity).toBe('critical');
+        });
+
+        it('should support custom limit parameter', async () => {
+            mockAxios
+                .onGet('/admin/security/critical-recent', { params: { limit: 10 } })
+                .reply(200, {
+                    success: true,
+                    data: mockCriticalAlerts,
+                });
+
+            const { result } = renderHook(() => useCriticalAlerts(10), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(mockAxios.history.get[0].params).toEqual({ limit: 10 });
+        });
+
+        it('should return empty array on API failure', async () => {
+            mockAxios.onGet('/admin/security/critical-recent').reply(500);
+
+            const { result } = renderHook(() => useCriticalAlerts(20), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual([]);
+        });
+    });
+
+    describe('useAcknowledgeAlert (Mutation)', () => {
+        it('should acknowledge alert successfully', async () => {
+            mockAxios.onPatch('/admin/security-alerts/1/ack').reply(200, {
+                success: true,
+                message: 'Alert acknowledged',
+            });
+
+            const { result } = renderHook(() => useAcknowledgeAlert(), {
+                wrapper: createWrapper(),
+            });
+
+            result.current.mutate(1);
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual({
+                success: true,
+                message: 'Alert acknowledged',
+            });
+        });
+
+        it('should invalidate queries on success', async () => {
+            mockAxios.onPatch('/admin/security-alerts/1/ack').reply(200, {
+                success: true,
+            });
+
+            const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+            const { result } = renderHook(() => useAcknowledgeAlert(), {
+                wrapper: createWrapper(),
+            });
+
+            result.current.mutate(1);
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(invalidateSpy).toHaveBeenCalledWith({
+                queryKey: ['securityDashboard'],
+            });
+        });
+
+        it('should handle mutation error', async () => {
+            mockAxios.onPatch('/admin/security-alerts/1/ack').reply(403, {
+                success: false,
+                message: 'Unauthorized',
+            });
+
+            const { result } = renderHook(() => useAcknowledgeAlert(), {
+                wrapper: createWrapper(),
+            });
+
+            result.current.mutate(1);
+
+            await waitFor(() => expect(result.current.isError).toBe(true));
+
+            expect(result.current.error).toBeDefined();
+        });
+    });
+
+    describe('useBulkAcknowledgeAlerts (Mutation)', () => {
+        it('should bulk acknowledge alerts successfully', async () => {
+            mockAxios.onPost('/admin/security-alerts/bulk-ack').reply(200, {
+                success: true,
+                message: '3 alerts acknowledged',
+            });
+
+            const { result } = renderHook(() => useBulkAcknowledgeAlerts(), {
+                wrapper: createWrapper(),
+            });
+
+            result.current.mutate([1, 2, 3]);
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toHaveProperty('success', true);
+        });
+
+        it('should send correct payload', async () => {
+            mockAxios.onPost('/admin/security-alerts/bulk-ack').reply(200, {
+                success: true,
+            });
+
+            const { result } = renderHook(() => useBulkAcknowledgeAlerts(), {
+                wrapper: createWrapper(),
+            });
+
+            result.current.mutate([1, 2, 3]);
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(mockAxios.history.post[0].data).toBe(JSON.stringify({ ids: [1, 2, 3] }));
+        });
+    });
+
+    describe('Error Handling & Edge Cases', () => {
+        it('should not crash on uncaught promise rejection', async () => {
+            mockAxios.onGet('/admin/security/summary').reply(() => {
+                return Promise.reject(new Error('Network failure'));
+            });
+
+            const { result } = renderHook(() => useSecuritySummary(), {
+                wrapper: createWrapper(),
+            });
+
+            // Should resolve with fallback data, not crash
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toBeDefined();
+        });
+
+        it('should handle timeout errors', async () => {
+            mockAxios.onGet('/admin/security/trend').timeout();
+
+            const { result } = renderHook(() => useSecurityTrend('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual([]);
+        });
+
+        it('should handle empty response arrays', async () => {
+            mockAxios.onGet('/admin/security/by-type').reply(200, {
+                success: true,
+                data: [],
+            });
+
+            const { result } = renderHook(() => useSecurityByType('7d'), {
+                wrapper: createWrapper(),
+            });
+
+            await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+            expect(result.current.data).toEqual([]);
+            expect(Array.isArray(result.current.data)).toBe(true);
+        });
+    });
+});

@@ -16,7 +16,7 @@ class SecurityPolicyRequest extends FormRequest
         $user = $this->user();
 
         // Must be authenticated
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -117,7 +117,7 @@ class SecurityPolicyRequest extends FormRequest
                 }
             }
 
-            if (!$key) {
+            if (! $key) {
                 return;
             }
 
@@ -159,8 +159,9 @@ class SecurityPolicyRequest extends FormRequest
             if (isset($numericPolicies[$key])) {
                 $constraints = $numericPolicies[$key];
 
-                if (!is_numeric($value)) {
+                if (! is_numeric($value)) {
                     $fail("The {$attribute} must be a number for policy '{$key}'.");
+
                     return;
                 }
 
@@ -172,7 +173,7 @@ class SecurityPolicyRequest extends FormRequest
             }
 
             if (in_array($key, $booleanPolicies)) {
-                if (!is_bool($value) && !in_array($value, [0, 1, '0', '1', 'true', 'false'], true)) {
+                if (! is_bool($value) && ! in_array($value, [0, 1, '0', '1', 'true', 'false'], true)) {
                     $fail("The {$attribute} must be a boolean value for policy '{$key}'.");
                 }
             }
@@ -224,13 +225,13 @@ class SecurityPolicyRequest extends FormRequest
     {
         $user = $this->user();
 
-        if (!$user) {
+        if (! $user) {
             throw new \Illuminate\Auth\AuthenticationException('Unauthenticated.');
         }
 
         $scopeType = $this->input('scope_type', 'school');
 
-        if ($scopeType === 'global' && !$user->isSuperAdmin()) {
+        if ($scopeType === 'global' && ! $user->isSuperAdmin()) {
             throw new \Illuminate\Auth\Access\AuthorizationException(
                 'Only super administrators can manage global security policies.'
             );

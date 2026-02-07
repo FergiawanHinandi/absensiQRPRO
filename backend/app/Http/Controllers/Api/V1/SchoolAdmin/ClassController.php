@@ -30,13 +30,15 @@ class ClassController extends Controller
         $user = $request->user();
         $schoolId = $user->school_id;
 
+        // SECURITY: Always filter by school_id - CRITICAL for tenant isolation
         $classes = DB::table('classes')
             ->leftJoin('users as homeroom', 'classes.homeroom_teacher_id', '=', 'homeroom.id')
             ->leftJoin('class_students', function ($join) {
                 $join->on('class_students.class_id', '=', 'classes.id')
                     ->where('class_students.status', '=', 'active');
             })
-            ->where('classes.school_id', $schoolId)
+            ->where('classes.school_id', $schoolId) // MANDATORY school_id filter
+            ->where('homeroom.school_id', $schoolId) // Join table also filtered
             ->groupBy(
                 'classes.id',
                 'classes.name',
@@ -89,12 +91,10 @@ class ClassController extends Controller
     /**
      * Store Class
      */
-    /**
-     * Store Class
-     */
     public function store(StoreClassRequest $request)
     {
         try {
+            // SECURITY: Pass user's school_id to ensure tenant isolation
             $class = $this->classService->store($request->validated(), $request->user()->school_id);
 
             return response()->json([
@@ -110,18 +110,16 @@ class ClassController extends Controller
     /**
      * Update Class
      */
-    /**
-     * Update Class
-     */
     public function update(UpdateClassRequest $request, int $classId)
     {
         try {
-            // Get class first to authorize
+            // SECURITY: Get class first to authorize with policy
             $class = \App\Models\ClassModel::findOrFail($classId);
 
-            // Policy-based authorization check
+            // POLICY: Enforces tenant isolation and role-based access
             $this->authorize('update', $class);
 
+            // SECURITY: Pass user's school_id to ensure tenant isolation
             $class = $this->classService->update($classId, $request->validated(), $request->user()->school_id);
 
             return response()->json([
@@ -137,12 +135,16 @@ class ClassController extends Controller
     /**
      * Update Class Status
      */
-    /**
-     * Update Class Status
-     */
     public function updateStatus(UpdateClassStatusRequest $request, int $classId)
     {
         try {
+            // SECURITY: Get class for policy authorization
+            $class = \App\Models\ClassModel::findOrFail($classId);
+            
+            // POLICY: Enforces tenant isolation and role-based access
+            $this->authorize('update', $class);
+
+            // SECURITY: Pass user's school_id to ensure tenant isolation
             $this->classService->updateStatus($classId, $request->validated()['is_active'], $request->user()->school_id);
 
             return response()->json([
@@ -159,24 +161,22 @@ class ClassController extends Controller
      */
     public function destroy(Request $request, int $classId)
     {
-        $user = $request->user();
-        $schoolId = $user->school_id;
+        try {
+            // SECURITY: Get class for policy authorization
+            $class = \App\Models\ClassModel::findOrFail($classId);
+            
+            // POLICY: Enforces tenant isolation and role-based access
+            $this->authorize('delete', $class);
 
-        $deleted = DB::table('classes')
-            ->where('school_id', $schoolId)
-            ->where('id', $classId)
-            ->delete();
+            // SECURITY: Use model with policy instead of direct DB access
+            $class->delete();
 
-        if (! $deleted) {
             return response()->json([
-                'success' => false,
-                'message' => 'Kelas tidak ditemukan.',
-            ], 404);
+                'success' => true,
+                'message' => 'Kelas berhasil dihapus',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Kelas berhasil dihapus',
-        ]);
     }
 }

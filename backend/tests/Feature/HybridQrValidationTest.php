@@ -12,7 +12,7 @@ use Tests\TestCase;
 
 /**
  * Hybrid QR Validation Tests
- * 
+ *
  * Test suite untuk memverifikasi bahwa hybrid validation
  * mencegah siswa non-aktif, transfer sekolah, dan cross-school attacks
  */
@@ -21,8 +21,11 @@ class HybridQrValidationTest extends TestCase
     use RefreshDatabase;
 
     private School $school1;
+
     private School $school2;
+
     private HybridQrValidationService $validator;
+
     private StudentQrService $qrService;
 
     protected function setUp(): void
@@ -347,7 +350,7 @@ class HybridQrValidationTest extends TestCase
         );
 
         // Tamper dengan QR (ubah sedikit)
-        $tamperedQr = substr($qrToken, 0, -5) . 'XXXXX';
+        $tamperedQr = substr($qrToken, 0, -5).'XXXXX';
 
         // Act & Assert: Harus ditolak di layer 1 (HMAC)
         $this->expectException(InvalidQrException::class);

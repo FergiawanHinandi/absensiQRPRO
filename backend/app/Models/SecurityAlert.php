@@ -2,15 +2,16 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * CRITICAL: Security Alert Model with proper defaults
+ * CRITICAL: Security Alert Model with proper defaults and school isolation
  */
 class SecurityAlert extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToSchool;
 
     // Severity constants
     public const SEVERITY_LOW = 'low';
@@ -42,6 +43,12 @@ class SecurityAlert extends Model
         'updated_at' => 'datetime',
     ];
 
+    public function school()
+    {
+        return $this->belongsTo(School::class);
+    }
+}
+
     /**
      * Relationship with School
      */
@@ -67,7 +74,7 @@ class SecurityAlert extends Model
     /**
      * CRITICAL: Log login attempt
      */
-    public static function logLoginAttempt(int $schoolId = null, string $description = null, string $severity = 'medium'): void
+    public static function logLoginAttempt(?int $schoolId = null, ?string $description = null, string $severity = 'medium'): void
     {
         try {
             self::createAlert([
@@ -94,5 +101,33 @@ class SecurityAlert extends Model
     {
         // Only notify for high and critical severity
         return in_array($this->severity, [self::SEVERITY_HIGH, self::SEVERITY_CRITICAL]);
+    }
+
+    /**
+     * Get emoji representation of severity level
+     */
+    public function getSeverityEmoji(): string
+    {
+        return match ($this->severity) {
+            self::SEVERITY_LOW => '🟢',
+            self::SEVERITY_MEDIUM => '🟡',
+            self::SEVERITY_HIGH => '🟠',
+            self::SEVERITY_CRITICAL => '🔴',
+            default => '⚪',
+        };
+    }
+
+    /**
+     * Get human-readable severity label
+     */
+    public function getSeverityLabel(): string
+    {
+        return match ($this->severity) {
+            self::SEVERITY_LOW => 'Low',
+            self::SEVERITY_MEDIUM => 'Medium',
+            self::SEVERITY_HIGH => 'High',
+            self::SEVERITY_CRITICAL => 'Critical',
+            default => 'Unknown',
+        };
     }
 }

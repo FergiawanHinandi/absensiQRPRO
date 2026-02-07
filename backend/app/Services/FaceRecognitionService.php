@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\User;
 use App\Models\StudentFaceEmbedding;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -25,8 +25,9 @@ class FaceRecognitionService
                 return $response['embedding'];
             }
         } catch (\Exception $e) {
-            Log::error('Face embedding service error: ' . $e->getMessage());
+            Log::error('Face embedding service error: '.$e->getMessage());
         }
+
         return null;
     }
 
@@ -49,10 +50,10 @@ class FaceRecognitionService
     {
         // Get all embeddings for the same school (excluding current student)
         $candidates = StudentFaceEmbedding::where('student_id', '!=', $student->id)
-            ->whereHas('student', function($q) use ($student) {
+            ->whereHas('student', function ($q) use ($student) {
                 $q->where('school_id', $student->school_id)
-                  ->where('role_type', 'student')
-                  ->where('is_active', true);
+                    ->where('role_type', 'student')
+                    ->where('is_active', true);
             })
             ->with('student:id,name,school_id')
             ->get();
@@ -61,10 +62,10 @@ class FaceRecognitionService
 
         foreach ($candidates as $candidate) {
             $similarity = $this->calculateCosineSimilarity($newEmbedding, $candidate->embedding);
-            
+
             if ($similarity > 0.85) {
                 $duplicatesFound = true;
-                
+
                 // Log the detection
                 Log::channel('audit')->warning('photo_duplicate_detected', [
                     'student_a_id' => $student->id,
@@ -72,7 +73,7 @@ class FaceRecognitionService
                     'student_b_id' => $candidate->student_id,
                     'student_b_name' => $candidate->student->name,
                     'similarity' => $similarity,
-                    'school_id' => $student->school_id
+                    'school_id' => $student->school_id,
                 ]);
             }
         }
@@ -89,10 +90,10 @@ class FaceRecognitionService
      */
     public function findAllDuplicatesInSchool($schoolId)
     {
-        $embeddings = StudentFaceEmbedding::whereHas('student', function($q) use ($schoolId) {
+        $embeddings = StudentFaceEmbedding::whereHas('student', function ($q) use ($schoolId) {
             $q->where('school_id', $schoolId)
-              ->where('role_type', 'student')
-              ->where('is_active', true);
+                ->where('role_type', 'student')
+                ->where('is_active', true);
         })->with('student:id,name,username,photo_path')->get();
 
         $pairs = [];
@@ -100,13 +101,17 @@ class FaceRecognitionService
 
         foreach ($embeddings as $i => $a) {
             foreach ($embeddings as $j => $b) {
-                if ($i >= $j) continue; // Avoid self-compare and double-counting
+                if ($i >= $j) {
+                    continue;
+                } // Avoid self-compare and double-counting
 
-                $key = $a->student_id < $b->student_id 
-                    ? "{$a->student_id}-{$b->student_id}" 
+                $key = $a->student_id < $b->student_id
+                    ? "{$a->student_id}-{$b->student_id}"
                     : "{$b->student_id}-{$a->student_id}";
 
-                if (in_array($key, $checked)) continue;
+                if (in_array($key, $checked)) {
+                    continue;
+                }
                 $checked[] = $key;
 
                 $similarity = $this->calculateCosineSimilarity($a->embedding, $b->embedding);
@@ -115,7 +120,7 @@ class FaceRecognitionService
                     $pairs[] = [
                         'student_a' => $a->student,
                         'student_b' => $b->student,
-                        'similarity_score' => round($similarity, 4)
+                        'similarity_score' => round($similarity, 4),
                     ];
                 }
             }
@@ -126,11 +131,19 @@ class FaceRecognitionService
 
     private function calculateCosineSimilarity($vecA, $vecB)
     {
-        if (is_string($vecA)) $vecA = json_decode($vecA);
-        if (is_string($vecB)) $vecB = json_decode($vecB);
+        if (is_string($vecA)) {
+            $vecA = json_decode($vecA);
+        }
+        if (is_string($vecB)) {
+            $vecB = json_decode($vecB);
+        }
 
-        if (!is_array($vecA) || !is_array($vecB)) return 0;
-        if (count($vecA) !== count($vecB)) return 0;
+        if (! is_array($vecA) || ! is_array($vecB)) {
+            return 0;
+        }
+        if (count($vecA) !== count($vecB)) {
+            return 0;
+        }
 
         $dotProduct = 0;
         $normA = 0;
@@ -142,7 +155,9 @@ class FaceRecognitionService
             $normB += $vecB[$i] * $vecB[$i];
         }
 
-        if ($normA == 0 || $normB == 0) return 0;
+        if ($normA == 0 || $normB == 0) {
+            return 0;
+        }
 
         return $dotProduct / (sqrt($normA) * sqrt($normB));
     }

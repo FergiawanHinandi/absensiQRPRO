@@ -3,24 +3,20 @@
 namespace App\Services;
 
 use App\Models\Attendance;
-use App\Models\Student;
-use App\Models\SchoolClass;
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class GroupTruancyDetectionService
 {
     /**
      * Detect classes with possible group truancy in a given month.
      *
-     * @param int $schoolId
-     * @param string|null $month (format: 'YYYY-MM', default: current month)
-     * @return array
+     * @param  string|null  $month  (format: 'YYYY-MM', default: current month)
      */
     public function detect(int $schoolId, ?string $month = null): array
     {
         $month = $month ?: Carbon::now()->format('Y-m');
-        $start = Carbon::parse($month . '-01')->startOfMonth();
+        $start = Carbon::parse($month.'-01')->startOfMonth();
         $end = (clone $start)->endOfMonth();
 
         // Query: For each class, for each day, count students absent
@@ -28,7 +24,7 @@ class GroupTruancyDetectionService
             ->select([
                 'attendances.class_id',
                 DB::raw('DATE(attendances.date) as date'),
-                DB::raw('COUNT(DISTINCT attendances.student_id) as absent_count')
+                DB::raw('COUNT(DISTINCT attendances.student_id) as absent_count'),
             ])
             ->where('attendances.school_id', $schoolId)
             ->whereBetween('attendances.date', [$start, $end])

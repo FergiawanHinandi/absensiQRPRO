@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Teacher Location Heatmap Service
- * 
+ *
  * Provides clustering and anomaly detection for scan location visualization.
  */
 class TeacherHeatmapService
@@ -37,7 +37,7 @@ class TeacherHeatmapService
         ?string $range = null
     ): array {
         $school = School::find($schoolId);
-        if (!$school) {
+        if (! $school) {
             return ['points' => [], 'school' => null];
         }
 
@@ -63,7 +63,7 @@ class TeacherHeatmapService
             ->whereBetween('attendance_date', [$startDate->toDateString(), $endDate->toDateString()])
             ->where(function ($q) {
                 $q->whereNotNull('lat_in')
-                  ->orWhereNotNull('lat_out');
+                    ->orWhereNotNull('lat_out');
             });
 
         if ($teacherId) {
@@ -138,7 +138,7 @@ class TeacherHeatmapService
                 'teacher_name' => $teacher?->name ?? 'Unknown',
                 'scan_count' => $teacherLogs->count(),
                 'students_scanned' => $teacherLogs->sum('students_scanned'),
-                'times' => $teacherLogs->pluck('created_at')->map(fn($t) => $t->format('H:i:s'))->toArray(),
+                'times' => $teacherLogs->pluck('created_at')->map(fn ($t) => $t->format('H:i:s'))->toArray(),
                 'first_scan' => $teacherLogs->min('created_at')?->format('Y-m-d H:i:s'),
                 'last_scan' => $teacherLogs->max('created_at')?->format('Y-m-d H:i:s'),
             ];
@@ -318,7 +318,7 @@ class TeacherHeatmapService
         }
 
         // Sort by count descending
-        usort($clusters, fn($a, $b) => $b['count'] <=> $a['count']);
+        usort($clusters, fn ($a, $b) => $b['count'] <=> $a['count']);
 
         return $clusters;
     }
@@ -352,6 +352,7 @@ class TeacherHeatmapService
     {
         if ($date) {
             $dateObj = Carbon::parse($date);
+
             return [$dateObj->startOfDay(), $dateObj->endOfDay()];
         }
 

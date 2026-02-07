@@ -1,0 +1,266 @@
+##############################################################################
+# Kubernetes Horizontal Pod Autoscaler (HPA) for AbsensiQRPro
+# Apply with: kubectl apply -f hpa.yaml
+##############################################################################
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: absensi-api-hpa
+  namespace: production
+  labels:
+    app: absensi-api
+    component: autoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: absensi-api
+  
+  # Instance Limits
+  minReplicas: 2
+  maxReplicas: 6
+  
+  # Scaling Metrics
+  metrics:
+    # CPU-based scaling (primary)
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+    
+    # Custom metric: HTTP requests per second
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second
+        target:
+          type: AverageValue
+          averageValue: "100"
+    
+    # Custom metric: Response time (p95)
+    - type: Pods
+      pods:
+        metric:
+          name: http_request_duration_seconds_p95
+        target:
+          type: AverageValue
+          averageValue: "500m"  # 500ms
+    
+    # Custom metric: Queue backlog
+    - type: External
+      external:
+        metric:
+          name: laravel_queue_size
+          selector:
+            matchLabels:
+              queue: default
+        target:
+          type: Value
+          value: "500"
+  
+  # Scaling Behavior (Cooldown)
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+      selectPolicy: Max
+    
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minute cooldown
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+      selectPolicy: Min
+
+---
+##############################################################################
+# Deployment Configuration (Stateless)
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: absensi-api
+  namespace: production
+  labels:
+    app: absensi-api
+spec:
+  replicas: 2  # Initial replicas (HPA will manage)
+  selector:
+    matchLabels:
+      app: absensi-api
+  template:
+    metadata:
+      labels:
+        app: absensi-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9000"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Anti-affinity: spread pods across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - absensi-api
+                topologyKey: kubernetes.io/hostname
+      
+      containers:
+        - name: api
+          image: absensi-api:latest
+          imagePullPolicy: Always
+          
+          ports:
+            - containerPort: 9000
+              name: http
+          
+          # Environment Variables (Stateless Config)
+          envFrom:
+            - configMapRef:
+                name: absensi-api-config
+            - secretRef:
+                name: absensi-api-secrets
+          
+          env:
+            # Ensure stateless: sessions/cache use Redis
+            - name: SESSION_DRIVER
+              value: "redis"
+            - name: CACHE_DRIVER
+              value: "redis"
+            - name: QUEUE_CONNECTION
+              value: "redis"
+            - name: LOG_CHANNEL
+              value: "stderr"
+          
+          # Resource Limits
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          
+          # Health Checks
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /health/load-balancer
+              port: 9000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          # Volume Mounts (read-only for stateless)
+          volumeMounts:
+            - name: storage
+              mountPath: /var/www/html/storage/app/public
+              readOnly: false
+      
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: absensi-storage-pvc
+
+---
+##############################################################################
+# Service (Load Balancer auto-registration)
+##############################################################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: absensi-api-service
+  namespace: production
+  labels:
+    app: absensi-api
+  annotations:
+    # AWS ALB
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: absensi-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9000
+      protocol: TCP
+  sessionAffinity: None  # Stateless - no sticky sessions
+
+---
+##############################################################################
+# PodDisruptionBudget (High Availability)
+##############################################################################
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: absensi-api-pdb
+  namespace: production
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: absensi-api
+
+---
+##############################################################################
+# ServiceMonitor (Prometheus metrics for HPA)
+##############################################################################
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: absensi-api-monitor
+  namespace: production
+  labels:
+    app: absensi-api
+spec:
+  selector:
+    matchLabels:
+      app: absensi-api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

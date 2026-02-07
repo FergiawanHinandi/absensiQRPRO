@@ -22,7 +22,7 @@ class QRScanRaceConditionTest extends TestCase
     protected $school;
 
     protected $student;
-    
+
     protected $teacher;
 
     protected $schedule;
@@ -32,7 +32,7 @@ class QRScanRaceConditionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Skip race condition tests on SQLite as they require PostgreSQL specific features
         if (DB::connection()->getDriverName() === 'sqlite') {
             $this->markTestSkipped('Race condition tests require PostgreSQL for proper locking support.');
@@ -310,12 +310,12 @@ class QRScanRaceConditionTest extends TestCase
     public function test_unique_index_exists_on_attendances()
     {
         $driver = DB::connection()->getDriverName();
-        
+
         if ($driver === 'sqlite') {
             // SQLite: Check for unique indexes using pragma
-            $indexes = DB::select("PRAGMA index_list(attendances)");
+            $indexes = DB::select('PRAGMA index_list(attendances)');
             $uniqueIndexes = collect($indexes)->where('unique', 1);
-            
+
             $this->assertNotEmpty(
                 $uniqueIndexes,
                 'Unique index should exist on attendances table'
@@ -335,10 +335,10 @@ class QRScanRaceConditionTest extends TestCase
             );
         } else {
             // MySQL
-            $indexes = DB::select("SHOW INDEXES FROM attendances WHERE Non_unique = 0");
+            $indexes = DB::select('SHOW INDEXES FROM attendances WHERE Non_unique = 0');
             $this->assertNotEmpty($indexes);
         }
-        
+
         $this->assertTrue(true, 'Unique indexes verified');
     }
 

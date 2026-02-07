@@ -35,7 +35,7 @@ class VerifySecurityLogIntegrity extends Command
         $silent = $this->option('silent');
         $sendAlerts = $this->option('alert');
 
-        if (!$silent) {
+        if (! $silent) {
             $this->info('🔐 Starting security log integrity verification...');
             $this->newLine();
         }
@@ -51,13 +51,13 @@ class VerifySecurityLogIntegrity extends Command
         $result = $this->logService->verifyChainIntegrity($progressCallback);
         $duration = round(microtime(true) - $startTime, 2);
 
-        if (!$silent) {
+        if (! $silent) {
             $this->newLine(2);
         }
 
         // Display results
         if ($result['is_valid']) {
-            if (!$silent) {
+            if (! $silent) {
                 $this->info('✅ VERIFICATION PASSED');
                 $this->newLine();
                 $this->table(
@@ -70,6 +70,7 @@ class VerifySecurityLogIntegrity extends Command
                     ]
                 );
             }
+
             return Command::SUCCESS;
         }
 
@@ -90,13 +91,13 @@ class VerifySecurityLogIntegrity extends Command
 
         $this->newLine();
         $this->error('Error Details:');
-        
+
         foreach (array_slice($result['errors'], 0, 10) as $error) {
             $this->line("  [{$error['type']}] Sequence #{$error['sequence_number']}: {$error['message']}");
         }
 
         if (count($result['errors']) > 10) {
-            $this->line("  ... and " . (count($result['errors']) - 10) . " more errors");
+            $this->line('  ... and '.(count($result['errors']) - 10).' more errors');
         }
 
         // Handle tampering detection

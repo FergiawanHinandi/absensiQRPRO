@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Services\TeacherSecurityReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -24,7 +23,7 @@ class SecurityReportController extends Controller
 
     /**
      * Generate a new security investigation report for a teacher
-     * 
+     *
      * POST /api/v1/admin/security-reports/teacher
      */
     public function generateTeacherReport(Request $request): JsonResponse
@@ -42,8 +41,8 @@ class SecurityReportController extends Controller
 
         // Authorization: super_admin or school_admin of same school
         $user = $request->user();
-        
-        if (!$this->canAccessTeacher($user, $teacher)) {
+
+        if (! $this->canAccessTeacher($user, $teacher)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized: You can only generate reports for teachers in your school.',
@@ -51,7 +50,7 @@ class SecurityReportController extends Controller
         }
 
         // Verify teacher is actually a teacher
-        if (!in_array($teacher->role_type, ['teacher', 'homeroom_teacher'])) {
+        if (! in_array($teacher->role_type, ['teacher', 'homeroom_teacher'])) {
             return response()->json([
                 'success' => false,
                 'message' => 'The specified user is not a teacher.',
@@ -83,14 +82,14 @@ class SecurityReportController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to generate report: ' . $e->getMessage(),
+                'message' => 'Failed to generate report: '.$e->getMessage(),
             ], 500);
         }
     }
 
     /**
      * Download a security report
-     * 
+     *
      * GET /api/v1/admin/security-reports/{id}/download
      */
     public function download(Request $request, int $id): JsonResponse|StreamedResponse
@@ -99,7 +98,7 @@ class SecurityReportController extends Controller
         $user = $request->user();
 
         // Authorization: only creator or super_admin can download
-        if (!$this->canDownloadReport($user, $report)) {
+        if (! $this->canDownloadReport($user, $report)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized: Only the report creator or super admin can download this report.',
@@ -107,7 +106,7 @@ class SecurityReportController extends Controller
         }
 
         // Check if file exists
-        if (!$report->fileExists()) {
+        if (! $report->fileExists()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Report file not found on server.',
@@ -119,14 +118,14 @@ class SecurityReportController extends Controller
             $report->file_name,
             [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $report->file_name . '"',
+                'Content-Disposition' => 'attachment; filename="'.$report->file_name.'"',
             ]
         );
     }
 
     /**
      * List security reports with filters
-     * 
+     *
      * GET /api/v1/admin/security-reports
      */
     public function index(Request $request): JsonResponse
@@ -176,7 +175,7 @@ class SecurityReportController extends Controller
 
     /**
      * Get a single report details
-     * 
+     *
      * GET /api/v1/admin/security-reports/{id}
      */
     public function show(Request $request, int $id): JsonResponse
@@ -184,7 +183,7 @@ class SecurityReportController extends Controller
         $report = SecurityReport::with(['teacher', 'generator', 'school'])->findOrFail($id);
         $user = $request->user();
 
-        if (!$this->canDownloadReport($user, $report)) {
+        if (! $this->canDownloadReport($user, $report)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access to this report.',
@@ -228,7 +227,7 @@ class SecurityReportController extends Controller
 
     /**
      * Delete a security report
-     * 
+     *
      * DELETE /api/v1/admin/security-reports/{id}
      */
     public function destroy(Request $request, int $id): JsonResponse
@@ -237,7 +236,7 @@ class SecurityReportController extends Controller
         $user = $request->user();
 
         // Only super_admin or the creator can delete
-        if (!$this->canDownloadReport($user, $report)) {
+        if (! $this->canDownloadReport($user, $report)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized to delete this report.',

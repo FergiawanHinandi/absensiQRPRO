@@ -7,6 +7,10 @@ use App\Models\Attendance;
 use App\Models\Schedule;
 use App\Models\School;
 use App\Models\User;
+use App\Models\ClassStudent;
+use App\Core\Services\Attendance\QrReplayPreventionService;
+use App\Services\SecurityAlertService;
+use App\Services\SecurityPolicyService;
 use App\Services\Logging\AttendanceLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -14,8 +18,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Events\AttendanceRecorded;
-use App\Events\AttendanceLate;
 
 /**
  * AttendanceCheckInService
@@ -35,6 +37,7 @@ use App\Events\AttendanceLate;
  * - Make business decisions
  *
  * @author Clean Architecture Team
+ *
  * @version 2.0.0
  */
 final class AttendanceCheckInService
@@ -54,35 +57,38 @@ final class AttendanceCheckInService
         private AttendanceLogger $logger,
         private StudentNotificationService $notificationService,
         private GamificationService $gamificationService,
-        private ?QRSignatureService $signatureService = null
+        private ?QRSignatureService $signatureService = null,
+        private ?QrReplayPreventionService $replayPreventionService = null,
+        private ?SecurityAlertService $alertService = null,
+        private ?SecurityPolicyService $policyService = null
     ) {}
 
     /**
      * Process student check-in via QR scan
      *
-     * @param User $student The authenticated student
-     * @param array $data Scan data with keys: qr_token, lat, lng, device_id, request_id
-     * @param Request|null $request HTTP request for logging context
-     * @return AttendanceResult
+     * @param  User  $student  The authenticated student
+     * @param  array  $data  Scan data with keys: qr_token, lat, lng, device_id, request_id
+     * @param  Request|null  $request  HTTP request for logging context
+     *
      * @throws AttendanceException
      */
     public function checkIn(User $student, array $data, ?Request $request = null): AttendanceResult
     {
         // Extract or generate request_id for idempotency
         $requestId = $data['request_id'] ?? (string) Str::uuid();
-        
+
         /*
          * IDEMPOTENCY CHECK (EARLY EXIT)
          * ==============================
-         * 
+         *
          * If a request with this request_id has already been processed,
          * return the existing result immediately WITHOUT re-running validations.
-         * 
+         *
          * This enables:
          * 1. Safe retries from mobile apps
          * 2. Offline sync with pre-generated request IDs
          * 3. Network timeout recovery
-         * 
+         *
          * The client should generate a UUID client-side and include it in
          * every request. If the request times out, the client can safely
          * retry with the SAME request_id.
@@ -95,7 +101,7 @@ final class AttendanceCheckInService
                 'student_id' => $student->id,
                 'is_retry' => true,
             ]);
-            
+
             return new AttendanceResult(
                 success: true,
                 attendance: $existingByRequestId,
@@ -148,13 +154,131 @@ final class AttendanceCheckInService
         try {
             $this->gamificationService->awardDailyPoints($attendance, $student);
         } catch (\Exception $e) {
-             Log::warning('Failed to award points', ['error' => $e->getMessage()]);
+            Log::warning('Failed to award points', ['error' => $e->getMessage()]);
         }
 
         return new AttendanceResult(
             success: true,
             attendance: $attendance,
             message: 'Absensi berhasil dicatat.',
+            status: $attendanceStatus,
+            isIdempotentRetry: false
+        );
+    }
+
+    /**
+     * Process manual attendance (Teacher/Admin only)
+     *
+     * @param  array  $data  Manual attendance data
+     * @param  int    $recordedBy The user ID recording the attendance
+     * @return Attendance
+     */
+    public function manualCheckIn(array $data, int $recordedBy): Attendance
+    {
+        return DB::transaction(function () use ($data, $recordedBy) {
+            // Check for duplicate attendance on the same date with row lock
+            $existing = Attendance::where('student_id', $data['student_id'])
+                ->where('schedule_id', $data['schedule_id'])
+                ->whereDate('attendance_date', $data['attendance_date'])
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                // If exists, update instead of create
+                $existing->update([
+                    'status' => $data['status'],
+                    'notes' => $data['notes'] ?? null,
+                    'is_manual' => true,
+                    'attendance_type' => 'manual',
+                    'recorded_by' => $recordedBy,
+                ]);
+
+                return $existing;
+            }
+
+            // Create new attendance record
+            return Attendance::create([
+                'school_id' => $data['school_id'],
+                'schedule_id' => $data['schedule_id'],
+                'student_id' => $data['student_id'],
+                'attendance_date' => $data['attendance_date'],
+                'status' => $data['status'],
+                'notes' => $data['notes'] ?? null,
+                'is_manual' => true,
+                'attendance_type' => 'manual',
+                'recorded_by' => $recordedBy,
+                'check_in_time' => now(),
+            ]);
+        });
+    }
+
+    /**
+     * Process teacher scan of student QR
+     *
+     * @param  User  $teacher  The teacher performing the scan
+     * @param  string  $qrToken  The encrypted QR token
+     * @param  array  $data  Scan data (lat, lng, request_id)
+     * @param  Request|null  $request
+     * @return AttendanceResult
+     */
+    public function teacherCheckIn(User $teacher, string $qrToken, array $data, ?Request $request = null): AttendanceResult
+    {
+        // 1. Verify Teacher Role
+        if (! in_array($teacher->role_type, ['teacher', 'homeroom_teacher'])) {
+             throw AttendanceException::invalidRole();
+        }
+
+        // 2. Validate QR & Extract Payload
+        $payload = $this->validateQrToken($qrToken, $request);
+        $studentId = $payload['id'] ?? $payload['sid'] ?? null;
+        $schoolId = $payload['sch'] ?? $payload['school_id'] ?? null;
+        $nonce = $payload['n'] ?? null;
+
+        if ($schoolId != $teacher->school_id) {
+             throw new AttendanceException('QR Code tidak valid untuk sekolah ini.');
+        }
+
+        // 3. Find & Validate Student
+        $student = User::where('id', $studentId)
+            ->where('school_id', $teacher->school_id)
+            ->where('role_type', 'student')
+            ->first();
+
+        if (! $student || ! $student->is_active) {
+            throw AttendanceException::studentNotFound();
+        }
+
+        // 4. Find Schedule (Must be owned by teacher)
+        $schedule = $this->findTeacherSchedule($teacher, $request);
+
+        // 5. Verify Student in Class
+        $this->validateStudentInClass($student, $schedule);
+
+        // 6. Validate Teacher Location (Geofence)
+        $this->validateLocation($teacher->school, $data['lat'] ?? null, $data['lng'] ?? null, $request);
+
+        // 7. Validate Time Window
+        $attendanceStatus = $this->validateTimeWindow($schedule, $teacher->school);
+
+        // 8. Atomic Check-In
+        $requestId = $data['request_id'] ?? (string) Str::uuid();
+
+        $attendance = $this->atomicCheckIn(
+            $student,
+            $schedule,
+            $attendanceStatus,
+            $data,
+            $requestId,
+            $nonce,
+            $request,
+            'teacher_scan',
+            $teacher->id
+        );
+
+        return new AttendanceResult(
+            success: true,
+            attendance: $attendance,
+            message: 'Absensi berhasil dicatat oleh guru.',
             status: $attendanceStatus,
             isIdempotentRetry: false
         );
@@ -171,7 +295,7 @@ final class AttendanceCheckInService
      * 2. Offline sync - mobile app queues requests with pre-generated IDs
      * 3. App crash recovery - request data persisted with ID
      *
-     * @param string $requestId The unique request identifier
+     * @param  string  $requestId  The unique request identifier
      * @return Attendance|null Existing attendance or null if not found
      */
     private function findByRequestId(string $requestId): ?Attendance
@@ -188,7 +312,7 @@ final class AttendanceCheckInService
      */
     private function validateStudent(User $student, ?Request $request = null): void
     {
-        if (!$student->is_active) {
+        if (! $student->is_active) {
             if ($request) {
                 $this->logger->checkInFailed($request, 'student_inactive', [
                     'student_id' => $student->id,
@@ -227,10 +351,10 @@ final class AttendanceCheckInService
 
         try {
             $payload = $this->qrService->verify($token);
-            
+
             // Validate QR timestamp with server-trust principles
             $this->validateQrTimestamp($payload, $request);
-            
+
             return $payload;
         } catch (AttendanceException $e) {
             // Re-throw attendance exceptions as-is
@@ -253,34 +377,36 @@ final class AttendanceCheckInService
      * 2. generated_at must NOT be older than configured expiry
      * 3. Only server time is used for actual attendance records
      *
-     * @param array $payload The QR payload
-     * @param Request|null $request For logging context
+     * @param  array  $payload  The QR payload
+     * @param  Request|null  $request  For logging context
+     *
      * @throws AttendanceException
      */
     private function validateQrTimestamp(array $payload, ?Request $request = null): void
     {
         $serverNow = now()->timestamp;
-        
+
         // Get timestamp from various possible field names
         $qrTimestamp = $payload['generated_at']
             ?? $payload['exp'] - $this->getQrExpirySeconds()
             ?? null;
-            
+
         $expTimestamp = $payload['exp'] ?? null;
-        
+
         // If no timestamp available, skip time validation (legacy QR)
-        if (!$qrTimestamp && !$expTimestamp) {
+        if (! $qrTimestamp && ! $expTimestamp) {
             Log::channel('attendance_security')->warning('QR without timestamp detected', [
                 'payload_keys' => array_keys($payload),
                 'ip' => $request?->ip(),
             ]);
+
             return;
         }
 
         // RULE 1: Detect future timestamps (clock tampering)
         // Allow 5 seconds of clock skew for network/processing delays
         $clockSkewTolerance = 5;
-        
+
         if ($qrTimestamp && $qrTimestamp > ($serverNow + $clockSkewTolerance)) {
             $this->logClockManipulation($request, 'future_timestamp', [
                 'qr_generated_at' => $qrTimestamp,
@@ -288,7 +414,7 @@ final class AttendanceCheckInService
                 'difference_seconds' => $qrTimestamp - $serverNow,
                 'student_id' => $payload['student_id'] ?? $payload['id'] ?? null,
             ]);
-            
+
             throw AttendanceException::custom(
                 'Waktu QR tidak valid. Pastikan waktu perangkat Anda sudah benar.'
             );
@@ -296,12 +422,12 @@ final class AttendanceCheckInService
 
         // RULE 2: Check expiration based on server time
         $expirySeconds = $this->getQrExpirySeconds();
-        
+
         if ($expTimestamp) {
             // If exp field exists, use it directly
             if ($serverNow > $expTimestamp) {
                 $secondsExpired = $serverNow - $expTimestamp;
-                
+
                 if ($request) {
                     $this->logger->expiredQr($request, [
                         'schedule_id' => $payload['id'] ?? null,
@@ -309,7 +435,7 @@ final class AttendanceCheckInService
                         'seconds_expired' => $secondsExpired,
                     ]);
                 }
-                
+
                 throw AttendanceException::custom(
                     'Kode QR sudah kadaluarsa. Minta guru untuk menampilkan QR baru.'
                 );
@@ -317,10 +443,10 @@ final class AttendanceCheckInService
         } elseif ($qrTimestamp) {
             // Calculate expiry from generated_at
             $expiresAt = $qrTimestamp + $expirySeconds;
-            
+
             if ($serverNow > $expiresAt) {
                 $secondsExpired = $serverNow - $expiresAt;
-                
+
                 if ($request) {
                     $this->logger->expiredQr($request, [
                         'schedule_id' => $payload['id'] ?? null,
@@ -329,7 +455,7 @@ final class AttendanceCheckInService
                         'seconds_expired' => $secondsExpired,
                     ]);
                 }
-                
+
                 throw AttendanceException::custom(
                     'Kode QR sudah kadaluarsa. Minta guru untuk menampilkan QR baru.'
                 );
@@ -345,7 +471,7 @@ final class AttendanceCheckInService
                 'age_seconds' => $serverNow - $qrTimestamp,
                 'max_age_seconds' => $maxAgeSeconds,
             ]);
-            
+
             throw AttendanceException::custom('Kode QR terlalu lama. Gunakan QR yang baru.');
         }
     }
@@ -388,7 +514,7 @@ final class AttendanceCheckInService
      */
     private function findActiveSchedule(?int $scheduleId, int $schoolId, ?Request $request = null): Schedule
     {
-        if (!$scheduleId) {
+        if (! $scheduleId) {
             if ($request) {
                 $this->logger->checkInFailed($request, 'no_schedule_id');
             }
@@ -401,7 +527,7 @@ final class AttendanceCheckInService
             ->where('day_of_week', strtolower(now()->format('l')))
             ->first();
 
-        if (!$schedule) {
+        if (! $schedule) {
             if ($request) {
                 $this->logger->checkInFailed($request, 'schedule_not_found', [
                     'schedule_id' => $scheduleId,
@@ -427,8 +553,8 @@ final class AttendanceCheckInService
                     'device_mismatch',
                     'Student attempt with different device (potential joki)',
                     [
-                        'registered_device' => substr($student->device_id, 0, 8) . '...',
-                        'incoming_device' => substr($deviceId, 0, 8) . '...',
+                        'registered_device' => substr($student->device_id, 0, 8).'...',
+                        'incoming_device' => substr($deviceId, 0, 8).'...',
                         'severity' => 'high',
                     ]
                 );
@@ -446,12 +572,12 @@ final class AttendanceCheckInService
         ?float $lng,
         ?Request $request = null
     ): void {
-        if (!$school || !$school->latitude || !$school->longitude) {
+        if (! $school || ! $school->latitude || ! $school->longitude) {
             // No geofence configured, skip validation
             return;
         }
 
-        if (!$lat || !$lng) {
+        if (! $lat || ! $lng) {
             // Location not provided, skip validation (or throw if required)
             return;
         }
@@ -534,21 +660,21 @@ final class AttendanceCheckInService
         /*
          * CONCURRENCY PROTECTION STRATEGY
          * ===============================
-         * 
+         *
          * Layer 1: Application-Level Lock (Cache/Redis)
          * - Provides fast, distributed lock before touching the database
          * - Reduces database contention under high load
          * - Works across multiple app servers
-         * 
+         *
          * Layer 2: Database Transaction
          * - Ensures all-or-nothing semantics
          * - Auto-rollback on any failure
-         * 
+         *
          * Layer 3: Database Row Lock (SELECT ... FOR UPDATE)
          * - Locks specific row(s) for the duration of transaction
          * - Other transactions WAIT until lock is released
          * - Prevents concurrent modifications to same row
-         * 
+         *
          * Layer 4: Gap Lock (for non-existent rows)
          * - When no row exists, acquires lock on the "gap" in the index
          * - Prevents concurrent INSERTs of the same unique row
@@ -556,7 +682,7 @@ final class AttendanceCheckInService
          */
 
         // Layer 1: Application-level distributed lock
-        $lockKey = "attendance_checkin:{$student->id}:{$schedule->id}:" . now()->toDateString();
+        $lockKey = "attendance_checkin:{$student->id}:{$schedule->id}:".now()->toDateString();
 
         return Cache::lock($lockKey, self::LOCK_TIMEOUT)->block(self::LOCK_WAIT, function () use (
             $student, $schedule, $status, $data, $requestId, $nonce, $request
@@ -566,23 +692,23 @@ final class AttendanceCheckInService
                 // SERVER TIME - Used for all timestamp comparisons
                 $serverNow = now();
                 $serverDate = $serverNow->toDateString();
-                
+
                 /*
                  * Layer 3 & 4: Row Lock with Gap Lock Fallback
-                 * 
+                 *
                  * CRITICAL: This MUST happen INSIDE the transaction
-                 * 
+                 *
                  * Case A: Row EXISTS
                  * - lockForUpdate() acquires exclusive lock on the row
                  * - Other transactions WAIT at this point
                  * - When lock is acquired, we check and reject duplicate
-                 * 
+                 *
                  * Case B: Row DOES NOT EXIST
                  * - lockForUpdate() returns NULL (no row to lock)
                  * - We acquire a "gap lock" on the unique index
                  * - This prevents concurrent INSERT with same (student, schedule, date)
                  */
-                
+
                 // Acquire lock on existing row OR gap in index
                 $existing = $this->findExistingAttendanceWithLock(
                     $student->id,
@@ -592,16 +718,17 @@ final class AttendanceCheckInService
 
                 if ($existing) {
                     // Row exists - we have exclusive lock on it
-                    
+
                     // Idempotency: same request_id returns original (for retry handling)
                     if ($requestId && $existing->request_id === $requestId) {
                         Log::channel('attendance')->debug('Idempotent retry detected', [
                             'attendance_id' => $existing->id,
                             'request_id' => $requestId,
                         ]);
+
                         return $existing;
                     }
-                    
+
                     // Different request trying to check in = duplicate attempt
                     if ($request) {
                         $this->logger->checkInDuplicate($request, $existing->id, [
@@ -610,20 +737,28 @@ final class AttendanceCheckInService
                             'new_request_id' => $requestId,
                         ]);
                     }
-                    
+
                     throw AttendanceException::alreadyRecorded();
                 }
 
                 // No existing row - we hold gap lock, safe to INSERT
-                
+
+                // A. Validate nonce for race condition prevention
+                if ($nonce) {
+                    $this->validateNonce($nonce, $student->id, $schedule->id);
+                }
+
                 // B. Register device if first time
-                if (empty($student->device_id) && !empty($data['device_id'])) {
+                if (empty($student->device_id) && ! empty($data['device_id'])) {
                     $student->update(['device_id' => $data['device_id']]);
                 }
 
                 // C. Create attendance record
                 // The unique constraint on (student_id, schedule_id, attendance_date)
                 // plus our gap lock guarantees no duplicate can be inserted
+                $attendanceType = $request ? 'qr_scan' : 'manual';
+                $recordedBy = $request ? null : auth()->id();
+                
                 try {
                     $attendance = Attendance::create([
                         'school_id' => $student->school_id,
@@ -636,10 +771,12 @@ final class AttendanceCheckInService
                         'lng_in' => $data['lng'] ?? null,
                         'device_id_in' => $data['device_id'] ?? null,
                         'is_manual' => false,
+                        'attendance_type' => $attendanceType,
+                        'recorded_by' => $recordedBy,
                         'request_id' => $requestId,
                         'nonce' => $nonce,
-                        'client_scanned_at' => isset($data['scanned_at']) 
-                            ? Carbon::parse($data['scanned_at'])->toDateTimeString() 
+                        'client_scanned_at' => isset($data['scanned_at'])
+                            ? Carbon::parse($data['scanned_at'])->toDateTimeString()
                             : null,
                     ]);
                 } catch (\Illuminate\Database\QueryException $e) {
@@ -664,11 +801,11 @@ final class AttendanceCheckInService
                         'longitude' => $data['lng'] ?? null,
                         'accuracy' => $data['accuracy'] ?? null,
                     ]);
-                    
+
                     if ($status === 'late') {
                         $scheduledStart = Carbon::parse($schedule->start_time);
                         $minutesLate = now()->diffInMinutes($scheduledStart);
-                        
+
                         $this->logger->lateCheckIn($attendance, $request, $minutesLate, [
                             'scheduled_start' => $scheduledStart->toTimeString(),
                         ]);
@@ -682,36 +819,36 @@ final class AttendanceCheckInService
 
     /**
      * Find existing attendance with exclusive row lock
-     * 
+     *
      * CONCURRENCY BEHAVIOR:
-     * 
+     *
      * 1. If row EXISTS:
      *    - Acquires exclusive lock (X lock) on the row
      *    - Other transactions will BLOCK at their lockForUpdate() call
      *    - Lock is held until transaction COMMIT or ROLLBACK
-     * 
+     *
      * 2. If row DOES NOT EXIST:
      *    - In InnoDB with proper index, acquires a "gap lock"
      *    - Gap lock prevents INSERT of row with same key values
      *    - This is why the unique index on (student_id, schedule_id, attendance_date) is CRITICAL
-     * 
+     *
      * WHY THIS PREVENTS DUPLICATES:
-     * 
+     *
      * Timeline WITHOUT proper locking:
      *   T1: Check exists? → No
      *   T2: Check exists? → No        (T1's insert not committed yet)
      *   T1: INSERT → Success
      *   T2: INSERT → DUPLICATE!       (or worse, both succeed with race)
-     * 
+     *
      * Timeline WITH lockForUpdate():
      *   T1: Check exists with LOCK → No (acquires gap lock)
      *   T2: Check exists with LOCK → BLOCKED (waiting for T1's lock)
      *   T1: INSERT → Success, COMMIT → releases lock
      *   T2: Lock acquired → Check exists? → YES! → Reject duplicate
-     * 
-     * @param int $studentId Student ID
-     * @param int $scheduleId Schedule ID  
-     * @param string $date Attendance date (Y-m-d)
+     *
+     * @param  int  $studentId  Student ID
+     * @param  int  $scheduleId  Schedule ID
+     * @param  string  $date  Attendance date (Y-m-d)
      * @return Attendance|null Existing attendance or null
      */
     private function findExistingAttendanceWithLock(
@@ -754,10 +891,10 @@ final class AttendanceCheckInService
     private function isDuplicateKeyException(\Illuminate\Database\QueryException $e): bool
     {
         $errorCode = $e->errorInfo[1] ?? null;
-        
+
         // MySQL: 1062 = Duplicate entry
         // PostgreSQL: 23505 = unique_violation
-        return in_array($errorCode, [1062, 23505], true) 
+        return in_array($errorCode, [1062, 23505], true)
             || str_contains($e->getMessage(), 'Duplicate entry')
             || str_contains($e->getMessage(), 'unique constraint');
     }
@@ -793,5 +930,260 @@ final class AttendanceCheckInService
         return Attendance::where('student_id', $studentId)
             ->whereDate('attendance_date', now()->toDateString())
             ->exists();
+    }
+
+    /**
+     * Handle attendance recording via Teacher Scan (Migrated from AttendanceService)
+     *
+     * @param  User  $teacher
+     * @param  string  $qrToken
+     * @param  float|null  $lat
+     * @param  float|null  $lng
+     * @param  string|null  $deviceId
+     * @param  string|null  $requestId
+     * @return array
+     * @throws AttendanceException
+     */
+    public function recordByTeacherScan(
+        User $teacher,
+        string $qrToken,
+        ?float $lat,
+        ?float $lng,
+        ?string $deviceId = null,
+        ?string $requestId = null,
+    ): array {
+        // 1. Verify Teacher Role
+        if ($teacher->role_type !== 'teacher') {
+            $this->logSecurityAnomaly('invalid_role_scan_attempt', [
+                'user_id' => $teacher->id,
+                'role' => $teacher->role_type,
+                'expected' => 'teacher',
+            ]);
+            throw AttendanceException::invalidRole();
+        }
+
+        // 2. Verify QR & Extract Payload
+        try {
+            $payload = $this->qrService->verify($qrToken);
+        } catch (\Exception $e) {
+            $this->logSecurityEvent('signature_failed', $teacher, $qrToken, $e->getMessage());
+            throw new AttendanceException('QR Code tidak valid atau rusak.');
+        }
+
+        $studentId = $payload['sid'] ?? $payload['student_id'] ?? null;
+        $schoolId = $payload['sch'] ?? $payload['school_id'] ?? null;
+        $nonce = $payload['n'] ?? $payload['nonce'] ?? null;
+
+        // Validate school isolation
+        if ($schoolId != $teacher->school_id) {
+             $this->logSecurityAnomaly('cross_school_scan_attempt', [
+                'teacher_id' => $teacher->id,
+                'teacher_school' => $teacher->school_id,
+                'qr_school' => $schoolId,
+            ]);
+            throw new AttendanceException('QR Code tidak valid untuk sekolah ini.');
+        }
+
+        // Check QR expiration
+        if (isset($payload['exp']) && $payload['exp'] < now()->timestamp) {
+            $this->logSecurityEvent('qr_expired', $teacher, $qrToken, 'QR Expired');
+            throw AttendanceException::expired();
+        }
+
+        // 3. Validate Student
+        try {
+            $student = $this->qrService->validateStudentStatus($payload, $teacher->school_id);
+        } catch (\Exception $e) {
+             $this->logSecurityEvent('student_validation_failed', $teacher, $qrToken, $e->getMessage());
+             throw new AttendanceException($e->getMessage());
+        }
+
+        // 4. Find Active Schedule (Teacher specific logic)
+        $dayOfWeek = now()->dayOfWeek;
+        $now = now();
+        
+        // Get tolerances from policy service if available, otherwise default
+        $toleranceBefore = $this->policyService ? $this->policyService->getScheduleToleranceBefore($teacher->school_id) : 15;
+        $toleranceAfter = $this->policyService ? $this->policyService->getScheduleToleranceAfter($teacher->school_id) : 15;
+
+        $windowStartTime = $now->copy()->subMinutes($toleranceAfter)->format('H:i:s');
+        $windowEndTime = $now->copy()->addMinutes($toleranceBefore)->format('H:i:s');
+
+        $schedule = Schedule::with(['class', 'subject'])
+            ->where('school_id', $teacher->school_id)
+            ->where('day_of_week', $dayOfWeek)
+            ->where('is_active', true)
+            ->where('start_time', '<=', $windowEndTime)
+            ->where('end_time', '>=', $windowStartTime)
+            ->first();
+
+        if (! $schedule) {
+            throw AttendanceException::scheduleNotFound();
+        }
+
+        if ($schedule->teacher_id !== $teacher->id) {
+             $this->logSecurityAnomaly('unauthorized_schedule_scan', [
+                'teacher_id' => $teacher->id,
+                'schedule_id' => $schedule->id,
+                'schedule_teacher_id' => $schedule->teacher_id,
+            ]);
+            throw new AttendanceException('Anda bukan pengajar pada jadwal ini.');
+        }
+
+        // 5. Verify Time Window (Strict)
+        $scheduleStart = Carbon::parse($schedule->start_time);
+        $scheduleEnd = Carbon::parse($schedule->end_time);
+        $windowStart = $scheduleStart->copy()->subMinutes($toleranceBefore);
+        $windowEnd = $scheduleEnd->copy()->addMinutes($toleranceAfter);
+        $currentTimeCarbon = Carbon::parse($now->format('H:i:s'));
+
+        if ($currentTimeCarbon->lt($windowStart) || $currentTimeCarbon->gt($windowEnd)) {
+             throw AttendanceException::outsideTimeWindow();
+        }
+
+        // 6. Verify Class Match
+        $isStudentInClass = ClassStudent::where('student_id', $student->id)
+            ->where('class_id', $schedule->class_id)
+            ->where('status', 'active')
+            ->exists();
+
+        if (! $isStudentInClass) {
+             $this->logSecurityAnomaly('student_class_mismatch', [
+                'student_id' => $student->id,
+                'student_class_id' => $student->class_id ?? 'N/A',
+                'schedule_class_id' => $schedule->class_id,
+            ]);
+            throw AttendanceException::studentNotInClass();
+        }
+
+        // 7. Atomic Check-in
+        $lockKey = "student_attendance_{$student->id}_{$schedule->id}_" . today()->format('Y-m-d');
+        $lock = Cache::lock($lockKey, 5);
+
+        if (! $lock->get()) {
+            throw new AttendanceException('Sedang memproses absensi. Coba lagi dalam beberapa detik.');
+        }
+
+        try {
+            return DB::transaction(function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken) {
+                // Nonce Check
+                if ($nonce && $this->replayPreventionService) {
+                     if ($this->replayPreventionService->checkNonceReplay($nonce, $schoolId)) {
+                         $this->replayPreventionService->logRepeatedAttempt($student->id, $schedule->id, $schoolId, $nonce, 'teacher_scan_nonce_replay');
+                         $this->logSecurityEvent('nonce_replay', $teacher, $qrToken, 'QR nonce already used');
+                         throw AttendanceException::replayDetected();
+                     }
+                }
+
+                // Check Existing
+                $existingAttendance = $this->findExistingAttendanceWithLock($student->id, $schedule->id, today()->toDateString());
+                
+                if ($existingAttendance) {
+                     if ($this->replayPreventionService) {
+                        $this->replayPreventionService->markStudentScanned($student->id, $schedule->id, $schoolId, $existingAttendance->id);
+                     }
+                     throw AttendanceException::alreadyRecorded();
+                }
+
+                // Idempotency
+                $reqId = $requestId ?: request()->header('X-Request-ID');
+                if ($reqId) {
+                    $existing = Attendance::where('request_id', $reqId)->lockForUpdate()->first();
+                    if ($existing) {
+                         return [
+                            'attendance' => $existing,
+                            'student' => $student,
+                            'schedule' => $schedule
+                        ];
+                    }
+                }
+
+                // Create
+                $status = $this->determineAttendanceStatus($schedule, $teacher->school_id);
+                $attendance = Attendance::create([
+                    'school_id' => $teacher->school_id,
+                    'class_id' => $schedule->class_id,
+                    'schedule_id' => $schedule->id,
+                    'subject_id' => $schedule->subject_id,
+                    'student_id' => $student->id,
+                    'attendance_date' => today(),
+                    'attendance_type' => 'teacher_scan',
+                    'status' => $status,
+                    'check_in_time' => now(),
+                    'lat_in' => $lat,
+                    'lng_in' => $lng,
+                    'device_id_in' => $deviceId,
+                    'is_manual' => false,
+                    'recorded_by' => $teacher->id,
+                    'request_id' => $reqId,
+                    'nonce' => $nonce,
+                ]);
+
+                // Post-Create Actions
+                if ($nonce && $this->replayPreventionService) {
+                    $this->replayPreventionService->markNonceUsed($nonce, $schoolId, $student->id, $schedule->id);
+                }
+                if ($this->replayPreventionService) {
+                    $this->replayPreventionService->markStudentScanned($student->id, $schedule->id, $schoolId, $attendance->id);
+                }
+
+                return [
+                    'attendance' => $attendance,
+                    'student' => $student,
+                    'schedule' => $schedule
+                ];
+            });
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function logSecurityAnomaly(string $type, array $context): void
+    {
+        Log::channel('security_json')->warning("Security Anomaly: $type", $context);
+    }
+
+    private function logSecurityEvent(string $type, User $user, string $token, string $message): void
+    {
+        Log::channel('security_json')->warning("Security Event: $type", [
+            'user_id' => $user->id,
+            'token_preview' => substr($token, 0, 10) . '...',
+            'message' => $message
+        ]);
+    }
+
+    private function determineAttendanceStatus(Schedule $schedule, int $schoolId): string
+    {
+        $lateTolerance = $this->policyService ? $this->policyService->getScheduleToleranceAfter($schoolId) : 15;
+        $lateThreshold = Carbon::parse($schedule->start_time)->addMinutes($lateTolerance);
+        return now()->format('H:i:s') > $lateThreshold->format('H:i:s') ? 'late' : 'present';
+    }
+
+    /**
+     * Validate nonce to prevent race conditions and replay attacks
+     *
+     * @param string $nonce The nonce from QR token
+     * @param int $studentId Student ID
+     * @param int $scheduleId Schedule ID
+     * @throws AttendanceException
+     */
+    private function validateNonce(string $nonce, int $studentId, int $scheduleId): void
+    {
+        // Check if nonce exists and is valid
+        $qrNonce = \App\Models\QrNonce::where('nonce', $nonce)
+            ->where('student_id', $studentId)
+            ->where('qr_code_id', $scheduleId) // Assuming qr_code_id maps to schedule
+            ->first();
+
+        if (!$qrNonce) {
+            throw new AttendanceException('QR Code tidak valid atau sudah kedaluwarsa.');
+        }
+
+        if (!$qrNonce->isValid()) {
+            throw new AttendanceException('QR Code sudah digunakan atau kedaluwarsa.');
+        }
+
+        // Mark nonce as used to prevent replay
+        $qrNonce->markAsUsed();
     }
 }

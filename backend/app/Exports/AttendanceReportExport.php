@@ -8,6 +8,7 @@ use Maatwebsite\Excel\Concerns\FromView;
 class AttendanceReportExport implements FromView
 {
     protected $type;
+
     protected $params;
 
     public function __construct($type, $params)
@@ -31,6 +32,7 @@ class AttendanceReportExport implements FromView
             default:
                 abort(400, 'Invalid export type');
         }
+
         return view($view, ['params' => $this->params]);
     }
 }

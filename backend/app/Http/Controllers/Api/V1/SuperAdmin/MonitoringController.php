@@ -3,10 +3,8 @@
 namespace App\Http\Controllers\Api\V1\SuperAdmin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use App\Models\User;
 use App\Models\School;
+use Illuminate\Support\Facades\DB;
 
 class MonitoringController extends Controller
 {
@@ -14,7 +12,7 @@ class MonitoringController extends Controller
     {
         // 7. Global System Monitoring
         // Total schools, Active users, Failed attendance, Security alerts
-        
+
         $stats = [
             'schools_count' => School::count(),
             'active_students_today' => DB::table('attendances')
@@ -33,7 +31,7 @@ class MonitoringController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $stats
+            'data' => $stats,
         ]);
     }
 }

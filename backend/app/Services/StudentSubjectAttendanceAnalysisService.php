@@ -3,16 +3,12 @@
 namespace App\Services;
 
 use App\Models\Attendance;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class StudentSubjectAttendanceAnalysisService
 {
     /**
      * Get attendance behavior per subject for a student
-     *
-     * @param int $studentId
-     * @return array
      */
     public function analyzePerSubject(int $studentId): array
     {

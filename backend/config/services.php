@@ -56,4 +56,20 @@ return [
         'enabled' => env('WHATSAPP_ENABLED', false),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Disaster Recovery Notifications
+    |--------------------------------------------------------------------------
+    |
+    | Webhook URLs for DR test notifications. Configure these to receive
+    | automated alerts when weekly DR tests complete.
+    |
+    */
+
+    'dr_notifications' => [
+        'slack_webhook' => env('SLACK_DR_WEBHOOK'),
+        'discord_webhook' => env('DISCORD_DR_WEBHOOK'),
+        'enabled' => env('DR_NOTIFICATIONS_ENABLED', true),
+    ],
+
 ];

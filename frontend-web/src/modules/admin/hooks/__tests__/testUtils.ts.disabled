@@ -1,0 +1,141 @@
+// Test setup utilities for Security Dashboard hooks
+import { QueryClient } from '@tanstack/react-query';
+
+/**
+ * Create a fresh QueryClient for each test
+ * Disables retries and refetch to make tests deterministic
+ */
+export const createTestQueryClient = () => {
+    return new QueryClient({
+        defaultOptions: {
+            queries: {
+                retry: false,
+                refetchInterval: false,
+                refetchOnWindowFocus: false,
+                refetchOnMount: false,
+                refetchOnReconnect: false,
+                staleTime: Infinity,
+            },
+            mutations: {
+                retry: false,
+            },
+        },
+        logger: {
+            log: () => { },
+            warn: () => { },
+            error: () => { },
+        },
+    });
+};
+
+/**
+ * Mock security API responses for testing
+ */
+export const mockSecurityResponses = {
+    summary: {
+        success: true,
+        data: {
+            alerts_last_24h: 15,
+            critical_alerts: 3,
+            high_severity_alerts: 7,
+            schools_with_alerts: 2,
+            most_common_event: 'invalid_qr_attempt',
+            most_common_event_count: 8,
+            unresolved_alerts: 10,
+        },
+    },
+
+    trend: {
+        success: true,
+        data: [
+            {
+                date: '2026-02-01',
+                total: 15,
+                critical: 2,
+                high: 5,
+                medium: 6,
+                low: 2,
+            },
+            {
+                date: '2026-02-02',
+                total: 12,
+                critical: 1,
+                high: 4,
+                medium: 5,
+                low: 2,
+            },
+        ],
+    },
+
+    byType: {
+        success: true,
+        data: [
+            {
+                event_type: 'invalid_qr_attempt',
+                label: 'Invalid QR Attempt',
+                count: 12,
+                critical_count: 2,
+            },
+            {
+                event_type: 'location_mismatch',
+                label: 'Location Mismatch',
+                count: 8,
+                critical_count: 1,
+            },
+        ],
+    },
+
+    bySeverity: {
+        success: true,
+        data: [
+            { severity: 'critical', count: 3 },
+            { severity: 'high', count: 7 },
+            { severity: 'medium', count: 11 },
+            { severity: 'low', count: 4 },
+        ],
+    },
+
+    criticalAlerts: {
+        success: true,
+        data: [
+            {
+                id: 1,
+                event_type: 'invalid_qr_attempt',
+                event_label: 'Invalid QR Attempt',
+                severity: 'critical',
+                description: 'Multiple failed QR scans detected',
+                user_name: 'Ahmad Rizki',
+                user_email: 'ahmad@school.id',
+                user_role: 'student',
+                school_name: 'SMA Negeri 1',
+                school_id: 1,
+                ip_address: '192.168.1.100',
+                device_id: 'device-123',
+                is_resolved: false,
+                timestamp: '2026-02-02T10:30:00Z',
+                time_ago: '2 hours ago',
+                details: { attempts: 5 },
+            },
+        ],
+    },
+
+    emptyFallback: {
+        summary: {
+            alerts_last_24h: 0,
+            critical_alerts: 0,
+            high_severity_alerts: 0,
+            schools_with_alerts: 0,
+            most_common_event: null,
+            most_common_event_count: 0,
+            unresolved_alerts: 0,
+        },
+        array: [],
+    },
+};
+
+/**
+ * Wait for async state updates
+ */
+export const waitForHookUpdate = async (timeout = 1000) => {
+    return new Promise((resolve) => setTimeout(resolve, timeout));
+};

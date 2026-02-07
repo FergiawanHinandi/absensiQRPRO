@@ -1,5 +1,7 @@
 <?php
 
+use App\Logging\CentralizedLoggerFactory;
+use App\Logging\JsonLogFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -15,6 +17,9 @@ return [
     | This option defines the default log channel that is utilized to write
     | messages to your logs. The value provided here should match one of
     | the channels present in the list of "channels" configured below.
+    |
+    | For production with centralized logging: LOG_CHANNEL=centralized
+    | For local development: LOG_CHANNEL=stack
     |
     */
 
@@ -51,6 +56,97 @@ return [
     */
 
     'channels' => [
+
+        /*
+        |----------------------------------------------------------------------
+        | Centralized Logging Channels
+        |----------------------------------------------------------------------
+        | These channels ship logs to ELK/Loki/Graylog for centralized logging.
+        | Use LOG_CHANNEL=centralized in production.
+        */
+
+        'centralized' => [
+            'driver' => 'stack',
+            'channels' => ['elk', 'daily'],
+            'ignore_exceptions' => false,
+        ],
+
+        'elk' => [
+            'driver' => 'custom',
+            'via' => CentralizedLoggerFactory::class,
+            'driver_type' => env('CENTRALIZED_LOG_DRIVER', 'elk'), // elk, loki, graylog, fluentd
+            'host' => env('LOGSTASH_HOST', 'localhost'),
+            'port' => env('LOGSTASH_PORT', 5044),
+            'protocol' => env('LOGSTASH_PROTOCOL', 'tcp'),
+            'timeout' => 5,
+            'level' => env('LOG_LEVEL', 'debug'),
+            'local_fallback' => true,
+            'memory_usage' => true,
+            'web_processor' => true,
+            'introspection' => true,
+        ],
+
+        'loki' => [
+            'driver' => 'custom',
+            'via' => CentralizedLoggerFactory::class,
+            'driver_type' => 'loki',
+            'host' => env('LOKI_HOST', 'localhost'),
+            'port' => env('LOKI_PORT', 3100),
+            'stream' => 'php://stdout', // Promtail collects from stdout
+            'level' => env('LOG_LEVEL', 'debug'),
+            'local_fallback' => true,
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | Request Logging Channel
+        |----------------------------------------------------------------------
+        | Logs all HTTP requests with timing and context.
+        */
+
+        'request' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/requests.log'),
+            'level' => 'debug',
+            'days' => 7,
+            'formatter' => JsonLogFormatter::class,
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | Auth Events Channel
+        |----------------------------------------------------------------------
+        | Logs authentication events: login, logout, password changes.
+        */
+
+        'auth' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/auth.log'),
+            'level' => 'debug',
+            'days' => 30, // Keep auth logs longer for security audit
+            'formatter' => JsonLogFormatter::class,
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | System Events Channel
+        |----------------------------------------------------------------------
+        | Logs system events: errors, job failures, slow queries.
+        */
+
+        'system' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/system.log'),
+            'level' => 'debug',
+            'days' => 14,
+            'formatter' => JsonLogFormatter::class,
+        ],
+
+        /*
+        |----------------------------------------------------------------------
+        | Default Channels (Laravel)
+        |----------------------------------------------------------------------
+        */
 
         'stack' => [
             'driver' => 'stack',
@@ -189,6 +285,36 @@ return [
 
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
+        ],
+
+        // Backup-specific logging channel
+        'backup' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/backup.log'),
+            'level' => 'debug',
+            'days' => 90, // Keep backup logs for 90 days for audit compliance
+            'replace_placeholders' => true,
+        ],
+
+        // Atomic rollback logging channel
+        'rollback' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/rollback.log'),
+            'level' => 'debug',
+            'days' => 365, // Keep rollback logs for 1 year for compliance
+            'replace_placeholders' => true,
+        ],
+
+        // JSON-formatted rollback logs for structured logging
+        'rollback_json' => [
+            'driver' => 'monolog',
+            'handler' => StreamHandler::class,
+            'handler_with' => [
+                'stream' => storage_path('logs/rollback-json.log'),
+            ],
+            'formatter' => Monolog\Formatter\JsonFormatter::class,
+            'processors' => [PsrLogMessageProcessor::class],
+            'level' => 'debug',
         ],
 
     ],

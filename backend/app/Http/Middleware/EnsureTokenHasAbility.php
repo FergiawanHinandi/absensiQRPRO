@@ -8,13 +8,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Ensure Sanctum Token Has Required Ability
- * 
+ *
  * This middleware enforces ability checks on Sanctum API tokens.
  * It is critical for multi-tenant security and role-based access control.
- * 
+ *
  * Usage:
  *   Route::get('/endpoint', ...)->middleware(['auth:sanctum', 'ability:report:export']);
- * 
+ *
  * Super admin bypass:
  *   Tokens with '*' ability bypass all checks (super_admin role).
  */
@@ -22,9 +22,7 @@ class EnsureTokenHasAbility
 {
     /**
      * Handle an incoming request.
-     * 
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
+     *
      * @param  string  ...$abilities  One or more required abilities (OR logic)
      * @return mixed
      */
@@ -32,9 +30,9 @@ class EnsureTokenHasAbility
     {
         // Get the authenticated user
         $user = $request->user();
-        
+
         // If user is not authenticated, return 401
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'message' => 'Unauthenticated',
             ], 401);
@@ -42,9 +40,9 @@ class EnsureTokenHasAbility
 
         // Get the current access token
         $token = $user->currentAccessToken();
-        
+
         // If no token (session-based auth), reject
-        if (!$token) {
+        if (! $token) {
             return response()->json([
                 'message' => 'Token required for this endpoint',
             ], 401);

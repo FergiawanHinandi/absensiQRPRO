@@ -12,20 +12,20 @@ class SchoolSuspensionController extends Controller
     {
         $request->validate([
             'school_id' => 'required|exists:schools,id',
-            'reason' => 'required|string|min:10'
+            'reason' => 'required|string|min:10',
         ]);
 
         $school = School::findOrFail($request->school_id);
-        
+
         // Check if already suspended
-        if (!$school->is_active) {
+        if (! $school->is_active) {
             return response()->json(['message' => 'School is already inactive/suspended.'], 400);
         }
 
         $school->is_active = false;
         // Assuming migration added 'suspension_reason' or similar, strict prompt asked for "School status field migration".
         // Use 'updated_at' for timestamp logic.
-        // For now, storing reason in a log or field if exists. 
+        // For now, storing reason in a log or field if exists.
         // We'll update school status.
         $school->save();
 
@@ -35,7 +35,7 @@ class SchoolSuspensionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'School suspended successfully.',
-            'school_id' => $school->id
+            'school_id' => $school->id,
         ]);
     }
 
@@ -49,7 +49,7 @@ class SchoolSuspensionController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'School reactivated successfully.'
+            'message' => 'School reactivated successfully.',
         ]);
     }
 }

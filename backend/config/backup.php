@@ -55,19 +55,20 @@ return [
             ],
 
             /*
-             * The names of the connections to the databases that should be backed up
-             * Using PostgreSQL for the attendance platform.
+             * The names of the connections to the databases that should be backed up.
+             * Uses the default database connection from .env (supports pgsql, mysql, sqlite).
              */
             'databases' => [
-                'pgsql',
+                env('DB_CONNECTION', 'pgsql'),
             ],
         ],
 
         /*
          * The database dump can be compressed to decrease disk space usage.
-         * Using Gzip compression for efficient storage.
+         * On Windows without gzip, set to null to disable compression.
+         * On Linux/production servers, use GzipCompressor::class.
          */
-        'database_dump_compressor' => GzipCompressor::class,
+        'database_dump_compressor' => env('BACKUP_USE_GZIP', false) ? GzipCompressor::class : null,
 
         /*
          * Database dump filename will contain a timestamp for easy identification.
@@ -102,12 +103,13 @@ return [
 
             /*
              * The disk names on which the backups will be stored.
-             * Local first (temporary), then synced to S3 for offsite storage.
+             * Local always included, S3 only when BACKUP_AWS_BUCKET is configured.
+             * This prevents errors when S3 is not set up in development.
              */
-            'disks' => [
+            'disks' => array_filter([
                 'local',
-                'backups-s3',
-            ],
+                env('BACKUP_AWS_BUCKET') ? 'backups-s3' : null,
+            ]),
         ],
 
         /*
@@ -192,8 +194,11 @@ return [
      */
     'monitor_backups' => [
         [
-            'name' => config('app.name', 'AbsensiQRPro'),
-            'disks' => ['local', 'backups-s3'],
+            'name' => env('APP_NAME', 'AbsensiQRPro'),
+            'disks' => array_filter([
+                'local',
+                env('BACKUP_AWS_BUCKET') ? 'backups-s3' : null,
+            ]),
             'health_checks' => [
                 // Alert if no backup in last 26 hours (allows for some delay in daily backups)
                 \Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumAgeInDays::class => 1,
@@ -206,7 +211,7 @@ return [
     /*
      * Cleanup strategy with retention policy:
      * - Daily backups: 14 days
-     * - Weekly backups: 8 weeks  
+     * - Weekly backups: 8 weeks
      * - Monthly backups: 6 months
      */
     'cleanup' => [
@@ -219,9 +224,9 @@ return [
             'keep_all_backups_for_days' => 7,
 
             /*
-             * Keep daily backups for 14 days total.
+             * Keep daily backups for 30 days total (requirement: 30-day retention).
              */
-            'keep_daily_backups_for_days' => 14,
+            'keep_daily_backups_for_days' => 30,
 
             /*
              * Keep weekly backups for 8 weeks.

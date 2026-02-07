@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Jobs\SendSecurityAlertNotification;
 use App\Models\BehaviorBaseline;
 use App\Models\BehaviorMetricDaily;
 use App\Models\SecurityAlert;
@@ -11,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Behavior Anomaly Service
- * 
+ *
  * Scoring engine for detecting behavioral anomalies.
  * Uses rule-based scoring against established baselines.
  */
@@ -19,23 +18,36 @@ class BehaviorAnomalyService
 {
     // Scoring rules
     private const SCORE_SCAN_VOLUME_ANOMALY = 2;
+
     private const SCORE_FAILURE_SPIKE = 2;
+
     private const SCORE_RAPID_SCANNING = 3;
+
     private const SCORE_LOCATION_ABUSE = 3;
+
     private const SCORE_DEVICE_ABUSE = 4;
+
     private const SCORE_SCHEDULE_ABUSE = 2;
+
     private const SCORE_QR_REPLAY_ABUSE = 4;
 
     // Thresholds
     private const THRESHOLD_SCAN_MULTIPLIER = 2.0;    // 2x baseline = anomaly
+
     private const THRESHOLD_FAILURE_MULTIPLIER = 3.0; // 3x baseline = anomaly
+
     private const THRESHOLD_RAPID_SCAN_SECONDS = 3;   // < 3 seconds = suspicious
+
     private const THRESHOLD_OUTSIDE_RADIUS_COUNT = 3;
+
     private const THRESHOLD_DEVICE_MISMATCH_COUNT = 2;
+
     private const THRESHOLD_SCHEDULE_MISMATCH_COUNT = 3;
+
     private const THRESHOLD_QR_REPLAY_COUNT = 2;
 
     protected BehaviorBaselineService $baselineService;
+
     protected SecurityAlertService $alertService;
 
     public function __construct(
@@ -52,7 +64,7 @@ class BehaviorAnomalyService
     public function analyzeTodayBehavior(int $userId): array
     {
         $user = User::find($userId);
-        if (!$user) {
+        if (! $user) {
             return $this->emptyResult('User not found');
         }
 
@@ -61,13 +73,13 @@ class BehaviorAnomalyService
             ->forDate(today())
             ->first();
 
-        if (!$todayMetrics) {
+        if (! $todayMetrics) {
             return $this->emptyResult('No activity today');
         }
 
         // Get baseline
         $baseline = $this->baselineService->getBaseline($userId);
-        if (!$baseline) {
+        if (! $baseline) {
             $baseline = BehaviorBaseline::getOrCreateForUser($userId, $user->school_id);
         }
 
@@ -77,7 +89,7 @@ class BehaviorAnomalyService
         $riskLevel = BehaviorBaseline::scoreToRiskLevel($totalScore);
 
         // Get triggered flags (non-zero scores)
-        $triggeredFlags = array_keys(array_filter($scoreBreakdown, fn($item) => $item['score'] > 0));
+        $triggeredFlags = array_keys(array_filter($scoreBreakdown, fn ($item) => $item['score'] > 0));
 
         return [
             'user_id' => $userId,
@@ -214,7 +226,7 @@ class BehaviorAnomalyService
      */
     private function scoreRapidScanning(BehaviorMetricDaily $today): array
     {
-        $triggered = $today->avg_scan_interval_seconds !== null 
+        $triggered = $today->avg_scan_interval_seconds !== null
                   && $today->avg_scan_interval_seconds < self::THRESHOLD_RAPID_SCAN_SECONDS
                   && $today->total_scans >= 5; // Need enough scans to be meaningful
 
@@ -306,7 +318,7 @@ class BehaviorAnomalyService
     public function processAndAlert(int $userId): array
     {
         $analysis = $this->analyzeTodayBehavior($userId);
-        
+
         if ($analysis['total_score'] === null) {
             return $analysis;
         }
@@ -334,7 +346,9 @@ class BehaviorAnomalyService
     private function handleEscalation(int $userId, array $analysis, BehaviorBaseline $baseline): void
     {
         $user = User::find($userId);
-        if (!$user) return;
+        if (! $user) {
+            return;
+        }
 
         // Create security alert for suspicious+ behavior
         if (in_array($analysis['risk_level'], [

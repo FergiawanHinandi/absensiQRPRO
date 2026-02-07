@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignId('issued_by')->constrained('users'); // Admin ID
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            
+
             // Ensure only one active card per student if desired, or just index
             // $table->unique(['student_id', 'is_active']); // Optional, but let's keep it flexible
         });

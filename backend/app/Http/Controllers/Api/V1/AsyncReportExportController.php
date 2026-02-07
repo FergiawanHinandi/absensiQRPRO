@@ -8,14 +8,13 @@ use App\Jobs\GenerateReportExport;
 use App\Models\ReportExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Async Report Export Controller
- * 
+ *
  * Handles asynchronous report generation with:
  * - Rate limiting (5 exports per hour per user)
  * - Queue-based processing
@@ -28,15 +27,13 @@ class AsyncReportExportController extends Controller
      * Rate limit: exports per hour per user
      */
     private const RATE_LIMIT_EXPORTS = 5;
+
     private const RATE_LIMIT_DECAY_SECONDS = 3600; // 1 hour
 
     /**
      * Create a new report export job
-     * 
+     *
      * POST /api/v1/reports/export
-     * 
-     * @param ExportReportRequest $request
-     * @return JsonResponse
      */
     public function create(ExportReportRequest $request): JsonResponse
     {
@@ -44,11 +41,11 @@ class AsyncReportExportController extends Controller
 
         // Check rate limit
         $rateLimitKey = "report_export:{$user->id}";
-        
+
         if (RateLimiter::tooManyAttempts($rateLimitKey, self::RATE_LIMIT_EXPORTS)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
             $minutes = ceil($seconds / 60);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => "Terlalu banyak permintaan export. Coba lagi dalam {$minutes} menit.",
@@ -97,12 +94,8 @@ class AsyncReportExportController extends Controller
 
     /**
      * Get export job status
-     * 
+     *
      * GET /api/v1/reports/export/{job_id}/status
-     * 
-     * @param Request $request
-     * @param string $jobId
-     * @return JsonResponse
      */
     public function status(Request $request, string $jobId): JsonResponse
     {
@@ -112,7 +105,7 @@ class AsyncReportExportController extends Controller
             ->where('user_id', $user->id) // Security: only own exports
             ->first();
 
-        if (!$export) {
+        if (! $export) {
             return response()->json([
                 'success' => false,
                 'message' => 'Export tidak ditemukan.',
@@ -148,11 +141,9 @@ class AsyncReportExportController extends Controller
 
     /**
      * Download completed export
-     * 
+     *
      * GET /api/v1/reports/export/{job_id}/download
-     * 
-     * @param Request $request
-     * @param string $jobId
+     *
      * @return JsonResponse|StreamedResponse
      */
     public function download(Request $request, string $jobId)
@@ -163,14 +154,14 @@ class AsyncReportExportController extends Controller
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$export) {
+        if (! $export) {
             return response()->json([
                 'success' => false,
                 'message' => 'Export tidak ditemukan.',
             ], 404);
         }
 
-        if (!$export->isReady()) {
+        if (! $export->isReady()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Export belum siap untuk diunduh.',
@@ -195,6 +186,7 @@ class AsyncReportExportController extends Controller
                 $export->file_path,
                 now()->addMinutes(30)
             );
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -205,15 +197,15 @@ class AsyncReportExportController extends Controller
         }
 
         // For local storage, stream the file
-        if (!Storage::exists($export->file_path)) {
+        if (! Storage::exists($export->file_path)) {
             return response()->json([
                 'success' => false,
                 'message' => 'File tidak ditemukan di server.',
             ], 404);
         }
 
-        $mimeType = $export->format === 'pdf' 
-            ? 'application/pdf' 
+        $mimeType = $export->format === 'pdf'
+            ? 'application/pdf'
             : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
         return Storage::download(
@@ -225,11 +217,8 @@ class AsyncReportExportController extends Controller
 
     /**
      * List user's export history
-     * 
+     *
      * GET /api/v1/reports/export/history
-     * 
-     * @param Request $request
-     * @return JsonResponse
      */
     public function history(Request $request): JsonResponse
     {
@@ -252,7 +241,7 @@ class AsyncReportExportController extends Controller
                     'created_at' => $export->created_at->toIso8601String(),
                     'completed_at' => $export->completed_at?->toIso8601String(),
                     'expires_at' => $export->expires_at?->toIso8601String(),
-                    'is_downloadable' => $export->isReady() && !$export->isExpired(),
+                    'is_downloadable' => $export->isReady() && ! $export->isExpired(),
                 ];
             });
 
@@ -275,12 +264,8 @@ class AsyncReportExportController extends Controller
 
     /**
      * Cancel a pending export
-     * 
+     *
      * DELETE /api/v1/reports/export/{job_id}
-     * 
-     * @param Request $request
-     * @param string $jobId
-     * @return JsonResponse
      */
     public function cancel(Request $request, string $jobId): JsonResponse
     {
@@ -290,7 +275,7 @@ class AsyncReportExportController extends Controller
             ->where('user_id', $user->id)
             ->first();
 
-        if (!$export) {
+        if (! $export) {
             return response()->json([
                 'success' => false,
                 'message' => 'Export tidak ditemukan.',

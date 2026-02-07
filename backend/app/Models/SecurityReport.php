@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SecurityReport extends Model
 {
-    use HasFactory, BelongsToSchool;
+    use BelongsToSchool, HasFactory;
 
     /**
      * The attributes that are mass assignable.
@@ -41,14 +41,18 @@ class SecurityReport extends Model
      * Risk level constants.
      */
     public const RISK_LOW = 'low';
+
     public const RISK_MEDIUM = 'medium';
+
     public const RISK_HIGH = 'high';
+
     public const RISK_CRITICAL = 'critical';
 
     /**
      * Generation type constants.
      */
     public const GENERATION_MANUAL = 'manual';
+
     public const GENERATION_AUTO = 'auto';
 
     /**
@@ -120,7 +124,7 @@ class SecurityReport extends Model
      */
     public function getFullPathAttribute(): string
     {
-        return storage_path('app/' . $this->file_path);
+        return storage_path('app/'.$this->file_path);
     }
 
     /**

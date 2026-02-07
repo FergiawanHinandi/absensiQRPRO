@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 class TeacherAttendanceService
 {
     protected QRCodeService $qrCodeService;
+
     protected GeofenceService $geofenceService;
 
     /**
@@ -26,7 +27,6 @@ class TeacherAttendanceService
      * 3. Must be within 50m school radius
      * 4. Must be during working hours
      */
-
     public function __construct(QRCodeService $qrCodeService, GeofenceService $geofenceService)
     {
         $this->qrCodeService = $qrCodeService;
@@ -36,9 +36,9 @@ class TeacherAttendanceService
     /**
      * Process teacher check-in via QR scan
      *
-     * @param User $teacher The authenticated teacher
-     * @param array $data Scan data including qr_token, lat, lng, accuracy, device_id, is_mock_location
-     * @return TeacherAttendance
+     * @param  User  $teacher  The authenticated teacher
+     * @param  array  $data  Scan data including qr_token, lat, lng, accuracy, device_id, is_mock_location
+     *
      * @throws Exception
      */
     public function processCheckIn(User $teacher, array $data): TeacherAttendance
@@ -85,7 +85,7 @@ class TeacherAttendanceService
                 }
 
                 // 7b. Create or update attendance record
-                $attendance = $existing ?? new TeacherAttendance();
+                $attendance = $existing ?? new TeacherAttendance;
                 $attendance->fill([
                     'school_id' => $schoolId,
                     'teacher_id' => $teacher->id,
@@ -145,7 +145,7 @@ class TeacherAttendanceService
                 // Must have checked in first
                 $attendance = TeacherAttendance::getTodayForTeacher($teacher->id, lock: true);
 
-                if (!$attendance || !$attendance->check_in_time) {
+                if (! $attendance || ! $attendance->check_in_time) {
                     throw new Exception('Anda belum melakukan check-in hari ini.');
                 }
 
@@ -199,13 +199,13 @@ class TeacherAttendanceService
     {
         $deviceId = $data['device_id'] ?? null;
 
-        if (!$deviceId) {
+        if (! $deviceId) {
             throw new Exception('ID perangkat tidak ditemukan dalam permintaan.');
         }
 
         $device = TeacherDevice::getApprovedDevice($teacher->id, $deviceId);
 
-        if (!$device) {
+        if (! $device) {
             // 9. LOG ANOMALY - New device attempt
             $this->logAnomaly($teacher, null, 'new_device_attempt', 'high', [
                 'message' => 'Percobaan akses dari perangkat tidak terdaftar/belum disetujui',
@@ -248,11 +248,11 @@ class TeacherAttendanceService
     {
         $maxRadius = 50; // CRITICAL: 50 meters
 
-        if (!$school || !$school->latitude || !$school->longitude) {
+        if (! $school || ! $school->latitude || ! $school->longitude) {
             throw new Exception('Koordinat sekolah belum dikonfigurasi. Hubungi admin.');
         }
 
-        if (!isset($data['lat']) || !isset($data['lng'])) {
+        if (! isset($data['lat']) || ! isset($data['lng'])) {
             throw new Exception('Lokasi GPS tidak tersedia. Pastikan GPS aktif.');
         }
 
@@ -265,7 +265,7 @@ class TeacherAttendanceService
             $maxRadius
         );
 
-        if (!$geofenceResult['is_within_radius']) {
+        if (! $geofenceResult['is_within_radius']) {
             // 9. LOG ANOMALY - Outside radius attempt
             $this->logAnomaly($teacher, null, 'outside_radius', 'high', [
                 'message' => "Percobaan absen dari luar area sekolah ({$geofenceResult['distance_meters']}m)",
@@ -331,8 +331,8 @@ class TeacherAttendanceService
         $workEndTime = $settings['work_end_time'] ?? '16:00';
 
         // Parse times for today
-        $workStart = now()->setTimeFromTimeString($workStartTime . ':00');
-        $workEnd = now()->setTimeFromTimeString($workEndTime . ':00');
+        $workStart = now()->setTimeFromTimeString($workStartTime.':00');
+        $workEnd = now()->setTimeFromTimeString($workEndTime.':00');
 
         // Calculate allowed windows
         $earliestCheckIn = $workStart->copy()->subMinutes($gracePeriod);
@@ -340,16 +340,16 @@ class TeacherAttendanceService
 
         // Check if current time is within window
         if ($now->lt($earliestCheckIn)) {
-            throw new Exception("Belum waktunya absen. Waktu absen dimulai pukul " . $earliestCheckIn->format('H:i') . ".");
+            throw new Exception('Belum waktunya absen. Waktu absen dimulai pukul '.$earliestCheckIn->format('H:i').'.');
         }
 
         if ($now->gt($latestCheckIn)) {
-            throw new Exception("Waktu absen sudah berakhir. Batas waktu absen adalah pukul " . $latestCheckIn->format('H:i') . ".");
+            throw new Exception('Waktu absen sudah berakhir. Batas waktu absen adalah pukul '.$latestCheckIn->format('H:i').'.');
         }
 
         // Determine status (present vs late)
         $lateThreshold = $workStart->copy()->addMinutes(15); // 15 min grace for "on time"
-        
+
         if ($now->gt($lateThreshold)) {
             return 'late';
         }
@@ -417,6 +417,7 @@ class TeacherAttendanceService
                     'is_manual' => true,
                     'recorded_by' => $recordedBy,
                 ]);
+
                 return $existing;
             }
 

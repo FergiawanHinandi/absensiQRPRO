@@ -99,7 +99,7 @@ class StudentQrController extends Controller
             \Illuminate\Support\Facades\Log::error('StudentQr validation unexpected error', [
                 'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'valid' => false,
                 'message' => 'Terjadi kesalahan saat memvalidasi QR.',

@@ -11,13 +11,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
-use Laravel\Sanctum\NewAccessToken;
 use Laravel\Sanctum\PersonalAccessToken;
 
 /**
  * Token Hardening Service
- * 
+ *
  * Implements secure token management with:
  * - Short-lived access tokens (30 min)
  * - Refresh token rotation
@@ -29,12 +27,13 @@ class TokenHardeningService
     /**
      * Access token lifetime in minutes
      */
-    public const ACCESS_TOKEN_LIFETIME_MINUTES = 30;
+    public const ACCESS_TOKEN_LIFETIME_MINUTES = 15;
 
     /**
      * Refresh rate limit: max attempts per minute
      */
     public const REFRESH_RATE_LIMIT = 5;
+
     public const REFRESH_RATE_WINDOW_MINUTES = 1;
 
     /**
@@ -43,6 +42,7 @@ class TokenHardeningService
     public const BOUND_ROLES = ['super_admin', 'school_admin'];
 
     protected ?ImmutableSecurityLogService $immutableLogService = null;
+
     protected ?SecurityAlertService $alertService = null;
 
     /**
@@ -53,6 +53,7 @@ class TokenHardeningService
         if ($this->immutableLogService === null) {
             $this->immutableLogService = app(ImmutableSecurityLogService::class);
         }
+
         return $this->immutableLogService;
     }
 
@@ -64,6 +65,7 @@ class TokenHardeningService
         if ($this->alertService === null) {
             $this->alertService = app(SecurityAlertService::class);
         }
+
         return $this->alertService;
     }
 
@@ -73,7 +75,7 @@ class TokenHardeningService
 
     /**
      * Issue new access and refresh tokens for a user (login flow).
-     * 
+     *
      * @return array{access_token: string, refresh_token: string, expires_in: int, token_type: string}
      */
     public function issueTokens(User $user, Request $request, string $tokenName = 'auth'): array
@@ -89,9 +91,9 @@ class TokenHardeningService
         return DB::transaction(function () use ($user, $deviceInfo, $tokenName, $isAdmin) {
             // Create short-lived access token
             $expiresAt = now()->addMinutes(self::ACCESS_TOKEN_LIFETIME_MINUTES);
-            
+
             $accessToken = $user->createToken($tokenName, ['*'], $expiresAt);
-            
+
             // Add device binding to access token for admins
             if ($isAdmin) {
                 $this->bindAccessToken($accessToken->accessToken, $deviceInfo);
@@ -135,14 +137,14 @@ class TokenHardeningService
     /**
      * Refresh tokens using a valid refresh token.
      * Implements rotation: old refresh token is revoked, new one issued.
-     * 
+     *
      * @throws \Exception If refresh token is invalid or rate limited
      */
     public function refreshTokens(string $refreshTokenPlaintext, Request $request): array
     {
         $refreshToken = RefreshToken::findByPlaintext($refreshTokenPlaintext);
 
-        if (!$refreshToken) {
+        if (! $refreshToken) {
             throw new \Exception('Invalid refresh token', 401);
         }
 
@@ -223,14 +225,14 @@ class TokenHardeningService
 
     /**
      * Validate access token binding (called by middleware).
-     * 
+     *
      * @throws \Exception If binding validation fails
      */
     public function validateAccessToken(PersonalAccessToken $token, Request $request): void
     {
         $user = $token->tokenable;
 
-        if (!$this->isAdminRole($user)) {
+        if (! $this->isAdminRole($user)) {
             return; // Non-admin tokens don't need binding validation
         }
 
@@ -267,8 +269,10 @@ class TokenHardeningService
         }
 
         // Country change check
-        if ($token->initial_country && $deviceInfo['country'] && 
-            $token->initial_country !== $deviceInfo['country']) {
+        if (
+            $token->initial_country && $deviceInfo['country'] &&
+            $token->initial_country !== $deviceInfo['country']
+        ) {
             $this->handleCountryChangeRefresh($user, $token, $deviceInfo);
             $token->revoke(RefreshToken::REVOKED_IP_COUNTRY_CHANGE);
             throw new \Exception('Location change detected', 401);
@@ -344,6 +348,7 @@ class TokenHardeningService
         // Simplified device name extraction
         if (preg_match('/\(([^)]+)\)/', $userAgent, $matches)) {
             $info = $matches[1];
+
             // Truncate if too long
             return substr($info, 0, 100);
         }
@@ -356,7 +361,7 @@ class TokenHardeningService
      */
     protected function getCountryFromIp(?string $ip): ?string
     {
-        if (!$ip || $ip === '127.0.0.1' || str_starts_with($ip, '192.168.') || str_starts_with($ip, '10.')) {
+        if (! $ip || $ip === '127.0.0.1' || str_starts_with($ip, '192.168.') || str_starts_with($ip, '10.')) {
             return null; // Skip local IPs
         }
 
@@ -368,17 +373,21 @@ class TokenHardeningService
 
             // Fallback: check cache first
             $cacheKey = "geoip:country:{$ip}";
+
             return Cache::remember($cacheKey, 3600, function () use ($ip) {
                 // Use free GeoIP service as fallback
                 $response = @file_get_contents("http://ip-api.com/json/{$ip}?fields=countryCode");
                 if ($response) {
                     $data = json_decode($response, true);
+
                     return $data['countryCode'] ?? null;
                 }
+
                 return null;
             });
         } catch (\Exception $e) {
             Log::warning('GeoIP lookup failed', ['ip' => $ip, 'error' => $e->getMessage()]);
+
             return null;
         }
     }
@@ -394,6 +403,7 @@ class TokenHardeningService
     {
         $key = "token:refresh:rate:{$userId}";
         $attempts = (int) Cache::get($key, 0);
+
         return $attempts >= self::REFRESH_RATE_LIMIT;
     }
 
@@ -423,7 +433,7 @@ class TokenHardeningService
         // Log immutable security event
         $this->getImmutableLogService()->write(
             ImmutableSecurityLog::TYPE_ADMIN_ACTION,
-            "Token refresh abuse detected - all tokens revoked",
+            'Token refresh abuse detected - all tokens revoked',
             $user->id,
             $user->school_id,
             [
@@ -467,7 +477,7 @@ class TokenHardeningService
 
         $this->getImmutableLogService()->write(
             ImmutableSecurityLog::TYPE_ADMIN_ACTION,
-            "Revoked refresh token reuse detected - potential session hijacking",
+            'Revoked refresh token reuse detected - potential session hijacking',
             $user->id,
             $user->school_id,
             [
@@ -518,7 +528,7 @@ class TokenHardeningService
 
         $this->getImmutableLogService()->write(
             ImmutableSecurityLog::TYPE_DEVICE_MISMATCH,
-            "Device fingerprint mismatch - admin token revoked",
+            'Device fingerprint mismatch - admin token revoked',
             $user->id,
             $user->school_id,
             [
@@ -564,7 +574,7 @@ class TokenHardeningService
 
         $this->getImmutableLogService()->write(
             ImmutableSecurityLog::TYPE_ADMIN_ACTION,
-            "IP country change detected - admin token revoked",
+            'IP country change detected - admin token revoked',
             $user->id,
             $user->school_id,
             [
@@ -601,7 +611,7 @@ class TokenHardeningService
     {
         $this->getImmutableLogService()->write(
             ImmutableSecurityLog::TYPE_DEVICE_MISMATCH,
-            "Device mismatch on token refresh - potential token theft",
+            'Device mismatch on token refresh - potential token theft',
             $user->id,
             $user->school_id,
             [
@@ -635,7 +645,7 @@ class TokenHardeningService
     {
         $this->getImmutableLogService()->write(
             ImmutableSecurityLog::TYPE_ADMIN_ACTION,
-            "Country change on token refresh - session terminated",
+            'Country change on token refresh - session terminated',
             $user->id,
             $user->school_id,
             [
@@ -680,8 +690,8 @@ class TokenHardeningService
             ->where('initial_country', $deviceInfo['country'])
             ->exists() : true;
 
-        if (!$knownDevice || !$knownCountry) {
-            $this->sendNewDeviceAlert($user, $deviceInfo, !$knownDevice, !$knownCountry);
+        if (! $knownDevice || ! $knownCountry) {
+            $this->sendNewDeviceAlert($user, $deviceInfo, ! $knownDevice, ! $knownCountry);
         }
     }
 
@@ -691,13 +701,17 @@ class TokenHardeningService
     protected function sendNewDeviceAlert(User $user, array $deviceInfo, bool $newDevice, bool $newCountry): void
     {
         $reasons = [];
-        if ($newDevice) $reasons[] = 'new device';
-        if ($newCountry) $reasons[] = "new country ({$deviceInfo['country']})";
+        if ($newDevice) {
+            $reasons[] = 'new device';
+        }
+        if ($newCountry) {
+            $reasons[] = "new country ({$deviceInfo['country']})";
+        }
 
         $this->getAlertService()->createAlert(
             'admin_new_device_login',
             SecurityAlert::SEVERITY_MEDIUM,
-            "Admin login from " . implode(' and ', $reasons) . ": {$user->email}",
+            'Admin login from ' . implode(' and ', $reasons) . ": {$user->email}",
             [
                 'user_id' => $user->id,
                 'email' => $user->email,
@@ -777,7 +791,7 @@ class TokenHardeningService
             ->orderByDesc('last_used_at')
             ->get();
 
-        return $refreshTokens->map(function ($token) use ($user) {
+        return $refreshTokens->map(function ($token) {
             return [
                 'id' => $token->id,
                 'device_name' => $token->device_name,
@@ -800,11 +814,12 @@ class TokenHardeningService
             ->where('id', $refreshTokenId)
             ->first();
 
-        if (!$token) {
+        if (! $token) {
             return false;
         }
 
         $token->revoke(RefreshToken::REVOKED_MANUAL);
+
         return true;
     }
 }

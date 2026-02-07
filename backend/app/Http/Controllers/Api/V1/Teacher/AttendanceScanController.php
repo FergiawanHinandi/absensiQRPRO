@@ -3,15 +3,11 @@
 namespace App\Http\Controllers\Api\V1\Teacher;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attendance;
+use App\Models\TeachingSession;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
-use App\Models\TeachingSession;
-use App\Models\Attendance;
-use App\Models\Student;
 
 class AttendanceScanController extends Controller
 {
@@ -31,12 +27,13 @@ class AttendanceScanController extends Controller
         $now = Carbon::now();
         // Validate signature
         $expectedSignature = hash_hmac('sha256', json_encode(array_except($payload, ['signature'])), config('app.key'));
-        if (!hash_equals($expectedSignature, $payload['signature'])) {
+        if (! hash_equals($expectedSignature, $payload['signature'])) {
             Log::channel('attendance')->warning('invalid_qr_signature', [
                 'student_id' => $student->id,
                 'session_id' => $session->id,
                 'timestamp' => $now,
             ]);
+
             return response()->json(['success' => false, 'message' => 'Invalid QR signature'], 422);
         }
         // Check expiry
@@ -66,6 +63,7 @@ class AttendanceScanController extends Controller
             'session_id' => $session->id,
             'timestamp' => $now,
         ]);
+
         return response()->json(['success' => true, 'message' => 'Attendance recorded']);
     }
 }

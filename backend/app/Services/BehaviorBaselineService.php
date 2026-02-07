@@ -7,12 +7,11 @@ use App\Models\BehaviorMetricDaily;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Behavior Baseline Service
- * 
+ *
  * Calculates and maintains rolling 14-day behavioral baselines for teachers.
  * These baselines are used as reference points for anomaly detection.
  */
@@ -39,7 +38,7 @@ class BehaviorBaselineService
     public function calculateBaseline(int $userId): ?BehaviorBaseline
     {
         $user = User::find($userId);
-        if (!$user || $user->role_type !== 'teacher') {
+        if (! $user || $user->role_type !== 'teacher') {
             return null;
         }
 
@@ -51,6 +50,7 @@ class BehaviorBaselineService
 
         if ($metrics->isEmpty()) {
             Log::debug("No metrics found for user {$userId} in baseline period");
+
             return BehaviorBaseline::getOrCreateForUser($userId, $user->school_id);
         }
 
@@ -85,7 +85,7 @@ class BehaviorBaselineService
     private function calculateStatistics(Collection $metrics): array
     {
         $count = $metrics->count();
-        
+
         // Calculate averages
         $avgScans = $metrics->avg('total_scans') ?? 0;
         $avgSuccessful = $metrics->avg('successful_scans') ?? 0;
@@ -93,7 +93,7 @@ class BehaviorBaselineService
         $avgDeviceMismatch = $metrics->avg('device_mismatch_attempts') ?? 0;
         $avgScheduleMismatch = $metrics->avg('schedule_mismatch_attempts') ?? 0;
         $avgScanInterval = $metrics->whereNotNull('avg_scan_interval_seconds')
-                                   ->avg('avg_scan_interval_seconds');
+            ->avg('avg_scan_interval_seconds');
 
         // Calculate failed ratio per day, then average
         $failedRatios = $metrics->map(function ($m) {
@@ -106,7 +106,7 @@ class BehaviorBaselineService
         $stddevFailedRatio = $this->calculateStdDev($failedRatios);
         $stddevScanInterval = $this->calculateStdDev(
             $metrics->whereNotNull('avg_scan_interval_seconds')
-                    ->pluck('avg_scan_interval_seconds')
+                ->pluck('avg_scan_interval_seconds')
         );
 
         return [
@@ -134,8 +134,8 @@ class BehaviorBaselineService
         }
 
         $mean = $values->avg();
-        $squaredDiffs = $values->map(fn($v) => pow($v - $mean, 2));
-        
+        $squaredDiffs = $values->map(fn ($v) => pow($v - $mean, 2));
+
         return sqrt($squaredDiffs->sum() / ($count - 1));
     }
 
@@ -236,14 +236,14 @@ class BehaviorBaselineService
     public function compareToBaseline(int $userId, ?BehaviorMetricDaily $todayMetrics = null): array
     {
         $baseline = $this->getBaseline($userId);
-        
-        if (!$todayMetrics) {
+
+        if (! $todayMetrics) {
             $todayMetrics = BehaviorMetricDaily::forUser($userId)
                 ->forDate(today())
                 ->first();
         }
 
-        if (!$baseline || !$todayMetrics) {
+        if (! $baseline || ! $todayMetrics) {
             return [
                 'has_data' => false,
                 'baseline' => null,
@@ -293,6 +293,7 @@ class BehaviorBaselineService
         }
 
         $zScore = abs($value - $mean) / $stddev;
+
         return $zScore > $threshold;
     }
 }

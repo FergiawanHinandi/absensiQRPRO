@@ -88,12 +88,12 @@ class HealthController extends Controller
             // Check if Redis is configured and running
             $redisHost = config('database.redis.default.host');
             $redisPort = config('database.redis.default.port');
-            
+
             // Quick connection test with timeout
             $timeout = 2; // 2 seconds timeout
             $socket = @fsockopen($redisHost, $redisPort, $errno, $errstr, $timeout);
-            
-            if (!$socket) {
+
+            if (! $socket) {
                 return [
                     'status' => 'warning',
                     'message' => "Redis server not running at {$redisHost}:{$redisPort}",

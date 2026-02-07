@@ -18,7 +18,7 @@ class CertificateService
         // 1. Prepare Data
         $school = $student->school;
         $className = 'Unknown Class';
-        
+
         $classMembership = $student->classStudents()->where('status', 'active')->first();
         if ($classMembership && $classMembership->class) {
             $className = $classMembership->class->name;
@@ -37,9 +37,9 @@ class CertificateService
         // 2. Generate PDF
         $pdf = Pdf::loadView('pdfs.certificate', $data);
         $pdf->setPaper('a4', 'landscape');
-        
+
         // 3. Define Filename
-        $code = 'CERT-' . $year . '-' . Str::upper(Str::slug($semester)) . '-' . $student->id . '-' . Str::upper(Str::random(4));
+        $code = 'CERT-'.$year.'-'.Str::upper(Str::slug($semester)).'-'.$student->id.'-'.Str::upper(Str::random(4));
         $filename = "certificates/{$year}/{$code}.pdf";
 
         // 4. Save to Storage (Public Disk to be accessible via URL)

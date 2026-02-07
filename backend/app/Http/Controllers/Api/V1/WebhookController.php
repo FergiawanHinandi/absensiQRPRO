@@ -36,22 +36,22 @@ class WebhookController extends Controller
             'access_token',
             'refresh_token',
         ];
-        
+
         $sanitized = $payload;
         foreach ($sensitiveKeys as $key) {
             if (isset($sanitized[$key])) {
                 $sanitized[$key] = '[REDACTED]';
             }
         }
-        
+
         // Also mask partial card numbers if present
         if (isset($sanitized['masked_card'])) {
-            $sanitized['masked_card'] = '****' . substr($sanitized['masked_card'], -4);
+            $sanitized['masked_card'] = '****'.substr($sanitized['masked_card'], -4);
         }
-        
+
         return $sanitized;
     }
-    
+
     public function handlePayment(Request $request)
     {
         // SECURITY FIX: Log sanitized payload only

@@ -1,0 +1,16 @@
+{
+    "timestamp": "2026-02-02T08:47:57.262728Z",
+    "database_stats": {
+        "schools": 38,
+        "users": 1162,
+        "attendances": 0,
+        "security_events": 0
+    },
+    "storage_stats": {
+        "student_photos": 0,
+        "qr_codes": 0,
+        "reports": 0
+    },
+    "php_version": "8.2.12",
+    "laravel_version": "12.49.0"
+}

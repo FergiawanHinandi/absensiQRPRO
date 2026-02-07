@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Core\Services\Attendance\AttendanceService;
 use App\Exceptions\AttendanceException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AttendanceScanRequest;
@@ -19,7 +18,6 @@ class AttendanceController extends Controller
     use \App\Traits\UsesCacheTags, ValidatesSchoolOwnership;
 
     public function __construct(
-        private AttendanceService $attendanceService,
         private AttendanceCheckInService $checkInService
     ) {}
 
@@ -60,6 +58,13 @@ class AttendanceController extends Controller
             if ($result->isSuccessful() && $result->attendance) {
                 $result->attendance->load(['student', 'schedule.class']);
                 \App\Events\StudentAttended::dispatch($result->attendance, $student->school_id);
+
+                \Illuminate\Support\Facades\Log::channel('audit')->info('attendance_scanned', [
+                    'user_id' => $student->id,
+                    'schedule_id' => $result->attendance->schedule_id,
+                    'action' => 'scan_success',
+                    'timestamp' => now(),
+                ]);
             }
 
             // 5. Return response (formatting only)
@@ -116,7 +121,7 @@ class AttendanceController extends Controller
         );
 
         // BUSINESS LOGIC: Delegated to service layer
-        $attendance = $this->attendanceService->manualAttendance(
+        $attendance = $this->checkInService->manualCheckIn(
             [
                 'school_id' => $request->user()->school_id,
                 'student_id' => $validated['student_id'],
@@ -217,10 +222,10 @@ class AttendanceController extends Controller
         // SECURITY FIX: Validate date format before parsing to prevent exception
         $dateParam = $request->query('date');
         $today = now()->toDateString();
-        
+
         if ($dateParam) {
             // Validate date format (YYYY-MM-DD)
-            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateParam)) {
+            if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateParam)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid date format. Use YYYY-MM-DD.',
@@ -235,10 +240,10 @@ class AttendanceController extends Controller
                 ], 422);
             }
         }
-        
+
         $key = "attendance_daily_report_{$schoolId}_{$today}";
         $data = $this->cacheWithTags(['dashboard', "school_{$schoolId}"], $key, 600, function () use ($schoolId, $today) {
-            
+
             // CRITICAL: Single query with aggregation instead of 5 separate queries
             $attendanceStats = \App\Models\Attendance::selectRaw('
                 COUNT(DISTINCT CASE WHEN status = ? THEN student_id END) as present_count,
@@ -247,9 +252,9 @@ class AttendanceController extends Controller
                 COUNT(DISTINCT CASE WHEN status = ? THEN student_id END) as permit_count,
                 COUNT(DISTINCT student_id) as total_attended
             ', ['present', 'late', 'sick', 'permit'])
-            ->where('school_id', $schoolId)
-            ->whereDate('attendance_date', $today)
-            ->first();
+                ->where('school_id', $schoolId)
+                ->whereDate('attendance_date', $today)
+                ->first();
 
             // CRITICAL: Single query for total students
             $totalStudents = \App\Models\User::where('school_id', $schoolId)
@@ -271,9 +276,6 @@ class AttendanceController extends Controller
             ];
         });
 
-        return response()->json([
-            'success' => true,
-            'data' => $data,
-        ]);
+        return response()->success($data);
     }
 }

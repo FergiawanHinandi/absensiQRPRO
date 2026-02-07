@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreignId('student_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('badge_id')->constrained('badges')->onDelete('cascade');
             $table->timestamp('awarded_at')->useCurrent();
-            
+
             $table->unique(['student_id', 'badge_id']); // Prevent duplicate badges
         });
     }

@@ -3,32 +3,34 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\AttendanceUpdateRequest;
 use App\Models\Attendance;
 use App\Models\Schedule;
 use App\Models\User;
 use App\Repositories\OptimizedAttendanceRepository;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Services\AttendanceOperationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
  * AttendanceReportController - Authorized Attendance Access
  *
- * AUTHORIZATION STRATEGY:
+ * CLEAN ARCHITECTURE:
  * - Policy-based authorization via $this->authorize()
+ * - Business logic delegated to AttendanceOperationService
  * - Eager loading to prevent N+1 queries
- * - School isolation enforced at multiple levels
  *
  * CONTROLLER RESPONSIBILITIES:
- * 1. Validate request
- * 2. Authorize action
- * 3. Delegate to repository/service
+ * 1. Validate request (FormRequest)
+ * 2. Authorize action (Policy)
+ * 3. Delegate to service
  * 4. Return response
  */
 class AttendanceReportController extends Controller
 {
     public function __construct(
-        private OptimizedAttendanceRepository $attendanceRepo
+        private OptimizedAttendanceRepository $attendanceRepo,
+        private AttendanceOperationService $operationService
     ) {}
 
     /**
@@ -141,6 +143,7 @@ class AttendanceReportController extends Controller
         // STEP 5: Merge attendance with roster
         $roster = $classStudents->map(function ($student) use ($attendances) {
             $attendance = $attendances->get($student->id);
+
             return [
                 'student_id' => $student->id,
                 'student_name' => $student->name,
@@ -251,47 +254,44 @@ class AttendanceReportController extends Controller
     /**
      * Update attendance (manual only)
      *
-     * Policy: update - Can user update THIS attendance?
+     * CLEAN: FormRequest → Service → Response
+     * All business logic in AttendanceOperationService::update()
      */
-    public function update(Request $request, int $attendanceId): JsonResponse
+    public function update(AttendanceUpdateRequest $request, int $attendanceId): JsonResponse
     {
-        $validated = $request->validate([
-            'status' => 'required|in:present,late,absent,sick,permit,excused',
-            'notes' => 'nullable|string|max:500',
-        ]);
-
-        // STEP 1: Load attendance
         $attendance = Attendance::findOrFail($attendanceId);
 
-        // STEP 2: Authorize - checks school, is_manual, role
+        // Policy authorization
         $this->authorize('update', $attendance);
 
-        // STEP 3: Update
-        $attendance->update([
-            'status' => $validated['status'],
-            'notes' => $validated['notes'] ?? $attendance->notes,
-        ]);
+        // Delegate to service - all logic in service layer
+        $result = $this->operationService->update(
+            $attendance,
+            $request->validated(),
+            $request->user()
+        );
 
         return response()->json([
             'success' => true,
             'message' => 'Absensi berhasil diupdate.',
-            'data' => $attendance->fresh(),
+            'data' => $result,
         ]);
     }
 
     /**
      * Delete attendance
      *
-     * Policy: delete - Only admins can delete (soft delete)
+     * CLEAN: Service handles soft delete with audit logging
      */
     public function destroy(Request $request, int $attendanceId): JsonResponse
     {
         $attendance = Attendance::findOrFail($attendanceId);
 
-        // Authorize deletion
+        // Policy authorization
         $this->authorize('delete', $attendance);
 
-        $attendance->delete(); // Soft delete
+        // Delegate to service
+        $this->operationService->delete($attendance, $request->user());
 
         return response()->json([
             'success' => true,

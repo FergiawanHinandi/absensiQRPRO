@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 /**
  * Teacher Device Management Controller
- * 
+ *
  * Allows school admins to approve, revoke, and manage teacher devices.
  */
 class TeacherDeviceController extends Controller
@@ -20,7 +20,7 @@ class TeacherDeviceController extends Controller
 
     /**
      * List all devices for the school
-     * 
+     *
      * GET /api/v1/school-admin/teacher-devices
      */
     public function index(Request $request): JsonResponse
@@ -33,14 +33,14 @@ class TeacherDeviceController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'devices' => $devices->map(fn($d) => [
+                'devices' => $devices->map(fn ($d) => [
                     'id' => $d->id,
                     'teacher' => [
                         'id' => $d->teacher->id,
                         'name' => $d->teacher->name,
                         'username' => $d->teacher->username,
                     ],
-                    'device_id' => substr($d->device_id, 0, 8) . '...', // Truncated for security
+                    'device_id' => substr($d->device_id, 0, 8).'...', // Truncated for security
                     'device_name' => $d->device_name,
                     'device_model' => $d->device_model,
                     'os_version' => $d->os_version,
@@ -68,7 +68,7 @@ class TeacherDeviceController extends Controller
 
     /**
      * Get pending devices requiring approval
-     * 
+     *
      * GET /api/v1/school-admin/teacher-devices/pending
      */
     public function pending(Request $request): JsonResponse
@@ -80,7 +80,7 @@ class TeacherDeviceController extends Controller
             'success' => true,
             'data' => [
                 'count' => $devices->count(),
-                'devices' => $devices->map(fn($d) => [
+                'devices' => $devices->map(fn ($d) => [
                     'id' => $d->id,
                     'teacher' => [
                         'id' => $d->teacher->id,
@@ -98,7 +98,7 @@ class TeacherDeviceController extends Controller
 
     /**
      * Approve a device
-     * 
+     *
      * POST /api/v1/school-admin/teacher-devices/{id}/approve
      */
     public function approve(Request $request, int $id): JsonResponse
@@ -125,7 +125,7 @@ class TeacherDeviceController extends Controller
 
     /**
      * Revoke a device
-     * 
+     *
      * POST /api/v1/school-admin/teacher-devices/{id}/revoke
      */
     public function revoke(Request $request, int $id): JsonResponse
@@ -142,8 +142,8 @@ class TeacherDeviceController extends Controller
             ->firstOrFail();
 
         $device = $this->deviceService->revokeDevice(
-            $id, 
-            $admin->id, 
+            $id,
+            $admin->id,
             $request->input('reason')
         );
 
@@ -160,7 +160,7 @@ class TeacherDeviceController extends Controller
 
     /**
      * Reactivate a revoked device
-     * 
+     *
      * POST /api/v1/school-admin/teacher-devices/{id}/reactivate
      */
     public function reactivate(Request $request, int $id): JsonResponse
@@ -187,7 +187,7 @@ class TeacherDeviceController extends Controller
 
     /**
      * Bulk approve devices
-     * 
+     *
      * POST /api/v1/school-admin/teacher-devices/bulk-approve
      */
     public function bulkApprove(Request $request): JsonResponse
@@ -218,7 +218,7 @@ class TeacherDeviceController extends Controller
 
     /**
      * Bulk revoke devices
-     * 
+     *
      * POST /api/v1/school-admin/teacher-devices/bulk-revoke
      */
     public function bulkRevoke(Request $request): JsonResponse
@@ -238,8 +238,8 @@ class TeacherDeviceController extends Controller
             ->toArray();
 
         $count = $this->deviceService->bulkRevoke(
-            $deviceIds, 
-            $admin->id, 
+            $deviceIds,
+            $admin->id,
             $request->input('reason')
         );
 
@@ -254,7 +254,7 @@ class TeacherDeviceController extends Controller
 
     /**
      * Get devices for a specific teacher
-     * 
+     *
      * GET /api/v1/school-admin/teachers/{teacherId}/devices
      */
     public function teacherDevices(Request $request, int $teacherId): JsonResponse
@@ -276,7 +276,7 @@ class TeacherDeviceController extends Controller
                     'id' => $teacher->id,
                     'name' => $teacher->name,
                 ],
-                'devices' => $devices->map(fn($d) => [
+                'devices' => $devices->map(fn ($d) => [
                     'id' => $d->id,
                     'device_name' => $d->device_name,
                     'device_model' => $d->device_model,

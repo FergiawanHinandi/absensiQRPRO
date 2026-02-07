@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Certificate;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class RewardController extends Controller
 {
@@ -18,7 +17,7 @@ class RewardController extends Controller
     {
         $user = $request->user();
         $schoolId = $user->school_id;
-        
+
         $query = Certificate::with(['student:id,name,class_students', 'verifier:id,name'])
             ->whereHas('student', function ($q) use ($schoolId) {
                 $q->where('school_id', $schoolId);
@@ -39,7 +38,7 @@ class RewardController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->whereHas('student', function($q) use ($search) {
+            $query->whereHas('student', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%");
             });
         }
@@ -48,7 +47,7 @@ class RewardController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $certificates
+            'data' => $certificates,
         ]);
     }
 
@@ -69,7 +68,7 @@ class RewardController extends Controller
         $certificates = Certificate::where('student_id', $studentId)
             ->orderByDesc('created_at')
             ->get();
-            
+
         $badges = $student->badges()
             ->orderByDesc('student_badges.awarded_at')
             ->get();
@@ -79,8 +78,8 @@ class RewardController extends Controller
             'data' => [
                 'student' => $student->only(['id', 'name', 'profile_photo_url', 'total_points']),
                 'circles' => $certificates,
-                'badges' => $badges
-            ]
+                'badges' => $badges,
+            ],
         ]);
     }
 
@@ -91,28 +90,28 @@ class RewardController extends Controller
     public function redeem(Request $request, $id)
     {
         $certificate = Certificate::findOrFail($id);
-        
+
         // Authorization check (ensure cert belongs to school via student)
         $student = $certificate->student;
-        if (!$student || $student->school_id !== $request->user()->school_id) {
+        if (! $student || $student->school_id !== $request->user()->school_id) {
             abort(403);
         }
 
         $request->validate([
-            'notes' => 'nullable|string|max:500'
+            'notes' => 'nullable|string|max:500',
         ]);
 
         $certificate->update([
             'is_redeemed' => true,
             'redeemed_at' => now(),
             'redeemed_by' => $request->user()->id,
-            'redemption_notes' => $request->input('notes')
+            'redemption_notes' => $request->input('notes'),
         ]);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Reward marked as redeemed.',
-            'data' => $certificate
+            'data' => $certificate,
         ]);
     }
 
@@ -123,9 +122,9 @@ class RewardController extends Controller
     public function destroy(Request $request, $id)
     {
         $certificate = Certificate::findOrFail($id);
-        
+
         $student = $certificate->student;
-        if (!$student || $student->school_id !== $request->user()->school_id) {
+        if (! $student || $student->school_id !== $request->user()->school_id) {
             abort(403);
         }
 
@@ -139,7 +138,7 @@ class RewardController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Reward revoked successfully.'
+            'message' => 'Reward revoked successfully.',
         ]);
     }
 }

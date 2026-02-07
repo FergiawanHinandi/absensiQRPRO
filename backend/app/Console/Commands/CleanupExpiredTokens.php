@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * CleanupExpiredTokens
- * 
+ *
  * Removes expired and revoked refresh tokens and personal access tokens
  * from the database to maintain performance and comply with data retention.
  */
@@ -40,46 +40,46 @@ class CleanupExpiredTokens extends Command
     {
         $daysToKeep = (int) $this->option('days');
         $dryRun = $this->option('dry-run');
-        
+
         $this->info('Starting token cleanup...');
-        
+
         if ($dryRun) {
             $this->warn('DRY RUN - No tokens will be deleted');
         }
-        
+
         $stats = [
             'refresh_tokens_expired' => 0,
             'refresh_tokens_revoked' => 0,
             'access_tokens_expired' => 0,
         ];
-        
+
         // Cleanup expired refresh tokens (keep for audit based on days)
         $expiredRefreshQuery = RefreshToken::where('expires_at', '<', now()->subDays($daysToKeep));
         $stats['refresh_tokens_expired'] = $expiredRefreshQuery->count();
-        
-        if (!$dryRun && $stats['refresh_tokens_expired'] > 0) {
+
+        if (! $dryRun && $stats['refresh_tokens_expired'] > 0) {
             $expiredRefreshQuery->delete();
         }
-        
+
         // Cleanup old revoked refresh tokens (keep revoked ones for audit)
         $revokedRefreshQuery = RefreshToken::whereNotNull('revoked_at')
             ->where('revoked_at', '<', now()->subDays($daysToKeep));
         $stats['refresh_tokens_revoked'] = $revokedRefreshQuery->count();
-        
-        if (!$dryRun && $stats['refresh_tokens_revoked'] > 0) {
+
+        if (! $dryRun && $stats['refresh_tokens_revoked'] > 0) {
             $revokedRefreshQuery->delete();
         }
-        
+
         // Cleanup expired access tokens (personal_access_tokens)
         $expiredAccessQuery = DB::table('personal_access_tokens')
             ->whereNotNull('expires_at')
             ->where('expires_at', '<', now()->subDays($daysToKeep));
         $stats['access_tokens_expired'] = $expiredAccessQuery->count();
-        
-        if (!$dryRun && $stats['access_tokens_expired'] > 0) {
+
+        if (! $dryRun && $stats['access_tokens_expired'] > 0) {
             $expiredAccessQuery->delete();
         }
-        
+
         // Output stats
         $this->table(
             ['Token Type', 'Count'],
@@ -89,21 +89,21 @@ class CleanupExpiredTokens extends Command
                 ['Expired Access Tokens', $stats['access_tokens_expired']],
             ]
         );
-        
+
         $totalDeleted = array_sum($stats);
-        
+
         if ($dryRun) {
             $this->info("Would delete {$totalDeleted} tokens");
         } else {
             $this->info("Deleted {$totalDeleted} tokens");
-            
+
             // Log cleanup activity
             Log::channel('security')->info('Token cleanup completed', [
                 'stats' => $stats,
                 'retention_days' => $daysToKeep,
             ]);
         }
-        
+
         return self::SUCCESS;
     }
 }

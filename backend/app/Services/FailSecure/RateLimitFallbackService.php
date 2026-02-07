@@ -31,8 +31,11 @@ class RateLimitFallbackService
      * Limiter types and their default limits
      */
     public const LIMITER_LOGIN = 'login';
+
     public const LIMITER_SCAN = 'scan';
+
     public const LIMITER_API = 'api';
+
     public const LIMITER_EXPORT = 'export';
 
     /**
@@ -73,10 +76,10 @@ class RateLimitFallbackService
     /**
      * Check if a request should be rate limited
      *
-     * @param string $key Unique identifier (user_id, ip, etc.)
-     * @param string $limiterType Type of rate limiter
-     * @param int|null $maxAttempts Override default max attempts
-     * @param int|null $decayMinutes Override default decay period
+     * @param  string  $key  Unique identifier (user_id, ip, etc.)
+     * @param  string  $limiterType  Type of rate limiter
+     * @param  int|null  $maxAttempts  Override default max attempts
+     * @param  int|null  $decayMinutes  Override default decay period
      * @return array ['limited' => bool, 'remaining' => int, 'retry_after' => int|null]
      */
     public function check(
@@ -116,10 +119,10 @@ class RateLimitFallbackService
     /**
      * Record a hit (increment counter)
      *
-     * @param string $key Unique identifier
-     * @param string $limiterType Type of rate limiter
-     * @param int|null $maxAttempts Override default max attempts
-     * @param int|null $decayMinutes Override default decay period
+     * @param  string  $key  Unique identifier
+     * @param  string  $limiterType  Type of rate limiter
+     * @param  int|null  $maxAttempts  Override default max attempts
+     * @param  int|null  $decayMinutes  Override default decay period
      * @return array ['limited' => bool, 'remaining' => int, 'retry_after' => int|null]
      */
     public function hit(
@@ -162,7 +165,7 @@ class RateLimitFallbackService
 
         try {
             Cache::forget($cacheKey);
-            Cache::forget($cacheKey . ':timer');
+            Cache::forget($cacheKey.':timer');
         } catch (Throwable $e) {
             // Ignore cache errors on clear
         }
@@ -190,6 +193,7 @@ class RateLimitFallbackService
     ): int {
         $maxAttempts = $this->getEffectiveLimit($limiterType, $maxAttempts);
         $result = $this->check($key, $limiterType, $maxAttempts);
+
         return $result['remaining'];
     }
 
@@ -203,6 +207,7 @@ class RateLimitFallbackService
     ): bool {
         $maxAttempts = $this->getEffectiveLimit($limiterType, $maxAttempts);
         $result = $this->check($key, $limiterType, $maxAttempts);
+
         return $result['limited'];
     }
 
@@ -222,7 +227,7 @@ class RateLimitFallbackService
 
         $retryAfter = null;
         if ($hits >= $maxAttempts) {
-            $timerKey = $cacheKey . ':timer';
+            $timerKey = $cacheKey.':timer';
             $timer = Cache::get($timerKey);
             if ($timer) {
                 $retryAfter = max(0, $timer - time());
@@ -258,7 +263,7 @@ class RateLimitFallbackService
             $hits = Cache::increment($cacheKey);
         } else {
             Cache::put($cacheKey, 1, $decaySeconds);
-            Cache::put($cacheKey . ':timer', time() + $decaySeconds, $decaySeconds);
+            Cache::put($cacheKey.':timer', time() + $decaySeconds, $decaySeconds);
             $hits = 1;
         }
 
@@ -266,7 +271,7 @@ class RateLimitFallbackService
 
         $retryAfter = null;
         if ($hits >= $maxAttempts) {
-            $timerKey = $cacheKey . ':timer';
+            $timerKey = $cacheKey.':timer';
             $timer = Cache::get($timerKey);
             if ($timer) {
                 $retryAfter = max(0, $timer - time());
@@ -444,6 +449,7 @@ class RateLimitFallbackService
         // If system is degraded, use stricter limits
         if ($this->failSecureService->isDegraded()) {
             $safeLimit = self::SAFE_LIMITS[$limiterType] ?? (int) ($baseLimit * 0.5);
+
             return min($baseLimit, $safeLimit);
         }
 
@@ -466,6 +472,7 @@ class RateLimitFallbackService
         // Group by decay period windows
         $timestamp = time();
         $windowSize = $decayMinutes * 60;
+
         return (int) floor($timestamp / $windowSize);
     }
 

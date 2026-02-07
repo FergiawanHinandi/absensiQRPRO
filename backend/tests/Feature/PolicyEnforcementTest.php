@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * Multi-Tenant Policy Enforcement Tests
- * 
+ *
  * These tests verify that policies block cross-school access
  * even when global scopes are bypassed.
  */
@@ -22,12 +22,19 @@ class PolicyEnforcementTest extends TestCase
     use RefreshDatabase;
 
     private School $schoolA;
+
     private School $schoolB;
+
     private User $adminA;
+
     private User $adminB;
+
     private User $studentA;
+
     private User $studentB;
+
     private User $teacherA;
+
     private User $teacherB;
 
     protected function setUp(): void

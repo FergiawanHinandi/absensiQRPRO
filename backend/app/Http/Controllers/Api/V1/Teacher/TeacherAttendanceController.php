@@ -22,7 +22,7 @@ class TeacherAttendanceController extends Controller
 
     /**
      * Check-in via QR scan
-     * 
+     *
      * POST /api/v1/teacher/attendance/check-in
      */
     public function checkIn(TeacherAttendanceScanRequest $request): JsonResponse
@@ -40,7 +40,7 @@ class TeacherAttendanceController extends Controller
                         'date' => $attendance->attendance_date->format('Y-m-d'),
                         'status' => $attendance->status,
                         'check_in_time' => $attendance->check_in_time->format('H:i:s'),
-                        'distance' => round($attendance->distance_in, 2) . 'm',
+                        'distance' => round($attendance->distance_in, 2).'m',
                     ],
                 ],
             ]);
@@ -54,7 +54,7 @@ class TeacherAttendanceController extends Controller
 
     /**
      * Check-out via QR scan
-     * 
+     *
      * POST /api/v1/teacher/attendance/check-out
      */
     public function checkOut(TeacherAttendanceScanRequest $request): JsonResponse
@@ -73,7 +73,7 @@ class TeacherAttendanceController extends Controller
                         'status' => $attendance->status,
                         'check_in_time' => $attendance->check_in_time?->format('H:i:s'),
                         'check_out_time' => $attendance->check_out_time->format('H:i:s'),
-                        'work_duration' => $attendance->check_in_time 
+                        'work_duration' => $attendance->check_in_time
                             ? $attendance->check_in_time->diff($attendance->check_out_time)->format('%H:%I:%S')
                             : null,
                     ],
@@ -89,7 +89,7 @@ class TeacherAttendanceController extends Controller
 
     /**
      * Get today's attendance status
-     * 
+     *
      * GET /api/v1/teacher/attendance/today
      */
     public function today(Request $request): JsonResponse
@@ -97,7 +97,7 @@ class TeacherAttendanceController extends Controller
         $teacher = $request->user();
         $attendance = TeacherAttendance::getTodayForTeacher($teacher->id);
 
-        if (!$attendance) {
+        if (! $attendance) {
             return response()->json([
                 'status' => 'success',
                 'message' => 'Belum ada absensi hari ini.',
@@ -120,8 +120,8 @@ class TeacherAttendanceController extends Controller
                     'status' => $attendance->status,
                     'check_in_time' => $attendance->check_in_time?->format('H:i:s'),
                     'check_out_time' => $attendance->check_out_time?->format('H:i:s'),
-                    'distance_in' => $attendance->distance_in ? round($attendance->distance_in, 2) . 'm' : null,
-                    'distance_out' => $attendance->distance_out ? round($attendance->distance_out, 2) . 'm' : null,
+                    'distance_in' => $attendance->distance_in ? round($attendance->distance_in, 2).'m' : null,
+                    'distance_out' => $attendance->distance_out ? round($attendance->distance_out, 2).'m' : null,
                 ],
             ],
         ]);
@@ -129,13 +129,13 @@ class TeacherAttendanceController extends Controller
 
     /**
      * Get attendance history for the authenticated teacher
-     * 
+     *
      * GET /api/v1/teacher/attendance/history
      */
     public function history(Request $request): JsonResponse
     {
         $teacher = $request->user();
-        
+
         $attendances = TeacherAttendance::where('teacher_id', $teacher->id)
             ->orderBy('attendance_date', 'desc')
             ->paginate(20);
@@ -143,7 +143,7 @@ class TeacherAttendanceController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'attendances' => $attendances->map(fn($a) => [
+                'attendances' => $attendances->map(fn ($a) => [
                     'id' => $a->id,
                     'date' => $a->attendance_date->format('Y-m-d'),
                     'day' => $a->attendance_date->translatedFormat('l'),
@@ -164,7 +164,7 @@ class TeacherAttendanceController extends Controller
 
     /**
      * Get attendance summary for a month
-     * 
+     *
      * GET /api/v1/teacher/attendance/summary
      */
     public function summary(Request $request): JsonResponse
@@ -175,7 +175,7 @@ class TeacherAttendanceController extends Controller
 
         $teacher = $request->user();
         $month = $request->input('month', now()->format('Y-m'));
-        
+
         $startDate = \Carbon\Carbon::createFromFormat('Y-m', $month)->startOfMonth();
         $endDate = $startDate->copy()->endOfMonth();
 
@@ -196,13 +196,13 @@ class TeacherAttendanceController extends Controller
 
     /**
      * Get list of teacher's registered devices
-     * 
+     *
      * GET /api/v1/teacher/attendance/devices
      */
     public function devices(Request $request): JsonResponse
     {
         $teacher = $request->user();
-        
+
         $devices = TeacherDevice::where('teacher_id', $teacher->id)
             ->orderBy('is_approved', 'desc')
             ->orderBy('last_used_at', 'desc')
@@ -211,7 +211,7 @@ class TeacherAttendanceController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'devices' => $devices->map(fn($d) => [
+                'devices' => $devices->map(fn ($d) => [
                     'id' => $d->id,
                     'device_id' => $d->device_id,
                     'device_name' => $d->device_name,

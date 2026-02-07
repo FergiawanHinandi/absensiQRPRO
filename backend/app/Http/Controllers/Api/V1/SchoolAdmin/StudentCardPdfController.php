@@ -3,19 +3,17 @@
 namespace App\Http\Controllers\Api\V1\SchoolAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicYear;
 use App\Models\AuditLog;
+use App\Models\ClassModel;
 use App\Models\StudentCard;
 use App\Models\User;
-use App\Models\ClassModel;
-use App\Models\AcademicYear;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
 class StudentCardPdfController extends Controller
@@ -32,7 +30,7 @@ class StudentCardPdfController extends Controller
     {
         // Authorization
         $this->authorize('view', $student); // Ensure admin can view this student
-        
+
         if ($student->school_id !== $request->user()->school_id) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -40,7 +38,7 @@ class StudentCardPdfController extends Controller
         // Check for duplicate photo flag
         if ($student->photo_duplicate_flag) {
             return response()->json([
-                'message' => 'Cannot generate card. Student photo is flagged as a potential duplicate. Please resolve this in the Photo Review section.'
+                'message' => 'Cannot generate card. Student photo is flagged as a potential duplicate. Please resolve this in the Photo Review section.',
             ], 403);
         }
 
@@ -51,16 +49,21 @@ class StudentCardPdfController extends Controller
             ->where('is_active', true)
             ->first();
 
-        if (!$activeCard) {
+        if (! $activeCard) {
             return response()->json(['message' => 'Siswa ini belum memiliki kartu aktif. Silakan generate kartu terlebih dahulu.'], 404);
         }
 
         // Generate QR Code
-        $qrContent = json_encode([
-            'student_id' => $student->id,
-            'card_id' => $activeCard->id,
-            'qr_hash' => $activeCard->qr_hash
-        ]);
+        // Generate QR Code using the decrypted plain token
+        // Fallback to empty if not set (legacy card?), but this shouldn't happen for new cards
+        $plainToken = $activeCard->qr_token_encrypted;
+
+        if (! $plainToken) {
+            return response()->json(['message' => 'Kartu ini format lama/rusak. Harap regenerasi kartu.'], 400);
+        }
+
+        // Format: card_id|plain_token
+        $qrContent = $activeCard->id.'|'.$plainToken;
 
         $qrCodeSvg = $this->generateQrSvg($qrContent);
 
@@ -108,11 +111,11 @@ class StudentCardPdfController extends Controller
         // Get students in class
         $students = User::whereHas('studentClass', function ($query) use ($class) {
             $query->where('class_id', $class->id)
-                  ->where('status', 'active');
+                ->where('status', 'active');
         })
-        ->where('role_type', 'student')
-        ->with(['profile', 'studentClass.class_model'])
-        ->get();
+            ->where('role_type', 'student')
+            ->with(['profile', 'studentClass.class_model'])
+            ->get();
 
         if ($students->isEmpty()) {
             return response()->json(['message' => 'Tidak ada siswa aktif di kelas ini.'], 404);
@@ -120,21 +123,21 @@ class StudentCardPdfController extends Controller
 
         $zipFileName = "kartu-kelas-{$class->name}.zip";
         $zipFilePath = storage_path("app/public/temp/{$zipFileName}");
-        
+
         // Ensure temp directory exists
-        if (!file_exists(dirname($zipFilePath))) {
+        if (! file_exists(dirname($zipFilePath))) {
             mkdir(dirname($zipFilePath), 0755, true);
         }
 
         $zip = new ZipArchive;
-        if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+        if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             return response()->json(['message' => 'Could not create ZIP file'], 500);
         }
 
         $academicYear = AcademicYear::where('school_id', $class->school_id)
             ->where('is_active', true)
             ->first();
-        
+
         $filesToAdd = [];
 
         foreach ($students as $student) {
@@ -147,15 +150,16 @@ class StudentCardPdfController extends Controller
                 ->where('is_active', true)
                 ->first();
 
-            if (!$activeCard) {
+            if (! $activeCard) {
                 continue; // Skip students without active cards
             }
 
-            $qrContent = json_encode([
-                'student_id' => $student->id,
-                'card_id' => $activeCard->id,
-                'qr_hash' => $activeCard->qr_hash
-            ]);
+            $plainToken = $activeCard->qr_token_encrypted;
+            if (! $plainToken) {
+                // Should we skip or include a broken card? Skipping for now.
+                continue;
+            }
+            $qrContent = $activeCard->id.'|'.$plainToken;
 
             $qrCodeSvg = $this->generateQrSvg($qrContent);
 
@@ -169,15 +173,15 @@ class StudentCardPdfController extends Controller
             ]);
 
             $pdf->setPaper([0, 0, 242.64, 153.07], 'landscape');
-            
+
             $fileName = "kartu-{$student->name}.pdf";
             $zip->addFromString($fileName, $pdf->output());
         }
 
         $zip->close();
 
-        if (!file_exists($zipFilePath)) {
-             return response()->json(['message' => 'Failed to generate ZIP file (No valid cards?)'], 500);
+        if (! file_exists($zipFilePath)) {
+            return response()->json(['message' => 'Failed to generate ZIP file (No valid cards?)'], 500);
         }
 
         // Audit Log
@@ -197,9 +201,10 @@ class StudentCardPdfController extends Controller
     {
         $renderer = new ImageRenderer(
             new RendererStyle(200, 0), // size, margin
-            new SvgImageBackEnd()
+            new SvgImageBackEnd
         );
         $writer = new Writer($renderer);
+
         return $writer->writeString($content);
     }
 }

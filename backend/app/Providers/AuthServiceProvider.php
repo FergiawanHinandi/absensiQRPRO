@@ -7,13 +7,17 @@ use App\Models\AttendanceReport;
 use App\Models\ClassModel;
 use App\Models\QrCode;
 use App\Models\Schedule;
+use App\Models\School;
+use App\Models\StudentPermission;
 use App\Models\User;
 use App\Policies\AttendancePolicy;
 use App\Policies\ClassPolicy;
 use App\Policies\QrCodePolicy;
 use App\Policies\ReportPolicy;
 use App\Policies\SchedulePolicy;
+use App\Policies\SchoolPolicy;
 use App\Policies\StudentCardPolicy;
+use App\Policies\StudentPermissionPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -60,6 +64,11 @@ class AuthServiceProvider extends ServiceProvider
         Schedule::class => SchedulePolicy::class,
         AttendanceReport::class => ReportPolicy::class,
         QrCode::class => QrCodePolicy::class,
+        \App\Models\StudentCard::class => StudentCardPolicy::class,
+        // CRITICAL: School Policy - Controls Unit Admin vs Global Admin
+        School::class => SchoolPolicy::class,
+        // CRITICAL: Student Permission Policy - Leave/Izin Management
+        StudentPermission::class => StudentPermissionPolicy::class,
         // CRITICAL: Student Card Policy - Only School Admin Access
         'student-card' => StudentCardPolicy::class,
     ];

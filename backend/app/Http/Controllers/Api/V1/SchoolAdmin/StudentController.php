@@ -120,7 +120,7 @@ class StudentController extends Controller
             ->where('id', $studentId)
             ->exists();
 
-        if (!$studentExists) {
+        if (! $studentExists) {
             return response()->json([
                 'success' => false,
                 'message' => 'Siswa tidak ditemukan atau bukan milik sekolah Anda.',
@@ -134,14 +134,14 @@ class StudentController extends Controller
             'profile:user_id,nisn,phone,address,birth_date,gender',
             'attendances' => function ($query) {
                 $query->select('id', 'student_id', 'attendance_date', 'status', 'check_in_time')
-                      ->latest()
-                      ->limit(5);
-            }
+                    ->latest()
+                    ->limit(5);
+            },
         ])
-        ->where('school_id', $schoolId)
-        ->where('role_type', 'student')
-        ->where('id', $studentId)
-        ->first();
+            ->where('school_id', $schoolId)
+            ->where('role_type', 'student')
+            ->where('id', $studentId)
+            ->first();
 
         // CRITICAL: Final authorization check on loaded model
         $this->authorize('view', $student);
@@ -196,17 +196,17 @@ class StudentController extends Controller
         $query = User::with([
             'classStudent:id,student_id,class_id,status',
             'classStudent.class_model:id,name,grade_level',
-            'profile:user_id,nisn,phone,address'
+            'profile:user_id,nisn,phone,address',
         ])
-        ->where('school_id', $schoolId)
-        ->where('role_type', 'student')
-        ->where('is_active', true);
+            ->where('school_id', $schoolId)
+            ->where('role_type', 'student')
+            ->where('is_active', true);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ILIKE', "%{$search}%")
-                  ->orWhere('username', 'ILIKE', "%{$search}%")
-                  ->orWhere('email', 'ILIKE', "%{$search}%");
+                    ->orWhere('username', 'ILIKE', "%{$search}%")
+                    ->orWhere('email', 'ILIKE', "%{$search}%");
             });
         }
 

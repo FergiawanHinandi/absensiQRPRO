@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\TeacherAttendance;
 use App\Models\TeacherAttendanceAnomaly;
 use App\Models\TeacherDevice;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,13 +13,13 @@ class TeacherDeviceController extends Controller
 {
     /**
      * Get all teacher devices for the school
-     * 
+     *
      * GET /api/v1/admin/teacher-devices
      */
     public function index(Request $request): JsonResponse
     {
         $admin = $request->user();
-        
+
         $devices = TeacherDevice::where('school_id', $admin->school_id)
             ->with('teacher:id,name,email')
             ->orderBy('is_approved', 'asc') // Pending first
@@ -30,7 +29,7 @@ class TeacherDeviceController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'devices' => $devices->map(fn($d) => [
+                'devices' => $devices->map(fn ($d) => [
                     'id' => $d->id,
                     'teacher' => [
                         'id' => $d->teacher->id,
@@ -58,13 +57,13 @@ class TeacherDeviceController extends Controller
 
     /**
      * Get pending device approvals
-     * 
+     *
      * GET /api/v1/admin/teacher-devices/pending
      */
     public function pending(Request $request): JsonResponse
     {
         $admin = $request->user();
-        
+
         $devices = TeacherDevice::where('school_id', $admin->school_id)
             ->where('is_approved', false)
             ->with('teacher:id,name,email')
@@ -75,7 +74,7 @@ class TeacherDeviceController extends Controller
             'status' => 'success',
             'data' => [
                 'pending_count' => $devices->count(),
-                'devices' => $devices->map(fn($d) => [
+                'devices' => $devices->map(fn ($d) => [
                     'id' => $d->id,
                     'teacher' => [
                         'id' => $d->teacher->id,
@@ -94,18 +93,18 @@ class TeacherDeviceController extends Controller
 
     /**
      * Approve a teacher device
-     * 
+     *
      * POST /api/v1/admin/teacher-devices/{id}/approve
      */
     public function approve(Request $request, int $id): JsonResponse
     {
         $admin = $request->user();
-        
+
         $device = TeacherDevice::where('school_id', $admin->school_id)
             ->where('id', $id)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'status' => 'fail',
                 'message' => 'Perangkat tidak ditemukan.',
@@ -141,18 +140,18 @@ class TeacherDeviceController extends Controller
 
     /**
      * Revoke a teacher device approval
-     * 
+     *
      * POST /api/v1/admin/teacher-devices/{id}/revoke
      */
     public function revoke(Request $request, int $id): JsonResponse
     {
         $admin = $request->user();
-        
+
         $device = TeacherDevice::where('school_id', $admin->school_id)
             ->where('id', $id)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'status' => 'fail',
                 'message' => 'Perangkat tidak ditemukan.',
@@ -173,18 +172,18 @@ class TeacherDeviceController extends Controller
 
     /**
      * Delete a teacher device
-     * 
+     *
      * DELETE /api/v1/admin/teacher-devices/{id}
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
         $admin = $request->user();
-        
+
         $device = TeacherDevice::where('school_id', $admin->school_id)
             ->where('id', $id)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'status' => 'fail',
                 'message' => 'Perangkat tidak ditemukan.',
@@ -201,13 +200,13 @@ class TeacherDeviceController extends Controller
 
     /**
      * Get teacher attendance anomalies for review
-     * 
+     *
      * GET /api/v1/admin/teacher-attendance/anomalies
      */
     public function anomalies(Request $request): JsonResponse
     {
         $admin = $request->user();
-        
+
         $request->validate([
             'reviewed' => 'nullable|boolean',
             'severity' => 'nullable|in:low,medium,high,critical',
@@ -229,7 +228,7 @@ class TeacherDeviceController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'anomalies' => $anomalies->map(fn($a) => [
+                'anomalies' => $anomalies->map(fn ($a) => [
                     'id' => $a->id,
                     'teacher' => [
                         'id' => $a->teacher->id,
@@ -256,13 +255,13 @@ class TeacherDeviceController extends Controller
 
     /**
      * Mark anomaly as reviewed
-     * 
+     *
      * POST /api/v1/admin/teacher-attendance/anomalies/{id}/review
      */
     public function reviewAnomaly(Request $request, int $id): JsonResponse
     {
         $admin = $request->user();
-        
+
         $request->validate([
             'notes' => 'nullable|string|max:500',
         ]);
@@ -271,7 +270,7 @@ class TeacherDeviceController extends Controller
             ->where('id', $id)
             ->first();
 
-        if (!$anomaly) {
+        if (! $anomaly) {
             return response()->json([
                 'status' => 'fail',
                 'message' => 'Anomali tidak ditemukan.',
@@ -288,13 +287,13 @@ class TeacherDeviceController extends Controller
 
     /**
      * Get all teacher attendances for the school
-     * 
+     *
      * GET /api/v1/admin/teacher-attendance
      */
     public function attendances(Request $request): JsonResponse
     {
         $admin = $request->user();
-        
+
         $request->validate([
             'date' => 'nullable|date',
             'teacher_id' => 'nullable|exists:users,id',
@@ -323,7 +322,7 @@ class TeacherDeviceController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'attendances' => $attendances->map(fn($a) => [
+                'attendances' => $attendances->map(fn ($a) => [
                     'id' => $a->id,
                     'teacher' => [
                         'id' => $a->teacher->id,
@@ -334,7 +333,7 @@ class TeacherDeviceController extends Controller
                     'status' => $a->status,
                     'check_in_time' => $a->check_in_time?->format('H:i:s'),
                     'check_out_time' => $a->check_out_time?->format('H:i:s'),
-                    'distance_in' => $a->distance_in ? round($a->distance_in, 2) . 'm' : null,
+                    'distance_in' => $a->distance_in ? round($a->distance_in, 2).'m' : null,
                     'is_manual' => $a->is_manual,
                 ]),
                 'pagination' => [

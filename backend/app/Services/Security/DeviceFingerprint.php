@@ -84,9 +84,10 @@ final readonly class DeviceFingerprint
      */
     public function deviceMatches(DeviceFingerprint $other): bool
     {
-        if (!$this->deviceHash || !$other->deviceHash) {
+        if (! $this->deviceHash || ! $other->deviceHash) {
             return false;
         }
+
         return hash_equals($this->deviceHash, $other->deviceHash);
     }
 }

@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Hybrid QR Validation Service
- * 
+ *
  * Strategi 2-Layer:
  * 1. HMAC Validation (cepat, tanpa DB) - Layer pertama
  * 2. Database Verification (1 query minimal) - Layer kedua untuk keamanan
- * 
+ *
  * Ini mencegah:
  * - Siswa yang sudah dikeluarkan tetap bisa absen
  * - QR card lama masih valid setelah transfer sekolah
@@ -27,11 +27,11 @@ final class HybridQrValidationService
 
     /**
      * Validasi QR dengan 2 layer: HMAC + Database
-     * 
-     * @param string $qrToken Token QR dari kartu siswa
-     * @param int|null $expectedSchoolId School ID yang diharapkan (dari context scan)
+     *
+     * @param  string  $qrToken  Token QR dari kartu siswa
+     * @param  int|null  $expectedSchoolId  School ID yang diharapkan (dari context scan)
      * @return array Payload yang sudah divalidasi dengan data siswa
-     * 
+     *
      * @throws InvalidQrException
      * @throws QrExpiredException
      */
@@ -50,14 +50,14 @@ final class HybridQrValidationService
         // LAYER 2: DATABASE VERIFICATION (1 QUERY)
         // ========================================
         // Validasi bahwa siswa masih valid dan aktif
-        
+
         $student = User::where('id', $studentId)
             ->where('role_type', 'student')
             ->select('id', 'school_id', 'is_active', 'name', 'username', 'device_id')
             ->first();
 
         // Validasi 1: Siswa tidak ditemukan
-        if (!$student) {
+        if (! $student) {
             $this->logSecurityAnomaly('student_not_found', [
                 'student_id' => $studentId,
                 'qr_school_id' => $qrSchoolId,
@@ -68,7 +68,7 @@ final class HybridQrValidationService
         }
 
         // Validasi 2: Siswa tidak aktif
-        if (!$student->is_active) {
+        if (! $student->is_active) {
             $this->logSecurityAnomaly('inactive_student_scan', [
                 'student_id' => $studentId,
                 'student_name' => $student->name,
@@ -108,7 +108,7 @@ final class HybridQrValidationService
         // ========================================
         // SEMUA VALIDASI BERHASIL
         // ========================================
-        
+
         // Gabungkan payload QR dengan data siswa dari database
         return [
             // Data dari QR payload
@@ -117,13 +117,13 @@ final class HybridQrValidationService
             'qr_issued_at' => $payload['iat'],
             'qr_type' => $payload['typ'] ?? 'student_card',
             'qr_version' => $payload['v'] ?? 1,
-            
+
             // Data dari database (fresh)
             'student_name' => $student->name,
             'student_username' => $student->username,
             'student_device_id' => $student->device_id,
             'is_active' => $student->is_active,
-            
+
             // Metadata validasi
             'validated_at' => now()->toIso8601String(),
             'validation_method' => 'hybrid_hmac_db',
@@ -132,28 +132,28 @@ final class HybridQrValidationService
 
     /**
      * Validasi QR schedule (untuk QR yang di-generate guru)
-     * 
-     * @param string $qrToken Token QR dari schedule
-     * @param int|null $expectedSchoolId School ID yang diharapkan
+     *
+     * @param  string  $qrToken  Token QR dari schedule
+     * @param  int|null  $expectedSchoolId  School ID yang diharapkan
      * @return array Payload yang sudah divalidasi
      */
     public function validateScheduleQr(string $qrToken, ?int $expectedSchoolId = null): array
     {
         // Untuk schedule QR, gunakan QrService yang sudah ada
         $qrService = app(\App\Services\QrService::class);
-        
+
         // Layer 1: HMAC validation
         $payload = $qrService->validate($qrToken);
 
         $scheduleId = $payload->scheduleId;
-        
+
         // Layer 2: Database verification
         $schedule = \App\Models\Schedule::where('id', $scheduleId)
             ->where('is_active', true)
             ->select('id', 'school_id', 'class_id', 'teacher_id', 'subject_id')
             ->first();
 
-        if (!$schedule) {
+        if (! $schedule) {
             $this->logSecurityAnomaly('schedule_not_found', [
                 'schedule_id' => $scheduleId,
                 'reason' => 'QR signature valid but schedule does not exist or inactive',
@@ -188,9 +188,9 @@ final class HybridQrValidationService
 
     /**
      * Log anomali keamanan untuk monitoring
-     * 
-     * @param string $anomalyType Tipe anomali
-     * @param array $context Data konteks
+     *
+     * @param  string  $anomalyType  Tipe anomali
+     * @param  array  $context  Data konteks
      */
     private function logSecurityAnomaly(string $anomalyType, array $context): void
     {
@@ -213,11 +213,11 @@ final class HybridQrValidationService
 
     /**
      * Validasi device ID untuk anti-joki
-     * 
-     * @param User $student Siswa yang melakukan scan
-     * @param string|null $scanDeviceId Device ID dari scan request
+     *
+     * @param  User  $student  Siswa yang melakukan scan
+     * @param  string|null  $scanDeviceId  Device ID dari scan request
      * @return bool True jika valid
-     * 
+     *
      * @throws InvalidQrException
      */
     public function validateDeviceId(User $student, ?string $scanDeviceId): bool
@@ -226,13 +226,13 @@ final class HybridQrValidationService
         if (empty($student->device_id)) {
             if ($scanDeviceId) {
                 $student->update(['device_id' => $scanDeviceId]);
-                
+
                 Log::info('Device ID registered for student', [
                     'student_id' => $student->id,
                     'device_id' => $scanDeviceId,
                 ]);
             }
-            
+
             return true;
         }
 
@@ -247,7 +247,7 @@ final class HybridQrValidationService
             ]);
 
             throw new InvalidQrException(
-                'Perangkat tidak dikenali. Harap gunakan HP Anda sendiri yang terdaftar. ' .
+                'Perangkat tidak dikenali. Harap gunakan HP Anda sendiri yang terdaftar. '.
                 'Jika Anda berganti HP, hubungi admin sekolah.'
             );
         }
@@ -257,17 +257,17 @@ final class HybridQrValidationService
 
     /**
      * Get validation statistics untuk monitoring
-     * 
-     * @param int $schoolId School ID
-     * @param string $period Period (today, week, month)
+     *
+     * @param  int  $schoolId  School ID
+     * @param  string  $period  Period (today, week, month)
      * @return array Statistics
      */
     public function getValidationStats(int $schoolId, string $period = 'today'): array
     {
         // Implementasi untuk monitoring dashboard
         // Bisa digunakan untuk melihat berapa banyak anomali yang terdeteksi
-        
-        $dateFilter = match($period) {
+
+        $dateFilter = match ($period) {
             'today' => now()->startOfDay(),
             'week' => now()->subWeek(),
             'month' => now()->subMonth(),

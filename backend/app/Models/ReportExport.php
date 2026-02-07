@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Report Export Model
- * 
+ *
  * Tracks async report generation jobs with status, progress, and file info.
  */
 class ReportExport extends Model
@@ -17,6 +17,7 @@ class ReportExport extends Model
     use HasUuids;
 
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -49,20 +50,25 @@ class ReportExport extends Model
      * Status constants
      */
     const STATUS_PENDING = 'pending';
+
     const STATUS_PROCESSING = 'processing';
+
     const STATUS_COMPLETED = 'completed';
+
     const STATUS_FAILED = 'failed';
 
     /**
      * Format constants
      */
     const FORMAT_EXCEL = 'excel';
+
     const FORMAT_PDF = 'pdf';
 
     /**
      * Type constants
      */
     const TYPE_ATTENDANCE = 'attendance';
+
     const TYPE_SUMMARY = 'summary';
 
     /**
@@ -181,7 +187,7 @@ class ReportExport extends Model
      */
     public function getDownloadUrl(): ?string
     {
-        if (!$this->isReady() || $this->isExpired()) {
+        if (! $this->isReady() || $this->isExpired()) {
             return null;
         }
 
@@ -206,6 +212,7 @@ class ReportExport extends Model
         if ($this->file_path && Storage::exists($this->file_path)) {
             return Storage::delete($this->file_path);
         }
+
         return true;
     }
 
@@ -231,7 +238,7 @@ class ReportExport extends Model
      */
     public function getStatusLabelAttribute(): string
     {
-        return match($this->status) {
+        return match ($this->status) {
             self::STATUS_PENDING => 'Menunggu',
             self::STATUS_PROCESSING => 'Sedang Diproses',
             self::STATUS_COMPLETED => 'Selesai',
@@ -245,7 +252,7 @@ class ReportExport extends Model
      */
     public function getFileSizeHumanAttribute(): ?string
     {
-        if (!$this->file_size) {
+        if (! $this->file_size) {
             return null;
         }
 
@@ -258,6 +265,6 @@ class ReportExport extends Model
             $i++;
         }
 
-        return round($size, 2) . ' ' . $units[$i];
+        return round($size, 2).' '.$units[$i];
     }
 }

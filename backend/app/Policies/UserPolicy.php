@@ -37,7 +37,7 @@ class UserPolicy
             'homeroom_teacher',
             'admin',
             'school_admin',
-            'principal'
+            'principal',
         ]);
     }
 
@@ -50,7 +50,7 @@ class UserPolicy
             'admin',
             'school_admin',
             'principal',
-            'super_admin'
+            'super_admin',
         ]);
     }
 
@@ -78,7 +78,7 @@ class UserPolicy
         return in_array($authenticatedUser->role_type, [
             'admin',
             'school_admin',
-            'principal'
+            'principal',
         ]);
     }
 
@@ -101,7 +101,7 @@ class UserPolicy
         return in_array($authenticatedUser->role_type, [
             'admin',
             'school_admin',
-            'super_admin'
+            'super_admin',
         ]);
     }
 
@@ -117,7 +117,7 @@ class UserPolicy
             'admin',
             'school_admin',
             'principal',
-            'super_admin'
+            'super_admin',
         ]);
     }
 
@@ -127,7 +127,7 @@ class UserPolicy
     private function isSuperAdmin(User $user): bool
     {
         $superAdminRole = config('permission.super_admin_role', 'super_admin');
-        
+
         if (method_exists($user, 'hasRole') && $user->hasRole($superAdminRole)) {
             return true;
         }

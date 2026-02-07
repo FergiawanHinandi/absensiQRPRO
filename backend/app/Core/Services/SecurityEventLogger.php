@@ -65,7 +65,7 @@ class SecurityEventLogger
         array $context = []
     ): SecurityEvent {
         $deviceLabel = $deviceName ?? $deviceId;
-        
+
         return $this->log(
             eventType: SecurityEvent::EVENT_UNAPPROVED_DEVICE,
             severity: SecurityEvent::SEVERITY_HIGH,
@@ -89,7 +89,7 @@ class SecurityEventLogger
         array $context = []
     ): SecurityEvent {
         $typeLabel = $attendanceType === 'teacher' ? 'Guru' : 'Siswa';
-        
+
         return $this->log(
             eventType: SecurityEvent::EVENT_DUPLICATE_ATTEMPT,
             severity: SecurityEvent::SEVERITY_MEDIUM,
@@ -245,7 +245,7 @@ class SecurityEventLogger
         array $context = []
     ): SecurityEvent {
         $userName = $user ? $user->name : 'Anonymous';
-        
+
         return $this->log(
             eventType: SecurityEvent::EVENT_RATE_LIMIT_EXCEEDED,
             severity: SecurityEvent::SEVERITY_MEDIUM,

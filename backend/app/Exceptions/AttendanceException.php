@@ -6,7 +6,7 @@ use Exception;
 
 /**
  * Exception for attendance-related business logic errors
- * 
+ *
  * Messages from this exception are safe to show to end users.
  * Use this for validation errors, business rule violations, etc.
  */

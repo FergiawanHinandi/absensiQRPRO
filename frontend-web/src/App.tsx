@@ -10,6 +10,7 @@ import ParentDashboard from './pages/Parent/ParentDashboard';
 
 // Placeholder Pages
 import DashboardLayout from './components/layout/DashboardLayout';
+import { SuperAdminLayout } from './components/layout/SuperAdminLayout';
 import PlaceholderPage from './pages/PlaceholderPage';
 
 // Placeholder Pages (AdminDashboard is real, others are placeholders for now if not imported)
@@ -31,6 +32,7 @@ import SecurityMonitoring from './pages/Admin/SecurityMonitoring';
 import RiskOverview from './pages/Admin/RiskOverview';
 import { AdminAccountGenerator } from './pages/Admin/AdminAccountGenerator';
 import { SuperAdminDashboard } from './pages/SuperAdmin/SuperAdminDashboard';
+import { NewDashboard } from './pages/SuperAdmin/NewDashboard';
 import { SchoolsManagement } from './pages/SuperAdmin/SchoolsManagement';
 import { SchoolActivation } from './pages/SuperAdmin/SchoolActivation';
 import { PricingPage } from './modules/billing/pages/PricingPage';
@@ -46,8 +48,6 @@ import { RolePermission } from './pages/SuperAdmin/RolePermission';
 import { AuditLog } from './pages/SuperAdmin/AuditLog';
 import { RateLimit } from './pages/SuperAdmin/RateLimit';
 import { FeatureFlags } from './pages/SuperAdmin/FeatureFlags';
-import { AcademicYear } from './pages/SuperAdmin/AcademicYear';
-import { ScheduleTemplate } from './pages/SuperAdmin/ScheduleTemplate';
 import { GlobalAttendanceRecap } from './pages/SuperAdmin/Reports/GlobalAttendanceRecap';
 import { PlatformStatistics } from './pages/SuperAdmin/Reports/PlatformStatistics';
 import { GlobalExportResults } from './pages/SuperAdmin/Reports/GlobalExportResults';
@@ -57,7 +57,12 @@ import { AnnouncementsManagement } from './pages/SuperAdmin/AnnouncementsManagem
 import { BackupDatabase } from './pages/SuperAdmin/System/BackupDatabase';
 import { MaintenanceMode } from './pages/SuperAdmin/System/MaintenanceMode';
 import TeacherHeatmapPage from './modules/admin/pages/TeacherHeatmapPage';
-import ActiveAcademicYear from './pages/Admin/ActiveAcademicYear';
+import AdminStudentCards from './pages/Admin/AdminStudentCards';
+import AdminPhotoReview from './pages/Admin/AdminPhotoReview';
+import AdminNotificationLogs from './pages/Admin/AdminNotificationLogs';
+import AdminAttendanceQrMode from './pages/Admin/AdminAttendanceQrMode';
+import AdminAttendanceOverride from './pages/Admin/AdminAttendanceOverride';
+import AdminAttendanceTolerance from './pages/Admin/AdminAttendanceTolerance';
 
 const adminPlaceholderRoutes: { path: string; title: string }[] = [
   // Placeholder khusus fitur admin yang belum diimplementasikan.
@@ -106,386 +111,414 @@ function App() {
       <BrowserRouter>
         <Toaster />
         <Routes>
-        <Route path="/login" element={<LoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* Protected Dashboard Routes */}
-        <Route element={<DashboardLayout />}>
-
-          {/* PRINCIPAL */}
-          <Route path="/principal">
-            <Route path="dashboard" element={
-              <ProtectedRoute allowedRoles={['principal']}>
-                <PrincipalDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="monitoring" element={
-              <ProtectedRoute allowedRoles={['principal']}>
-                <PlaceholderPage title="Monitoring Absensi" />
-              </ProtectedRoute>
-            } />
-            <Route path="reports" element={
-              <ProtectedRoute allowedRoles={['principal']}>
-                <PlaceholderPage title="Laporan Sekolah" />
-              </ProtectedRoute>
-            } />
-            <Route path="approvals" element={
-              <ProtectedRoute allowedRoles={['principal']}>
-                <PlaceholderPage title="Approval" />
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={
-              <ProtectedRoute allowedRoles={['principal']}>
-                <PlaceholderPage title="Fitur Kepala Sekolah" />
-              </ProtectedRoute>
-            } />
-          </Route>
-
-          {/* TEACHER */}
-          <Route path="/teacher">
-            <Route path="dashboard" element={
-              <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
-                <TeacherDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={
-              <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
-                <PlaceholderPage title="Fitur Guru" />
-              </ProtectedRoute>
-            } />
-          </Route>
-
-          {/* ADMIN */}
-          <Route path="/admin">
-            <Route path="dashboard" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="dashboard/class-attendance" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminClassAttendance />
-              </ProtectedRoute>
-            } />
-            <Route path="dashboard/teacher-absent" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminTeacherAbsent />
-              </ProtectedRoute>
-            } />
-            <Route path="dashboard/late-absent" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminLateAlpha />
-              </ProtectedRoute>
-            } />
-            <Route path="dashboard/anomalies" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminAnomalies />
-              </ProtectedRoute>
-            } />
-            <Route path="risk-overview" element={
-            <ProtectedRoute allowedRoles={['admin', 'school_admin', 'principal']}>
-              <RiskOverview />
+          {/* New Super Admin Dashboard (Modern V2) */}
+          <Route path="/super-admin/dashboard-v2" element={
+            <ProtectedRoute allowedRoles={['super_admin']}>
+              <NewDashboard />
             </ProtectedRoute>
           } />
-          <Route path="security-monitoring" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin', 'super_admin']}>
-                <SecurityMonitoring />
-              </ProtectedRoute>
-            } />
-            <Route path="teacher-heatmap" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin', 'super_admin']}>
-                <TeacherHeatmapPage />
-              </ProtectedRoute>
-            } />
-            <Route path="teachers/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminTeachers />
-              </ProtectedRoute>
-            } />
-            <Route path="students/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminStudents />
-              </ProtectedRoute>
-            } />
-            <Route path="classes/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminClasses />
-              </ProtectedRoute>
-            } />
-            <Route path="subjects/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminSubjects />
-              </ProtectedRoute>
-            } />
-            <Route path="schedules/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminSchedules />
-              </ProtectedRoute>
-            } />
-            <Route path="attendance/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminAttendanceSettings />
-              </ProtectedRoute>
-            } />
-            <Route path="parents/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminParents />
-              </ProtectedRoute>
-            } />
-            <Route path="reports/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminReports />
-              </ProtectedRoute>
-            } />
-            <Route path="settings/*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminSchoolSettings />
-              </ProtectedRoute>
-            } />
-            <Route path="accounts/generate" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <AdminAccountGenerator />
-              </ProtectedRoute>
-            } />
-            <Route path="billing/pricing" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <PricingPage />
-              </ProtectedRoute>
-            } />
-            {adminPlaceholderRoutes.map((route) => (
-              <Route
-                key={route.path}
-                path={route.path}
-                element={
-                  <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                    <PlaceholderPage title={route.title} />
-                  </ProtectedRoute>
-                }
-              />
-            ))}
-            <Route path="*" element={
-              <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
-                <PlaceholderPage title="Fitur Admin" />
-              </ProtectedRoute>
-            } />
+
+          {/* Protected Dashboard Routes */}
+          <Route element={<DashboardLayout />}>
+
+            {/* PRINCIPAL */}
+            <Route path="/principal">
+              <Route path="dashboard" element={
+                <ProtectedRoute allowedRoles={['principal']}>
+                  <PrincipalDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="monitoring" element={
+                <ProtectedRoute allowedRoles={['principal']}>
+                  <PlaceholderPage title="Monitoring Absensi" />
+                </ProtectedRoute>
+              } />
+              <Route path="reports" element={
+                <ProtectedRoute allowedRoles={['principal']}>
+                  <PlaceholderPage title="Laporan Sekolah" />
+                </ProtectedRoute>
+              } />
+              <Route path="approvals" element={
+                <ProtectedRoute allowedRoles={['principal']}>
+                  <PlaceholderPage title="Approval" />
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={
+                <ProtectedRoute allowedRoles={['principal']}>
+                  <PlaceholderPage title="Fitur Kepala Sekolah" />
+                </ProtectedRoute>
+              } />
+            </Route>
+
+            {/* TEACHER */}
+            <Route path="/teacher">
+              <Route path="dashboard" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <TeacherDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <PlaceholderPage title="Fitur Guru" />
+                </ProtectedRoute>
+              } />
+            </Route>
+
+            {/* ADMIN */}
+            <Route path="/admin">
+              <Route path="dashboard" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="dashboard/class-attendance" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminClassAttendance />
+                </ProtectedRoute>
+              } />
+              <Route path="dashboard/teacher-absent" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminTeacherAbsent />
+                </ProtectedRoute>
+              } />
+              <Route path="dashboard/late-absent" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminLateAlpha />
+                </ProtectedRoute>
+              } />
+              <Route path="dashboard/anomalies" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminAnomalies />
+                </ProtectedRoute>
+              } />
+              <Route path="risk-overview" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin', 'principal']}>
+                  <RiskOverview />
+                </ProtectedRoute>
+              } />
+              <Route path="security-monitoring" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin', 'super_admin']}>
+                  <SecurityMonitoring />
+                </ProtectedRoute>
+              } />
+              <Route path="teacher-heatmap" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin', 'super_admin']}>
+                  <TeacherHeatmapPage />
+                </ProtectedRoute>
+              } />
+              <Route path="teachers/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminTeachers />
+                </ProtectedRoute>
+              } />
+              <Route path="students/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminStudents />
+                </ProtectedRoute>
+              } />
+              <Route path="classes/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminClasses />
+                </ProtectedRoute>
+              } />
+              <Route path="subjects/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminSubjects />
+                </ProtectedRoute>
+              } />
+              <Route path="schedules/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminSchedules />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance/qr-mode" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminAttendanceQrMode />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance/override" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminAttendanceOverride />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance/tolerance" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminAttendanceTolerance />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminAttendanceSettings />
+                </ProtectedRoute>
+              } />
+              <Route path="parents/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminParents />
+                </ProtectedRoute>
+              } />
+              <Route path="reports/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminReports />
+                </ProtectedRoute>
+              } />
+              <Route path="settings/*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminSchoolSettings />
+                </ProtectedRoute>
+              } />
+              <Route path="accounts/generate" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminAccountGenerator />
+                </ProtectedRoute>
+              } />
+              <Route path="billing/pricing" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <PricingPage />
+                </ProtectedRoute>
+              } />
+              <Route path="student-cards" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminStudentCards />
+                </ProtectedRoute>
+              } />
+              <Route path="photo-review" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminPhotoReview />
+                </ProtectedRoute>
+              } />
+              <Route path="notifications" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <AdminNotificationLogs />
+                </ProtectedRoute>
+              } />
+              {adminPlaceholderRoutes.map((route) => (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                      <PlaceholderPage title={route.title} />
+                    </ProtectedRoute>
+                  }
+                />
+              ))}
+              <Route path="*" element={
+                <ProtectedRoute allowedRoles={['admin', 'school_admin']}>
+                  <PlaceholderPage title="Fitur Admin" />
+                </ProtectedRoute>
+              } />
+            </Route>
+
+            {/* STUDENT */}
+            <Route path="/student">
+              <Route path="dashboard" element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <PlaceholderPage title="Dashboard Siswa" />
+                </ProtectedRoute>
+              } />
+              <Route path="history" element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <PlaceholderPage title="Riwayat Absensi" />
+                </ProtectedRoute>
+              } />
+              <Route path="schedule" element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <PlaceholderPage title="Jadwal Saya" />
+                </ProtectedRoute>
+              } />
+              <Route path="profile" element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <PlaceholderPage title="Profil Siswa" />
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={
+                <ProtectedRoute allowedRoles={['student']}>
+                  <PlaceholderPage title="Fitur Siswa" />
+                </ProtectedRoute>
+              } />
+            </Route>
+
+            {/* PARENT */}
+            <Route path="/parent">
+              <Route path="dashboard" element={
+                <ProtectedRoute allowedRoles={['parent']}>
+                  <ParentDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="children-history" element={
+                <ProtectedRoute allowedRoles={['parent']}>
+                  <PlaceholderPage title="Riwayat Anak" />
+                </ProtectedRoute>
+              } />
+              <Route path="permissions" element={
+                <ProtectedRoute allowedRoles={['parent']}>
+                  <PlaceholderPage title="Izin / Sakit" />
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={<Navigate to="dashboard" replace />} />
+            </Route>
+
+
+            {/* TEACHER & HOMEROOM */}
+            <Route path="/teacher">
+              <Route path="dashboard" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <TeacherDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="permissions" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <HomeroomPermissions />
+                </ProtectedRoute>
+              } />
+              {/* Homeroom Specific */}
+              <Route path="class-attendance/daily" element={
+                <ProtectedRoute allowedRoles={['homeroom_teacher']}>
+                  <HomeroomDailyAttendance />
+                </ProtectedRoute>
+              } />
+              {/* Common Teacher Pages */}
+              <Route path="schedules" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <PlaceholderPage title="Jadwal Mengajar" />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance/*" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <PlaceholderPage title="Absensi Mapel" />
+                </ProtectedRoute>
+              } />
+              <Route path="reports/*" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <PlaceholderPage title="Laporan Guru" />
+                </ProtectedRoute>
+              } />
+              <Route path="profile/*" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <PlaceholderPage title="Profil Guru" />
+                </ProtectedRoute>
+              } />
+            </Route>
+
+            {/* SUPER ADMIN */}
           </Route>
 
-          {/* STUDENT */}
-          <Route path="/student">
-            <Route path="dashboard" element={
-              <ProtectedRoute allowedRoles={['student']}>
-                <PlaceholderPage title="Dashboard Siswa" />
-              </ProtectedRoute>
-            } />
-            <Route path="history" element={
-              <ProtectedRoute allowedRoles={['student']}>
-                <PlaceholderPage title="Riwayat Absensi" />
-              </ProtectedRoute>
-            } />
-            <Route path="schedule" element={
-              <ProtectedRoute allowedRoles={['student']}>
-                <PlaceholderPage title="Jadwal Saya" />
-              </ProtectedRoute>
-            } />
-            <Route path="profile" element={
-              <ProtectedRoute allowedRoles={['student']}>
-                <PlaceholderPage title="Profil Siswa" />
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={
-              <ProtectedRoute allowedRoles={['student']}>
-                <PlaceholderPage title="Fitur Siswa" />
-              </ProtectedRoute>
-            } />
-          </Route>
-
-          {/* PARENT */}
-          <Route path="/parent">
-            <Route path="dashboard" element={
-              <ProtectedRoute allowedRoles={['parent']}>
-                <ParentDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="children-history" element={
-              <ProtectedRoute allowedRoles={['parent']}>
-                <PlaceholderPage title="Riwayat Anak" />
-              </ProtectedRoute>
-            } />
-            <Route path="permissions" element={
-              <ProtectedRoute allowedRoles={['parent']}>
-                <PlaceholderPage title="Izin / Sakit" />
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={<Navigate to="dashboard" replace />} />
-          </Route>
-
-
-          {/* TEACHER & HOMEROOM */}
-          <Route path="/teacher">
-            <Route path="dashboard" element={
-              <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
-                <TeacherDashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="permissions" element={
-              <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
-                <HomeroomPermissions />
-              </ProtectedRoute>
-            } />
-            {/* Homeroom Specific */}
-            <Route path="class-attendance/daily" element={
-              <ProtectedRoute allowedRoles={['homeroom_teacher']}>
-                <HomeroomDailyAttendance />
-              </ProtectedRoute>
-            } />
-            {/* Common Teacher Pages */}
-            <Route path="schedules" element={
-              <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
-                <PlaceholderPage title="Jadwal Mengajar" />
-              </ProtectedRoute>
-            } />
-            <Route path="attendance/*" element={
-              <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
-                <PlaceholderPage title="Absensi Mapel" />
-              </ProtectedRoute>
-            } />
-            <Route path="reports/*" element={
-              <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
-                <PlaceholderPage title="Laporan Guru" />
-              </ProtectedRoute>
-            } />
-            <Route path="profile/*" element={
-              <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
-                <PlaceholderPage title="Profil Guru" />
-              </ProtectedRoute>
-            } />
-          </Route>
-
-          {/* SUPER ADMIN */}
-          <Route path="/super-admin">
-            <Route path="dashboard" element={
+          {/* SUPER ADMIN - Standalone Layout (Dark Theme) */}
+          <Route element={<SuperAdminLayout />}>
+            <Route path="/super-admin/dashboard" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <SuperAdminDashboard />
               </ProtectedRoute>
             } />
-            <Route path="schools" element={
+            <Route path="/super-admin/schools" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <SchoolsManagement />
               </ProtectedRoute>
             } />
-            <Route path="schools/activation" element={
+            <Route path="/super-admin/schools/activation" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <SchoolActivation />
               </ProtectedRoute>
             } />
-            <Route path="schools/packages" element={
+            <Route path="/super-admin/schools/packages" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <PackageLimits />
               </ProtectedRoute>
             } />
-            <Route path="users/admins" element={
+            <Route path="/super-admin/users/admins" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <AdminSchoolManagement />
               </ProtectedRoute>
             } />
-            <Route path="billing/packages" element={
+            <Route path="/super-admin/billing/packages" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <SubscriptionPackages />
               </ProtectedRoute>
             } />
-            <Route path="billing/payment-history" element={
+            <Route path="/super-admin/billing/payment-history" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <PaymentHistory />
               </ProtectedRoute>
             } />
-            <Route path="billing/invoices" element={
+            <Route path="/super-admin/billing/invoices" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <InvoiceManagement />
               </ProtectedRoute>
             } />
-            <Route path="security/roles" element={
+            <Route path="/super-admin/security/roles" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <RolePermission />
               </ProtectedRoute>
             } />
-            <Route path="security/audit" element={
+            <Route path="/super-admin/security/audit" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <AuditLog />
               </ProtectedRoute>
             } />
-            <Route path="security/rate-limit" element={
+            <Route path="/super-admin/security/rate-limit" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <RateLimit />
               </ProtectedRoute>
             } />
-            <Route path="users/activity-logs" element={
+            <Route path="/super-admin/users/activity-logs" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <ActivityLogs />
               </ProtectedRoute>
             } />
-            <Route path="users/reset-access" element={
+            <Route path="/super-admin/users/reset-access" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <ResetAccess />
               </ProtectedRoute>
             } />
-            <Route path="config/academic-year" element={
-              <ProtectedRoute allowedRoles={['super_admin']}>
-                <AcademicYear />
-              </ProtectedRoute>
-            } />
-            <Route path="config/schedule-template" element={
-              <ProtectedRoute allowedRoles={['super_admin']}>
-                <ScheduleTemplate />
-              </ProtectedRoute>
-            } />
-            <Route path="config/features" element={
+            <Route path="/super-admin/config/features" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <FeatureFlags />
               </ProtectedRoute>
             } />
-            <Route path="reports/attendance" element={
+            <Route path="/super-admin/reports/attendance" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <GlobalAttendanceRecap />
               </ProtectedRoute>
             } />
-            <Route path="reports/statistics" element={
+            <Route path="/super-admin/reports/statistics" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <PlatformStatistics />
               </ProtectedRoute>
             } />
-            <Route path="reports/export" element={
+            <Route path="/super-admin/reports/export" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <GlobalExportResults />
               </ProtectedRoute>
             } />
-            <Route path="announcements" element={
+            <Route path="/super-admin/announcements" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <AnnouncementsManagement />
               </ProtectedRoute>
             } />
-            <Route path="system/backup" element={
+            <Route path="/super-admin/system/backup" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <BackupDatabase />
               </ProtectedRoute>
             } />
-            <Route path="system/maintenance" element={
+            <Route path="/super-admin/system/maintenance" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <MaintenanceMode />
               </ProtectedRoute>
             } />
-            <Route path="*" element={
+            <Route path="/super-admin/*" element={
               <ProtectedRoute allowedRoles={['super_admin']}>
                 <PlaceholderPage title="Fitur Super Admin" />
               </ProtectedRoute>
             } />
           </Route>
 
-        </Route>
-
-        <Route path="/" element={
-          <RootRedirect />
-        } />
-      </Routes>
-    </BrowserRouter>
+          <Route path="/" element={
+            <RootRedirect />
+          } />
+        </Routes>
+      </BrowserRouter>
     </AppErrorBoundary>
   );
 }

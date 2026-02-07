@@ -2,18 +2,21 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class StudentCard extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToSchool;
 
     protected $table = 'student_cards';
 
     protected $fillable = [
         'student_id',
+        'school_id',
         'qr_hash',
+        'qr_token_encrypted',
         'issued_by',
         'issued_at',
         'distributed_at',
@@ -28,6 +31,7 @@ class StudentCard extends Model
         'distributed_at' => 'datetime',
         'revoked_at' => 'datetime',
         'is_active' => 'boolean',
+        'qr_token_encrypted' => 'encrypted',
     ];
 
     public function student()
@@ -39,6 +43,12 @@ class StudentCard extends Model
     {
         return $this->belongsTo(User::class, 'issued_by');
     }
+
+    public function school()
+    {
+        return $this->belongsTo(School::class);
+    }
+}
 
     public function distributedBy()
     {

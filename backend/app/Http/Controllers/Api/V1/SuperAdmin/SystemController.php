@@ -12,7 +12,7 @@ class SystemController extends Controller
 {
     /**
      * Download Database Backup
-     * 
+     *
      * SECURITY FIXES:
      * - Uses config() instead of env() (works with config:cache)
      * - Uses Laravel Process for safer command execution
@@ -38,7 +38,7 @@ class SystemController extends Controller
             $username = config('database.connections.pgsql.username');
             $password = config('database.connections.pgsql.password');
 
-            if (!$database || !$username) {
+            if (! $database || ! $username) {
                 throw new \Exception('Database configuration is incomplete.');
             }
 
@@ -66,7 +66,7 @@ class SystemController extends Controller
             }
 
             // Verify file was created
-            if (!file_exists($filepath) || filesize($filepath) === 0) {
+            if (! file_exists($filepath) || filesize($filepath) === 0) {
                 throw new \Exception('Backup file was not created successfully.');
             }
 
@@ -84,7 +84,7 @@ class SystemController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Backup error', ['message' => $e->getMessage()]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Backup gagal. Silakan hubungi administrator.',
@@ -94,7 +94,7 @@ class SystemController extends Controller
 
     /**
      * Toggle Maintenance Mode
-     * 
+     *
      * SECURITY FIX: Use configurable secret instead of hardcoded
      */
     public function toggleMaintenanceMode(Request $request)
@@ -105,12 +105,12 @@ class SystemController extends Controller
             if ($enable) {
                 // SECURITY FIX: Generate unique secret or use configured one
                 $secret = config('app.maintenance_secret', Str::random(32));
-                
+
                 \Illuminate\Support\Facades\Artisan::call('down', [
                     '--secret' => $secret,
                 ]);
                 $status = 'enabled';
-                
+
                 // Store secret for super admin reference (encrypted in session/cache)
                 cache()->put('maintenance_bypass_secret', $secret, now()->addHours(24));
             } else {
@@ -133,7 +133,7 @@ class SystemController extends Controller
                 'message' => "Maintenance mode {$status}",
                 'data' => ['maintenance_mode' => $enable],
             ];
-            
+
             // Include bypass URL for super admin when enabling
             if ($enable && isset($secret)) {
                 $response['data']['bypass_url'] = url("/{$secret}");
@@ -143,7 +143,7 @@ class SystemController extends Controller
 
         } catch (\Exception $e) {
             Log::error('Maintenance mode toggle failed', ['error' => $e->getMessage()]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mengubah mode maintenance.',

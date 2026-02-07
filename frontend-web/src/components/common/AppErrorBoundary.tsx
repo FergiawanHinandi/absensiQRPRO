@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface Props {
     children: ReactNode;
@@ -20,7 +20,7 @@ export class AppErrorBoundary extends Component<Props, State> {
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
         console.error('App Error Boundary caught an error:', error, errorInfo);
-        
+
         // Log to monitoring service in production
         if (import.meta.env.PROD) {
             const errorId = Date.now().toString(36);

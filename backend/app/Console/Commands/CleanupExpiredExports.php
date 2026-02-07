@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Command to cleanup expired report exports
- * 
+ *
  * This command should be scheduled to run hourly to:
  * - Delete expired export files from storage
  * - Remove expired export records from database
@@ -35,7 +35,7 @@ class CleanupExpiredExports extends Command
         $isDryRun = $this->option('dry-run');
 
         $this->info('Starting export cleanup...');
-        
+
         if ($isDryRun) {
             $this->warn('DRY RUN MODE - No files will be deleted');
         }
@@ -45,6 +45,7 @@ class CleanupExpiredExports extends Command
 
         if ($expired->isEmpty()) {
             $this->info('No expired exports found.');
+
             return self::SUCCESS;
         }
 
@@ -84,7 +85,7 @@ class CleanupExpiredExports extends Command
             $this->info("Would delete {$expired->count()} exports.");
         } else {
             $this->info("Deleted {$deletedFiles} files and {$deletedRecords} records.");
-            
+
             if ($errors > 0) {
                 $this->warn("Encountered {$errors} errors during cleanup. Check logs for details.");
             }

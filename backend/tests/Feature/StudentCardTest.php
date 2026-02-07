@@ -17,7 +17,7 @@ class StudentCardTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Seed roles if necessary or mock them. 
+        // Seed roles if necessary or mock them.
         // Assuming factories handle basic setup.
     }
 
@@ -47,7 +47,7 @@ class StudentCardTest extends TestCase
                     'student_id',
                     'school_id',
                     'issued_at',
-                ]
+                ],
             ]);
 
         $data = $response->json('data');
@@ -59,7 +59,7 @@ class StudentCardTest extends TestCase
         $this->assertEquals($student->id, $card->student_id);
         $this->assertTrue($card->is_active);
         $this->assertEquals($admin->id, $card->issued_by);
-        
+
         // Assert Hash
         [$cardId, $rawToken] = explode('|', $token);
         $this->assertTrue(Hash::check($rawToken, $card->qr_hash));
@@ -139,7 +139,7 @@ class StudentCardTest extends TestCase
         // Verify fail
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Kartu ini sudah dinonaktifkan'); // Or whatever message I put
-        
+
         $service = app(StudentQrService::class);
         $service->verify($token);
     }

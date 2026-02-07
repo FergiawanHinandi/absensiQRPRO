@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Queue Health Controller
- * 
+ *
  * Provides operational visibility into queue system health.
  * Critical for production monitoring and incident response.
  */
@@ -15,17 +15,17 @@ class QueueHealthController extends Controller
 {
     /**
      * Get queue system health status
-     * 
+     *
      * Returns metrics for:
      * - Pending jobs awaiting processing
      * - Failed jobs in last 24 hours
      * - Total failed jobs
-     * 
+     *
      * Use this endpoint for:
      * - Monitoring dashboards
      * - Alerting systems (if failed_jobs_24h > threshold)
      * - Health checks before deployment
-     * 
+     *
      * @return \Illuminate\Http\JsonResponse
      */
     public function status()
@@ -47,8 +47,8 @@ class QueueHealthController extends Controller
                 ->orderBy('created_at', 'asc')
                 ->first();
 
-            $queueLagSeconds = $oldestPendingJob 
-                ? now()->timestamp - $oldestPendingJob->created_at 
+            $queueLagSeconds = $oldestPendingJob
+                ? now()->timestamp - $oldestPendingJob->created_at
                 : 0;
 
             // Determine health status
@@ -82,11 +82,6 @@ class QueueHealthController extends Controller
 
     /**
      * Generate alert messages based on queue metrics
-     * 
-     * @param int $failedJobs24h
-     * @param int $queueLagSeconds
-     * @param int $pendingJobs
-     * @return array
      */
     private function generateAlerts(int $failedJobs24h, int $queueLagSeconds, int $pendingJobs): array
     {
