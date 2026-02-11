@@ -5,6 +5,9 @@ use App\Http\Controllers\Api\V1\Teacher\TeacherDashboardController;
 use App\Http\Controllers\Api\V1\Teacher\TeacherAttendanceController;
 use App\Http\Controllers\Api\V1\Teacher\TeacherScheduleController;
 use App\Http\Controllers\Api\V1\Teacher\TeacherStudentAttendanceController;
+use App\Http\Controllers\Api\V1\Teacher\HomeroomController;
+use App\Http\Controllers\Api\V1\TeacherProfileController;
+use App\Http\Controllers\Api\V1\PermissionController;
 
 Route::middleware('role:teacher')->prefix('teacher')->group(function () {
     Route::get('/dashboard', [TeacherDashboardController::class, 'index'])
@@ -42,5 +45,21 @@ Route::middleware('role:teacher')->prefix('teacher')->group(function () {
             ->middleware('school.rate.limit:30,1');
         Route::post('/manual/bulk', [TeacherStudentAttendanceController::class, 'bulkManual'])
             ->middleware('school.rate.limit:10,1');
+    });
+    
+    // Teacher Profile
+    Route::get('/profile', [TeacherProfileController::class, 'show']);
+    
+    // Teacher Classes (homeroom class summary)
+    Route::get('/classes', [HomeroomController::class, 'classSummary']);
+    
+    // My Students (homeroom students)
+    Route::get('/my-students', [HomeroomController::class, 'getStudentNotes']);
+    
+    // Permission Management (izin/dispensasi)
+    Route::prefix('permissions')->group(function () {
+        Route::get('/', [PermissionController::class, 'index']);
+        Route::post('/', [PermissionController::class, 'store']);
+        Route::patch('/{id}/status', [PermissionController::class, 'updateStatus']);
     });
 });

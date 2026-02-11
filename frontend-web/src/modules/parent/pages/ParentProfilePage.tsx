@@ -9,7 +9,7 @@ const ParentProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get('/v1/parent/profile')
+    apiClient.get('/auth/me')
       .then(res => setData(res.data))
       .catch(() => setError('Gagal memuat profil orang tua'))
       .finally(() => setIsLoading(false));

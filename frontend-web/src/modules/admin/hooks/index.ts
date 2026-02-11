@@ -241,7 +241,7 @@ export const useDailyReport = (date?: string) => {
         queryKey: ['dailyReport', date],
         queryFn: async () => {
             const params = date ? { date } : {};
-            const response = await apiClient.get('/reports/daily', { params });
+            const response = await apiClient.get('/admin/reports/daily', { params });
             return response.data.data as DailyReportStats;
         },
         refetchInterval: 60000,

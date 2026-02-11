@@ -53,7 +53,7 @@ export const SchoolActivation: React.FC = () => {
         if (!confirm('Aktifkan sekolah ini?')) return;
 
         try {
-            await apiClient.patch(`/super-admin/schools/${schoolId}/activate`);
+            await apiClient.post(`/super-admin/schools/${schoolId}/activate`);
             showToast.success('Sekolah berhasil diaktifkan');
             fetchSchools();
         } catch (error) {
@@ -65,7 +65,7 @@ export const SchoolActivation: React.FC = () => {
         if (!confirm('Nonaktifkan sekolah ini? Sekolah tidak akan bisa mengakses sistem.')) return;
 
         try {
-            await apiClient.patch(`/super-admin/schools/${schoolId}/deactivate`);
+            await apiClient.post(`/super-admin/schools/${schoolId}/deactivate`);
             showToast.success('Sekolah berhasil dinonaktifkan');
             fetchSchools();
         } catch (error) {

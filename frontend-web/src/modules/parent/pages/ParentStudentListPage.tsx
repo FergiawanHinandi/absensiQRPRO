@@ -9,7 +9,7 @@ const ParentStudentListPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get('/v1/parent/students')
+    apiClient.get('/parent/my-children')
       .then(res => setData(res.data?.students || []))
       .catch(() => setError('Gagal memuat daftar siswa'))
       .finally(() => setIsLoading(false));

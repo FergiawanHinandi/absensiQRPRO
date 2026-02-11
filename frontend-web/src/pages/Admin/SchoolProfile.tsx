@@ -10,7 +10,7 @@ const SchoolProfile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get('/v1/admin/school/profile')
+    apiClient.get('/admin/school/profile')
       .then(res => setData(res.data))
       .catch(() => setError('Gagal memuat profil sekolah'))
       .finally(() => setIsLoading(false));

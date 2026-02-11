@@ -10,7 +10,7 @@ const ActiveAcademicYear: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get('/v1/admin/settings/academic-year')
+    apiClient.get('/admin/settings/academic-year')
       .then(res => setData(res.data))
       .catch(() => setError('Gagal memuat tahun ajaran'))
       .finally(() => setIsLoading(false));

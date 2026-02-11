@@ -11,7 +11,7 @@ import { apiClient } from '../lib/api';
 
 export const getDailyReport = async (date?: string) => {
     const params = date ? { date } : {};
-    const response = await apiClient.get('/reports/daily', { params });
+    const response = await apiClient.get('/admin/reports/daily', { params });
     return response.data.data;
 };
 

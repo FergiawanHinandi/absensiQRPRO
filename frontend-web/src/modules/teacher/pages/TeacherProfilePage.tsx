@@ -9,7 +9,7 @@ const TeacherProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get('/v1/teacher/profile')
+    apiClient.get('/teacher/profile')
       .then(res => setData(res.data))
       .catch(() => setError('Gagal memuat profil guru'))
       .finally(() => setIsLoading(false));

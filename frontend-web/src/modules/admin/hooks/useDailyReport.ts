@@ -17,7 +17,7 @@ export const useDailyReport = () => {
             // In a real app we'd fetch from API
             // For now we simulate or use the placeholder logic from the original component if API fails
             try {
-                const response = await apiClient.get<DailyStats>('/reports/daily');
+                const response = await apiClient.get<DailyStats>('/admin/reports/daily');
                 return response.data;
             } catch (error) {
                 // Fallback Mock Data as per original requirement during dev

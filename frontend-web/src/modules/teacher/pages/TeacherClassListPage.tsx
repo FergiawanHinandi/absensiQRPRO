@@ -9,7 +9,7 @@ const TeacherClassListPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient.get('/v1/teacher/classes')
+    apiClient.get('/teacher/classes')
       .then(res => setData(res.data?.classes || []))
       .catch(() => setError('Gagal memuat daftar kelas'))
       .finally(() => setIsLoading(false));

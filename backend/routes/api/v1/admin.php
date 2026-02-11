@@ -9,9 +9,20 @@ use App\Http\Controllers\Api\V1\SchoolAdmin\SubjectController;
 use App\Http\Controllers\Api\V1\SchoolAdmin\TeacherSubjectController;
 use App\Http\Controllers\Api\V1\SchoolAdmin\ScheduleController as AdminScheduleController;
 use App\Http\Controllers\Api\V1\SchoolAdmin\AttendanceSettingsController;
+use App\Http\Controllers\Api\V1\SchoolAdmin\RiskOverviewController;
+use App\Http\Controllers\Api\V1\SchoolAdmin\ReportController;
+use App\Http\Controllers\Api\V1\SchoolAdmin\StudentCardController as SchoolAdminStudentCardController;
 use App\Http\Controllers\Api\V1\Admin\SecurityMonitoringController;
+use App\Http\Controllers\Api\V1\Admin\SecurityDashboardController;
+use App\Http\Controllers\Api\V1\Admin\AdminSecurityAlertController;
 use App\Http\Controllers\Api\V1\Admin\AttendanceReportControllerOptimized;
+use App\Http\Controllers\Api\V1\Admin\AttendanceReportController;
+use App\Http\Controllers\Api\V1\Admin\StudentCardController as AdminStudentCardController;
+use App\Http\Controllers\Api\V1\Admin\StudentCardProgressController;
+use App\Http\Controllers\Api\V1\Admin\StudentPhotoReviewController;
+use App\Http\Controllers\Api\V1\Admin\TeacherHeatmapController;
 use App\Http\Controllers\Api\V1\AdminDashboardController;
+use App\Http\Controllers\Api\V1\NotificationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,26 +41,45 @@ use App\Http\Controllers\Api\V1\AdminDashboardController;
 |
 */
 
-Route::middleware(['role:school_admin'])->prefix('school-admin')->group(function () {
-    // Dashboard
-    Route::get('/dashboard', [AdminDashboardController::class, 'index'])
-        ->middleware('ability:admin:view_dashboard');
+Route::middleware(['role:school_admin'])->prefix('admin')->group(function () {
+    // Dashboard sub-routes (classAttendance, teacherAbsent, lateAlpha, anomalies)
+    Route::prefix('dashboard')->middleware('ability:admin:view_dashboard')->group(function () {
+        Route::get('/class-attendance', [AdminDashboardController::class, 'classAttendance']);
+        Route::get('/teacher-absent', [AdminDashboardController::class, 'teacherAbsent']);
+        Route::get('/late-alpha', [AdminDashboardController::class, 'lateAlpha']);
+        Route::get('/anomalies', [AdminDashboardController::class, 'anomalies']);
+    });
     
     // School - view/update own school only
     Route::apiResource('school', SchoolController::class)->only(['show', 'update']);
     
-    // Classes CRUD
+    // Classes CRUD with status toggle
     Route::apiResource('classes', ClassController::class);
+    Route::patch('classes/{id}/status', [ClassController::class, 'updateStatus']);
     
     // Students CRUD with import
     Route::apiResource('students', StudentController::class);
     Route::post('students/import', [StudentController::class, 'import'])
         ->middleware('ability:student:import');
+    Route::get('students/placement', [StudentController::class, 'placements']);
+    Route::get('students/mutations', [StudentController::class, 'mutations']);
+    Route::patch('students/{studentId}/placement', [StudentController::class, 'updatePlacement']);
+    Route::patch('students/{studentId}/mutation', [StudentController::class, 'updateMutation']);
+    
+    // Student Photos Review
+    Route::get('students/photos/pending', [StudentPhotoReviewController::class, 'pending']);
+    Route::post('students/{studentId}/photos/approve', [StudentPhotoReviewController::class, 'approve']);
+    Route::post('students/{studentId}/photos/reject', [StudentPhotoReviewController::class, 'reject']);
     
     // Teachers CRUD with import
     Route::apiResource('teachers', TeacherController::class);
     Route::post('teachers/import', [TeacherController::class, 'import'])
         ->middleware('ability:teacher:import');
+    Route::patch('teachers/{id}/status', [TeacherController::class, 'updateStatus']);
+    Route::get('teachers/assignments', [TeacherController::class, 'assignments']);
+    Route::post('teachers/assignments', [TeacherController::class, 'storeAssignment']);
+    Route::delete('teachers/assignments/{id}', [TeacherController::class, 'destroyAssignment']);
+    Route::post('teachers/homeroom', [TeacherController::class, 'setHomeroom']);
     
     // Subjects CRUD
     Route::apiResource('subjects', SubjectController::class);
@@ -115,6 +145,59 @@ Route::middleware(['role:school_admin'])->prefix('school-admin')->group(function
         // Async export
         Route::post('/export/excel', [AttendanceReportControllerOptimized::class, 'exportExcel'])
             ->middleware('ability:report:export');
+        Route::post('/export-pdf', [AttendanceReportController::class, 'exportPdf'])
+            ->middleware('ability:report:export');
         Route::get('/export/{jobId}/status', [AttendanceReportControllerOptimized::class, 'exportStatus']);
+    });
+    
+    // General Reports (index)
+    Route::get('reports', [ReportController::class, 'index'])
+        ->middleware('ability:report:view');
+    
+    // Parents listing
+    Route::get('parents', [StudentController::class, 'parents']);
+    
+    // Student Cards
+    Route::prefix('student-cards')->group(function () {
+        Route::get('/progress', [StudentCardProgressController::class, 'progress']);
+        Route::post('/{studentId}/generate', [AdminStudentCardController::class, 'generate']);
+        Route::post('/bulk-generate', [AdminStudentCardController::class, 'bulkGenerate']);
+        Route::get('/{studentId}/status', [SchoolAdminStudentCardController::class, 'getCardStatus']);
+    });
+    
+    // Risk Overview
+    Route::prefix('risk-overview')->group(function () {
+        Route::get('/', [RiskOverviewController::class, 'index']);
+        Route::get('/students', [RiskOverviewController::class, 'studentDetails']);
+        Route::post('/export', [RiskOverviewController::class, 'export']);
+    });
+    
+    // Risk changes
+    Route::get('risk/changes', [RiskOverviewController::class, 'trendData']);
+    
+    // School Settings & Profile
+    Route::get('settings/profile', [SchoolController::class, 'getSettings']);
+    Route::get('settings/academic-year', [SchoolController::class, 'academicYears']);
+    Route::get('school/profile', [SchoolController::class, 'profile']);
+    
+    // Notifications
+    Route::get('notifications/logs', [NotificationController::class, 'index']);
+    
+    // Security Alerts (acknowledge/bulk)
+    Route::prefix('security-alerts')->middleware('ability:security:manage')->group(function () {
+        Route::patch('/{alertId}/ack', [AdminSecurityAlertController::class, 'resolve']);
+        Route::post('/bulk-ack', [SecurityDashboardController::class, 'bulkResolve']);
+    });
+    
+    // Security Dashboard - by school
+    Route::get('security/by-school', [SecurityDashboardController::class, 'bySchool'])
+        ->middleware('ability:security:view');
+    
+    // Teacher Heatmap
+    Route::prefix('security-dashboard/teacher-heatmap')->middleware('ability:security:view')->group(function () {
+        Route::get('/', [TeacherHeatmapController::class, 'index']);
+        Route::get('/cluster-details', [TeacherHeatmapController::class, 'clusterDetails']);
+        Route::get('/teachers', [TeacherHeatmapController::class, 'teacherSummary']);
+        Route::get('/anomalies', [TeacherHeatmapController::class, 'anomalies']);
     });
 });

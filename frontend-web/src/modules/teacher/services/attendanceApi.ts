@@ -50,7 +50,7 @@ export const teacherAttendanceApi = {
    * Generate QR code for attendance session
    */
   generateQR: async (sessionId: number): Promise<GenerateQRResponse> => {
-    const response = await apiClient.post('/teacher/attendance/generate', {
+    const response = await apiClient.post('/teacher/attendance/generate-qr', {
       session_id: sessionId,
     });
     return response.data;
@@ -60,7 +60,7 @@ export const teacherAttendanceApi = {
    * Get live attendances for a session
    */
   getLiveAttendances: async (sessionId: number): Promise<LiveAttendancesResponse> => {
-    const response = await apiClient.get(`/teacher/attendance/${sessionId}/live`);
+    const response = await apiClient.get(`/teacher/attendance/session/${sessionId}/live`);
     return response.data;
   },
 

@@ -46,39 +46,14 @@ class RouteServiceProvider extends ServiceProvider
     {
         $this->configureRateLimiting();
 
-        $this->routes(function () {
-            // ========================================
-            // API ROUTES (Versioned)
-            // ========================================
+        // ========================================
+        // DEPRECATED: Route loading moved to bootstrap/app.php (Laravel 11)
+        // This provider is NOT registered in bootstrap/providers.php.
+        // Route loading is handled by withRouting() in bootstrap/app.php.
+        // Only rate limiting configuration below is used (inherited by parent).
+        // ========================================
 
-            // V1 API Routes
-            Route::middleware('api')
-                ->prefix('api/v1')
-                ->group(base_path('routes/api/v1.php'));
-
-            // V2 API Routes (Future - currently disabled)
-            // Uncomment when v2 is ready
-            // if (file_exists(base_path('routes/api/v2.php'))) {
-            //     Route::middleware('api')
-            //         ->prefix('api/v2')
-            //         ->group(base_path('routes/api/v2.php'));
-            // }
-
-            // ========================================
-            // LEGACY API ROUTES (Backward Compatibility)
-            // ========================================
-            // Keep this for backward compatibility during transition
-            // TODO: Deprecate and remove after all clients migrate to v1
-            Route::middleware('api')
-                ->prefix('api')
-                ->group(base_path('routes/api.php'));
-
-            // ========================================
-            // WEB ROUTES
-            // ========================================
-            Route::middleware('web')
-                ->group(base_path('routes/web.php'));
-        });
+        // $this->routes(function () { ... }); // REMOVED - causes duplication
     }
 
     /**

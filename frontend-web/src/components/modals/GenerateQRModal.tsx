@@ -47,7 +47,7 @@ const GenerateQRModal: React.FC<Props> = ({ isOpen, onClose, schedule }) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await api.post<{ qr_code: QrCodeData }>('/qr/generate', {
+            const response = await api.post<{ qr_code: QrCodeData }>('/attendance/secure/generate-qr', {
                 schedule_id: schedule.id,
                 qr_type: 'in', // Default check-in
                 expiry_minutes: 5, // Default 5 mins
@@ -63,7 +63,8 @@ const GenerateQRModal: React.FC<Props> = ({ isOpen, onClose, schedule }) => {
     const handleCloseQR = async () => {
         if (qrCode) {
             try {
-                await api.post(`/qr/close`, { qr_code_id: qrCode.id });
+                // Note: QR tokens are stateless (HMAC-based) and expire automatically
+                // No server-side close needed for HMAC tokens
             } catch (e) {
                 // ignore error on close
             }
