@@ -2,108 +2,166 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 
-/**
- * CRITICAL: ProcessedWebhook Model for Idempotency
- *
- * PREVENTS:
- * - Duplicate webhook processing
- * - Replay attacks
- * - Data corruption from multiple processing
- */
 class ProcessedWebhook extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'order_id',
         'transaction_id',
-        'webhook_type',
-        'payment_method',
         'status',
-        'webhook_payload',
+        'transaction_status',
+        'payment_type',
+        'payment_method',
+        'gross_amount',
+        'payload',
         'signature_hash',
-        'source_ip',
-        'user_agent',
-        'processed_at',
-        'processed_by',
         'processing_notes',
+        'processed_at',
     ];
-
+    
     protected $casts = [
-        'webhook_payload' => 'array',
-        'processed_at' => 'datetime',
+        'payload' => 'array',
+        'processed_at' => 'datetime'
     ];
 
     /**
-     * CRITICAL: Check if webhook already processed
+     * Mark webhook as being processed (initial state)
+     * 
+     * @param array $data
+     * @return self
      */
-    public static function isAlreadyProcessed(string $orderId): bool
+    public static function markAsProcessing(array $data): self
     {
-        return self::where('order_id', $orderId)->exists();
+        $webhook = self::create([
+            'order_id' => $data['order_id'],
+            'transaction_id' => $data['transaction_id'],
+            'status' => 'processing',
+            'payload' => $data['payload'] ?? null,
+            'signature_hash' => $data['signature_hash'] ?? null,
+            'payment_method' => $data['payment_method'] ?? null,
+            'processing_notes' => $data['notes'] ?? 'Processing started',
+        ]);
+
+        Log::info('Webhook marked as processing', [
+            'order_id' => $data['order_id'],
+            'transaction_id' => $data['transaction_id'],
+            'webhook_id' => $webhook->id,
+        ]);
+
+        return $webhook;
     }
 
     /**
-     * CRITICAL: Check if transaction already processed
-     */
-    public static function isTransactionProcessed(string $transactionId): bool
-    {
-        return self::where('transaction_id', $transactionId)->exists();
-    }
-
-    /**
-     * CRITICAL: Create processed webhook record
+     * Mark webhook as processed (final state)
+     * 
+     * @param array $data
+     * @return self
      */
     public static function markAsProcessed(array $data): self
     {
-        return self::create([
-            'order_id' => $data['order_id'],
-            'transaction_id' => $data['transaction_id'],
-            'webhook_type' => $data['webhook_type'] ?? 'payment',
-            'payment_method' => $data['payment_method'] ?? 'midtrans',
-            'status' => $data['status'] ?? 'success',
-            'webhook_payload' => $data['payload'] ?? [],
-            'signature_hash' => $data['signature_hash'] ?? null,
-            'source_ip' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-            'processed_at' => now(),
-            'processed_by' => $data['processed_by'] ?? 'system',
-            'processing_notes' => $data['notes'] ?? null,
-        ]);
+        // Try to find existing processing record
+        $webhook = self::where('order_id', $data['order_id'])
+            ->orWhere('transaction_id', $data['transaction_id'])
+            ->first();
+
+        if ($webhook) {
+            // Update existing record
+            $webhook->update([
+                'status' => $data['status'] ?? 'success',
+                'transaction_status' => $data['transaction_status'] ?? null,
+                'payment_type' => $data['payment_type'] ?? null,
+                'payment_method' => $data['payment_method'] ?? $webhook->payment_method,
+                'gross_amount' => $data['gross_amount'] ?? null,
+                'payload' => $data['payload'] ?? $webhook->payload,
+                'signature_hash' => $data['signature_hash'] ?? $webhook->signature_hash,
+                'processing_notes' => $data['notes'] ?? 'Processed successfully',
+                'processed_at' => now(),
+            ]);
+
+            Log::info('Webhook updated to processed', [
+                'order_id' => $data['order_id'],
+                'transaction_id' => $data['transaction_id'],
+                'status' => $webhook->status,
+                'webhook_id' => $webhook->id,
+            ]);
+        } else {
+            // Create new record if not exists
+            $webhook = self::create([
+                'order_id' => $data['order_id'],
+                'transaction_id' => $data['transaction_id'],
+                'status' => $data['status'] ?? 'success',
+                'transaction_status' => $data['transaction_status'] ?? null,
+                'payment_type' => $data['payment_type'] ?? null,
+                'payment_method' => $data['payment_method'] ?? null,
+                'gross_amount' => $data['gross_amount'] ?? null,
+                'payload' => $data['payload'] ?? null,
+                'signature_hash' => $data['signature_hash'] ?? null,
+                'processing_notes' => $data['notes'] ?? 'Processed successfully',
+                'processed_at' => now(),
+            ]);
+
+            Log::info('Webhook marked as processed', [
+                'order_id' => $data['order_id'],
+                'transaction_id' => $data['transaction_id'],
+                'status' => $webhook->status,
+                'webhook_id' => $webhook->id,
+            ]);
+        }
+
+        return $webhook;
     }
 
     /**
-     * Get processing history for order
+     * Check if order has already been processed
+     * 
+     * @param string $orderId
+     * @return bool
+     */
+    public static function isAlreadyProcessed(string $orderId): bool
+    {
+        return self::where('order_id', $orderId)
+            ->whereIn('status', ['success', 'failed'])
+            ->exists();
+    }
+
+    /**
+     * Check if transaction has already been processed
+     * 
+     * @param string $transactionId
+     * @return bool
+     */
+    public static function isTransactionProcessed(string $transactionId): bool
+    {
+        return self::where('transaction_id', $transactionId)
+            ->whereIn('status', ['success', 'failed'])
+            ->exists();
+    }
+
+    /**
+     * Check if webhook is currently being processed
+     * 
+     * @param string $orderId
+     * @return bool
+     */
+    public static function isProcessing(string $orderId): bool
+    {
+        return self::where('order_id', $orderId)
+            ->where('status', 'processing')
+            ->exists();
+    }
+
+    /**
+     * Get processing history for an order
+     * 
+     * @param string $orderId
+     * @return \Illuminate\Database\Eloquent\Collection
      */
     public static function getProcessingHistory(string $orderId)
     {
         return self::where('order_id', $orderId)
-            ->orderBy('processed_at', 'desc')
+            ->orderBy('created_at', 'desc')
             ->get();
-    }
-
-    /**
-     * Scopes
-     */
-    public function scopeSuccessful($query)
-    {
-        return $query->where('status', 'success');
-    }
-
-    public function scopeFailed($query)
-    {
-        return $query->where('status', 'failed');
-    }
-
-    public function scopeByType($query, string $type)
-    {
-        return $query->where('webhook_type', $type);
-    }
-
-    public function scopeRecent($query, int $hours = 24)
-    {
-        return $query->where('processed_at', '>=', now()->subHours($hours));
     }
 }

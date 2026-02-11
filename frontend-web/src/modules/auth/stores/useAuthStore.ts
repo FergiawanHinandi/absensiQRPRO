@@ -44,16 +44,14 @@ export const useAuthStore = create<AuthState>()((set) => ({
     },
 
     login: (token, user) => {
-        console.log('[AUTH] login() called with token:', token?.substring(0, 20) + '...');
-        console.log('[AUTH] login() user:', user);
-        
+        // SECURITY: Removed token logging to prevent exposure in DevTools
+        if (import.meta.env.DEV) {
+            console.log('[AUTH] login() called');
+        }
+
         // Store token in sessionStorage
         tokenStore.setToken(token);
-        
-        // Verify token was stored
-        const storedToken = tokenStore.getToken();
-        console.log('[AUTH] Token stored successfully:', !!storedToken);
-        
+
         // Set session indicator (non-sensitive) for UX purposes
         sessionIndicator.setActive();
 
@@ -65,8 +63,10 @@ export const useAuthStore = create<AuthState>()((set) => ({
             error: null,
             sessionExpired: false
         });
-        
-        console.log('[AUTH] State updated, isAuthenticated: true');
+
+        if (import.meta.env.DEV) {
+            console.log('[AUTH] Login successful');
+        }
     },
 
     logout: () => {

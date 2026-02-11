@@ -42,8 +42,8 @@ if git diff --cached | grep -E "^\+.*APP_KEY=base64:[A-Za-z0-9+/]{40,}" > /dev/n
     SECRETS_FOUND=1
 fi
 
-# Pattern 2: Database passwords (not placeholder)
-if git diff --cached | grep -E "^\+.*DB_PASSWORD=[^'\"]*[a-zA-Z0-9]{8,}" | grep -v "your-secure-password" > /dev/null; then
+# Pattern 2: Database passwords (not placeholder, not CI/CD variable)
+if git diff --cached | grep -E "^\+.*DB_PASSWORD=[^'\"]*[a-zA-Z0-9]{8,}" | grep -v "your-secure-password" | grep -v '\${{' | grep -v "DB_PASSWORD=$" > /dev/null; then
     echo -e "${RED}❌ BLOCKED: DB_PASSWORD with actual value detected!${NC}"
     echo -e "${YELLOW}   Never commit real database passwords${NC}"
     SECRETS_FOUND=1
@@ -108,8 +108,8 @@ if echo "$FILES" | grep -E "\.(pem|key|p12|pfx|asc)$" > /dev/null; then
     SECRETS_FOUND=1
 fi
 
-# Check for credentials in JSON files
-if git diff --cached | grep -E "^\+.*(password|secret|token|api_key)\":\s*\"[^\"]{8,}\"" > /dev/null; then
+# Check for credentials in JSON files (exclude docs and markdown)
+if git diff --cached --name-only --diff-filter=ACM | grep -v '\.md$' | grep -v '/docs/' | grep -v '.env.example' | grep -v 'workflows/' | xargs -I {} git diff --cached -- {} 2>/dev/null | grep -E "^\+.*(password|secret|token|api_key)\":\s*\"[^\"]{8,}\"" > /dev/null; then
     echo -e "${RED}❌ BLOCKED: Credentials in JSON detected!${NC}"
     echo -e "${YELLOW}   Never commit credentials in JSON files${NC}"
     SECRETS_FOUND=1

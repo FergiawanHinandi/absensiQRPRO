@@ -425,6 +425,7 @@ class BehaviorAnomalyService
         if (in_array($user->role_type, ['teacher', 'homeroom_teacher'])) {
             \App\Jobs\GenerateSecurityReportJob::dispatch(
                 $user->id,
+                $user->school_id,  // ✅ Pass school_id for tenant context
                 '7d',
                 'critical_behavior_risk_detected'
             );

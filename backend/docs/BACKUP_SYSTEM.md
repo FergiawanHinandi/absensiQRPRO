@@ -14,9 +14,11 @@ AbsensiQRPro implements a production-grade automated encrypted backup system usi
 ┌─────────────────────────────────────────────────────────────┐
 │                    BACKUP SCHEDULE                          │
 ├─────────────────────────────────────────────────────────────┤
-│  02:00 AM  │  Database backup (--only-db)                  │
+│  Every 15m │  Incremental DB backup (--only-db)            │
+│  02:00 AM  │  Full Database backup (--only-db)             │
 │  02:45 AM  │  Files backup (--only-files)                  │
-│  03:00 AM  │  Weekly cleanup (Sundays)                     │
+│  03:00 AM  │  Daily Cleanup                                │
+│  Monthly   │  Automated Restore Validation (1st of month)  │
 │  Every 6h  │  Health monitoring                            │
 └─────────────────────────────────────────────────────────────┘
                             │
@@ -98,17 +100,24 @@ Create a dedicated S3 bucket with:
 
 ## Commands
 
-### Manual Backup
+### Manual Backup (Monitored)
 
 ```bash
 # Full backup (database + files)
-php artisan backup:run
+php artisan backup:monitored
 
 # Database only
-php artisan backup:run --only-db
+php artisan backup:monitored --only-db
 
 # Files only
-php artisan backup:run --only-files
+php artisan backup:monitored --only-files
+```
+
+### Automated Validation
+
+```bash
+# Run the validation process immediately
+php artisan backup:validate-restore
 ```
 
 ### Health Check
@@ -270,3 +279,50 @@ php artisan backup:test-restore --disk=backups-s3
 - `app/Http/Controllers/Api/V1/Admin/SystemHealthController.php` - API endpoint
 - `routes/api.php` - API route
 - `.env.example` - Environment template
+
+## 📊 Recovery Objectives (RTO & RPO)
+
+### Recovery Point Objective (RPO)
+**Target: 15 Minutes**
+- **Database**: We perform incremental (full snap) backups every 15 minutes. In a worst-case disaster, maximum data loss is ~15 minutes of transactions.
+- **Files (Uploads)**: Backed up daily (24h RPO). This is acceptable as file changes are less frequent and often recoverable from source or not business-critical for immediate operations.
+
+### Recovery Time Objective (RTO)
+**Target: < 1 Hour**
+- **Database Restore**: ~15-30 minutes depending on size.
+- **Files Restore**: ~30-60 minutes depending on S3 download speed.
+- **System Availability**: The application can be brought up in maintenance mode within minutes, with full functionality restored once the database is populated.
+
+## ✅ Restore Validation Checklist
+
+Use this checklist for Monthly Manual Verification or when reviewing Automated Validation logs.
+
+### 1. Preparation
+- [ ] Identify the backup artifact to restore (Date/Time).
+- [ ] Ensure `BACKUP_ENCRYPTION_KEY` is available.
+- [ ] Prepare a clean environment (staging server or local Docker container). **NEVER** test on production.
+
+### 2. Execution
+- [ ] Download the backup zip file.
+- [ ] Unzip and decrypt the payload.
+- [ ] Verify the SQL dump file exists and is not empty.
+- [ ] Import the SQL dump into the test database.
+  ```bash
+  psql -U user -d test_db < dump.sql
+  ```
+
+### 3. Data Integrity Verification
+- [ ] **User Count**: Check if total users match expected range.
+  `SELECT count(*) FROM users;`
+- [ ] **Recent Data**: specific check for recent attendance records.
+  `SELECT * FROM attendances ORDER BY created_at DESC LIMIT 5;`
+- [ ] **Foreign Keys**: Ensure no orphaned records (handled by DB constraints, but good to verify).
+- [ ] **Application Logic**: Login as a Super Admin and browse the dashboard.
+
+### 4. File Verification
+- [ ] Check if `storage/app/public` contains readable images.
+- [ ] Open a random sample of 3 uploaded files/photos.
+
+### 5. Completion
+- [ ] Log the result of the test (Success/Failure/Notes).
+- [ ] Destroy the test environment/database to prevent data leaks.

@@ -280,7 +280,7 @@ class N1QueryPreventionExamples
 
         // ✅ CRITICAL: Fetch ALL attendances in ONE query
         $startDate = $month.'-01';
-        $endDate = date('Y-m-t', strtotime($startDate));
+        $endDate = \Carbon\Carbon::parse($startDate)->endOfMonth()->format('Y-m-d');
 
         $studentIds = $students->pluck('id')->toArray();
         $allAttendances = \App\Models\Attendance::whereIn('student_id', $studentIds)

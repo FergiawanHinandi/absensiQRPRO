@@ -134,7 +134,7 @@ class BillingController extends Controller
 
         // Sort by date desc
         usort($data, function ($a, $b) {
-            return strtotime($b['paid_at']) - strtotime($a['paid_at']);
+            return Carbon::parse($b['paid_at'])->timestamp - Carbon::parse($a['paid_at'])->timestamp;
         });
 
         return $data;
@@ -152,7 +152,7 @@ class BillingController extends Controller
             $dueDate = $date->copy()->addDays(7);
 
             $data[] = [
-                'id' => 'INV-'.date('Y').'-'.str_pad($i, 4, '0', STR_PAD_LEFT),
+                'id' => 'INV-'.now()->year.'-'.str_pad($i, 4, '0', STR_PAD_LEFT),
                 'school_id' => rand(1, 10),
                 'school_name' => $schools[array_rand($schools)],
                 'package' => ['Basic', 'Pro', 'Premium'][rand(0, 2)],

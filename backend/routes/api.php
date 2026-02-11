@@ -24,6 +24,9 @@ Route::prefix('v1')
     ->middleware('rate.limit:global')
     ->group(function () {
         
+        // Webhooks (Public - no auth required)
+        require __DIR__ . '/api/v1/webhook.php';
+        
         // Common / Public
         require __DIR__ . '/api/v1/common.php';
         
@@ -35,6 +38,9 @@ Route::prefix('v1')
             
             // Attendance (Scan/Manual)
             require __DIR__ . '/api/v1/attendance.php';
+            
+            // ✅ SECURE ATTENDANCE (QR with HMAC signature)
+            require __DIR__ . '/api/v1/secure-attendance.php';
             
             // Student
             require __DIR__ . '/api/v1/student.php';
@@ -50,6 +56,9 @@ Route::prefix('v1')
             
             // Principal
             require __DIR__ . '/api/v1/principal.php';
+            
+            // Super Admin
+            require __DIR__ . '/api/v1/super-admin.php';
             
         });
     });

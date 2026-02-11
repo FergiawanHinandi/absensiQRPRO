@@ -157,14 +157,38 @@ class JsonLogFormatter extends BaseJsonFormatter
         // Handle exceptions
         if (isset($normalized['context']['exception'])) {
             $exception = $normalized['context']['exception'];
-            $normalized['exception'] = [
-                'class' => $exception['class'] ?? get_class($record->context['exception'] ?? new \Exception()),
-                'message' => $exception['message'] ?? '',
-                'code' => $exception['code'] ?? 0,
-                'file' => $exception['file'] ?? '',
-                'line' => $exception['line'] ?? 0,
-                'trace' => $exception['trace'] ?? [],
-            ];
+            
+            // Check if exception is an object or already normalized array
+            if (is_object($record->context['exception'] ?? null)) {
+                $exceptionObj = $record->context['exception'];
+                $normalized['exception'] = [
+                    'class' => get_class($exceptionObj),
+                    'message' => $exceptionObj->getMessage(),
+                    'code' => $exceptionObj->getCode(),
+                    'file' => $exceptionObj->getFile(),
+                    'line' => $exceptionObj->getLine(),
+                    'trace' => $exception['trace'] ?? [],
+                ];
+            } elseif (is_array($exception)) {
+                $normalized['exception'] = [
+                    'class' => $exception['class'] ?? 'Unknown',
+                    'message' => $exception['message'] ?? '',
+                    'code' => $exception['code'] ?? 0,
+                    'file' => $exception['file'] ?? '',
+                    'line' => $exception['line'] ?? 0,
+                    'trace' => $exception['trace'] ?? [],
+                ];
+            } else {
+                // Exception is a string or other type
+                $normalized['exception'] = [
+                    'class' => 'Unknown',
+                    'message' => is_string($exception) ? $exception : 'Unknown error',
+                    'code' => 0,
+                    'file' => '',
+                    'line' => 0,
+                    'trace' => [],
+                ];
+            }
             unset($normalized['context']['exception']);
         }
 

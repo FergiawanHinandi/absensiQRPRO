@@ -35,6 +35,12 @@ class AttendanceLog extends Model
         'new_status',
         'notes',
         'created_at',
+        // State machine transition fields
+        'from_state',
+        'to_state',
+        'performed_by',
+        'reason',
+        'changes',
     ];
 
     protected $casts = [
@@ -73,6 +79,11 @@ class AttendanceLog extends Model
     public function qrCode(): BelongsTo
     {
         return $this->belongsTo(QrCode::class);
+    }
+
+    public function performer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'performed_by');
     }
 
     // =========================================================================

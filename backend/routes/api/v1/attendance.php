@@ -34,8 +34,9 @@ use App\Http\Controllers\Api\V1\SecureAttendanceScanController;
 Route::middleware([
     'role:student',
     'ability:attendance:scan',
-    'attendance.security',      // NEW: Full security checks
-    'critical.rate.limit:qr-scan',
+    'attendance.security',      // Full security checks (replay, GPS, timestamp)
+    'idempotency:2',            // REQUIRED: Idempotency with 2min TTL
+    'attendance.rate.limit:qr-scan', // Specialized rate limiting
 ])->group(function () {
     Route::post('/attendance/scan', [AttendanceController::class, 'scan']);
 });
@@ -43,7 +44,7 @@ Route::middleware([
 // Teacher & Admin Scan Actions
 Route::middleware([
     'role:teacher,homeroom_teacher,admin,school_admin',
-    'attendance.security',      // NEW: Full security checks
+    'attendance.security',      // Full security checks
 ])->group(function () {
     Route::post('/attendance/scan-student', [
         TeacherScanController::class,
@@ -51,7 +52,8 @@ Route::middleware([
     ])->middleware([
         'teacher.device',
         'ability:attendance:scan',
-        'critical.rate.limit:qr-scan',
+        'idempotency:2',            // REQUIRED: Idempotency with 2min TTL
+        'attendance.rate.limit:qr-scan', // Specialized rate limiting
     ]);
     
     Route::post('/attendance/manual', [
@@ -60,7 +62,8 @@ Route::middleware([
     ])->middleware([
         'teacher.device',
         'ability:attendance:manual,*',
-        'school.rate.limit:60,1',
+        'idempotency:2',            // REQUIRED: Idempotency with 2min TTL
+        'attendance.rate.limit:manual-entry', // Specialized rate limiting
     ]);
 });
 
@@ -68,15 +71,15 @@ Route::middleware([
 Route::middleware([
     'role:teacher,homeroom_teacher',
     'teacher.device',
-    'attendance.security',      // NEW: Full security checks
-    'school.rate.limit:60,1',
+    'attendance.security',      // Full security checks
 ])->prefix('attendance/secure')->group(function () {
     Route::post('/scan', [
         SecureAttendanceScanController::class,
         'scan',
     ])->middleware([
         'ability:attendance:scan',
-        'critical.rate.limit:qr-scan',
+        'idempotency:2',            // REQUIRED: Idempotency with 2min TTL
+        'attendance.rate.limit:qr-scan', // Specialized rate limiting
     ]);
 
     Route::post('/scan-encoded', [
@@ -84,11 +87,15 @@ Route::middleware([
         'scanEncoded',
     ])->middleware([
         'ability:attendance:scan',
-        'critical.rate.limit:qr-scan',
+        'idempotency:2',            // REQUIRED: Idempotency with 2min TTL
+        'attendance.rate.limit:qr-scan', // Specialized rate limiting
     ]);
 
     Route::post('/generate-qr', [
         SecureAttendanceScanController::class,
         'generateQR',
-    ])->middleware('ability:qr:generate');
+    ])->middleware([
+        'ability:qr:generate',
+        'attendance.rate.limit:generate-qr', // Specialized rate limiting
+    ]);
 });

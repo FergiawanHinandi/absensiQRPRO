@@ -159,4 +159,21 @@ class StateViolationException extends Exception
             ),
         ];
     }
+
+    /**
+     * Create exception for direct attribute modification attempt
+     * 
+     * @param string $attribute The attribute that was attempted to modify
+     * @param string $hint Hint on how to properly change the value
+     */
+    public static function directModificationBlocked(string $attribute, string $hint): self
+    {
+        $exception = new self(
+            AttendanceState::INIT,
+            AttendanceState::INIT,
+            "Modifikasi langsung pada '{$attribute}' tidak diizinkan. {$hint}"
+        );
+        
+        return $exception;
+    }
 }

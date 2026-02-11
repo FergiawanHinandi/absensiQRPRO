@@ -25,6 +25,7 @@ import { useRiskOverview } from '../../modules/admin/hooks/useAdminService';
 import { AnnouncementWidget } from '../../components/AnnouncementWidget';
 import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import { getErrorMessage } from '../../utils/errorHandler';
 import {
     BarChart,
     Bar,
@@ -83,7 +84,7 @@ const AdminDashboard: React.FC = () => {
     if (error) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-                <ErrorMessage message="Gagal memuat laporan harian" onRetry={() => refetch()} />
+                <ErrorMessage message={getErrorMessage(error)} onRetry={() => refetch()} />
             </div>
         );
     }
@@ -145,7 +146,7 @@ const AdminDashboard: React.FC = () => {
             <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8" variants={itemVariants}>
                 {[
                     { title: "Siswa Terdaftar", value: stats?.total_students, bg: "from-blue-500 to-blue-600", icon: Users, shadow: "shadow-blue-200" },
-                    { title: "Presentase Hadir", value: `${stats?.total_students ? Math.round((stats.present / stats.total_students) * 100) : 0}%`, bg: "from-emerald-500 to-emerald-600", icon: CheckCircle2, shadow: "shadow-emerald-200" },
+                    { title: "Presentase Hadir", value: `${stats?.attendance_rate ?? 0}%`, bg: "from-emerald-500 to-emerald-600", icon: CheckCircle2, shadow: "shadow-emerald-200" },
                     { title: "Siswa Terlambat", value: stats?.late, bg: "from-amber-400 to-amber-500", icon: Clock, shadow: "shadow-amber-200" },
                     { title: "Tanpa Keterangan", value: stats?.alpha, bg: "from-red-500 to-red-600", icon: AlertTriangle, shadow: "shadow-red-200" },
                     { title: "Risiko Tinggi", value: riskData?.high_risk_count || 0, bg: "from-orange-500 to-orange-600", icon: AlertCircle, shadow: "shadow-orange-200", onClick: () => navigate('/admin/risk-overview') }

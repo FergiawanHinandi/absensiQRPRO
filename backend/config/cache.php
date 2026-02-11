@@ -94,8 +94,9 @@ return [
         'failover' => [
             'driver' => 'failover',
             'stores' => [
-                'database',
-                'array',
+                'redis',      // Primary: Fast in-memory cache
+                'database',   // Secondary: Persistent fallback
+                'array',      // Tertiary: Request-scoped fallback
             ],
         ],
 

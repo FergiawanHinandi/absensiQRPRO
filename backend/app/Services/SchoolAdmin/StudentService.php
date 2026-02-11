@@ -2,7 +2,10 @@
 
 namespace App\Services\SchoolAdmin;
 
+use App\Models\ClassModel;
+use App\Models\ClassStudent;
 use App\Models\User;
+use App\Models\UserProfile;
 use App\Traits\HasSchoolLimits;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +38,7 @@ class StudentService
                 'is_active' => true,
             ]);
 
-            DB::table('user_profiles')->insert([
+            UserProfile::create([
                 'user_id' => $student->id,
                 'full_name' => $validated['name'],
                 'nisn' => $validated['nisn'] ?? null,
@@ -43,17 +46,13 @@ class StudentService
                 'birth_date' => $validated['birth_date'] ?? null,
                 'phone' => $validated['phone'] ?? null,
                 'address' => $validated['address'] ?? null,
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
 
-            DB::table('class_students')->insert([
+            ClassStudent::create([
                 'class_id' => $validated['class_id'],
                 'student_id' => $student->id,
                 'enrollment_date' => now()->toDateString(),
                 'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
 
             // Parent handling (if needed)
@@ -75,7 +74,7 @@ class StudentService
      */
     public function updateMutation(int $studentId, string $status, int $schoolId)
     {
-        $active = DB::table('class_students')
+        $active = ClassStudent::query()
             ->join('classes', 'class_students.class_id', '=', 'classes.id')
             ->where('class_students.student_id', $studentId)
             ->where('class_students.status', 'active')
@@ -87,11 +86,9 @@ class StudentService
             throw new Exception('Siswa belum memiliki kelas aktif.');
         }
 
-        DB::table('class_students')
-            ->where('id', $active->id)
+        ClassStudent::where('id', $active->id)
             ->update([
                 'status' => $status,
-                'updated_at' => now(),
             ]);
 
         return true;
@@ -103,8 +100,7 @@ class StudentService
     public function updatePlacement(int $studentId, int $classId, int $schoolId)
     {
         // Verify class belongs to school
-        $classExists = DB::table('classes')
-            ->where('school_id', $schoolId)
+        $classExists = ClassModel::where('school_id', $schoolId)
             ->where('id', $classId)
             ->exists();
 
@@ -114,7 +110,7 @@ class StudentService
 
         DB::transaction(function () use ($studentId, $classId, $schoolId) {
             // SECURITY: Validate student enrollment belongs to same school
-            $existing = DB::table('class_students')
+            $existing = ClassStudent::query()
                 ->join('classes', 'class_students.class_id', '=', 'classes.id')
                 ->where('class_students.student_id', $studentId)
                 ->where('class_students.status', 'active')
@@ -127,21 +123,17 @@ class StudentService
             }
 
             if ($existing) {
-                DB::table('class_students')
-                    ->where('id', $existing->id)
+                ClassStudent::where('id', $existing->id)
                     ->update([
                         'status' => 'moved',
-                        'updated_at' => now(),
                     ]);
             }
 
-            DB::table('class_students')->insert([
+            ClassStudent::create([
                 'class_id' => $classId,
                 'student_id' => $studentId,
                 'enrollment_date' => now()->toDateString(),
                 'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
         });
 
@@ -161,8 +153,7 @@ class StudentService
 
         $classMap = [];
         if (! empty($classNames)) {
-            $classMap = DB::table('classes')
-                ->where('school_id', $schoolId)
+            $classMap = ClassModel::where('school_id', $schoolId)
                 ->whereIn('name', array_map('trim', $classNames))
                 ->pluck('id', 'name')
                 ->mapWithKeys(fn ($id, $name) => [strtolower($name) => $id])
@@ -171,8 +162,7 @@ class StudentService
 
         $classIdMap = [];
         if (! empty($classIds)) {
-            $classIdMap = DB::table('classes')
-                ->where('school_id', $schoolId)
+            $classIdMap = ClassModel::where('school_id', $schoolId)
                 ->whereIn('id', $classIds)
                 ->pluck('id', 'id')
                 ->toArray();
@@ -321,10 +311,10 @@ class StudentService
                 }
 
                 if (! empty($profileData)) {
-                    DB::table('user_profiles')->insert($profileData);
+                    UserProfile::insert($profileData);
                 }
                 if (! empty($pivotData)) {
-                    DB::table('class_students')->insert($pivotData);
+                    ClassStudent::insert($pivotData);
                 }
             }
 
@@ -398,7 +388,7 @@ class StudentService
             $student->update($userUpdate);
 
             // Update Profile
-            DB::table('user_profiles')->updateOrInsert(
+            UserProfile::updateOrCreate(
                 ['user_id' => $student->id],
                 [
                     'full_name' => $validated['name'],
@@ -407,31 +397,25 @@ class StudentService
                     'birth_date' => $validated['birth_date'] ?? null,
                     'phone' => $validated['phone'] ?? null,
                     'address' => $validated['address'] ?? null,
-                    'updated_at' => now(),
                 ]
             );
 
             // Update Class if changed
             if (isset($validated['class_id'])) {
-                $currentClass = DB::table('class_students')
-                    ->where('student_id', $student->id)
+                $currentClass = ClassStudent::where('student_id', $student->id)
                     ->where('status', 'active')
                     ->first();
 
                 if (! $currentClass || $currentClass->class_id != $validated['class_id']) {
                     if ($currentClass) {
-                        DB::table('class_students')
-                            ->where('id', $currentClass->id)
-                            ->update(['status' => 'moved', 'updated_at' => now()]);
+                        $currentClass->update(['status' => 'moved']);
                     }
 
-                    DB::table('class_students')->insert([
+                    ClassStudent::create([
                         'student_id' => $student->id,
                         'class_id' => $validated['class_id'],
                         'status' => 'active',
                         'enrollment_date' => now()->toDateString(),
-                        'created_at' => now(),
-                        'updated_at' => now(),
                     ]);
                 }
             }

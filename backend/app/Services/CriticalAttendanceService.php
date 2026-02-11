@@ -98,22 +98,26 @@ class CriticalAttendanceService
                 throw new \Exception('Siswa sudah absen untuk pelajaran ini.');
             }
 
-            // 5. CRITICAL: Record Attendance with all required fields
-            $attendance = Attendance::create([
-                'school_id' => $teacher->school_id,
-                'class_id' => $schedule->class_id,
-                'schedule_id' => $schedule->id,
-                'student_id' => $studentId,
-                'attendance_date' => today(),
-                'attendance_type' => 'qr_scan',
-                'status' => 'present',
-                'check_in_time' => now(),
-                'lat_in' => $lat,
-                'lng_in' => $lng,
-                'recorded_by' => $teacher->id,
-                'is_manual' => false,
-                'request_id' => request()->header('X-Request-ID', uniqid()),
-            ]);
+            // 5. CRITICAL: Record Attendance with all required fields (using firstOrCreate)
+            $attendance = Attendance::firstOrCreate(
+                [
+                    'student_id' => $studentId,
+                    'schedule_id' => $schedule->id,
+                    'attendance_date' => today(),
+                    'school_id' => $teacher->school_id,
+                ],
+                [
+                    'class_id' => $schedule->class_id,
+                    'attendance_type' => 'qr_scan',
+                    'status' => 'present',
+                    'check_in_time' => now(),
+                    'lat_in' => $lat,
+                    'lng_in' => $lng,
+                    'recorded_by' => $teacher->id,
+                    'is_manual' => false,
+                    'request_id' => request()->header('X-Request-ID', uniqid()),
+                ]
+            );
 
             // 6. CRITICAL: Cache invalidation for performance
             Cache::forget("attendance_summary_{$teacher->school_id}_".today()->format('Y-m-d'));

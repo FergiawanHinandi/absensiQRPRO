@@ -7,6 +7,7 @@ use App\Models\AttendanceFlag;
 use App\Models\SecurityAlert;
 use App\Models\TeacherAttendanceAnomaly;
 use App\Models\TeacherDevice;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -229,7 +230,7 @@ class AdminSecurityAlertController extends Controller
         }
 
         // Sort all alerts by created_at desc
-        usort($alerts, fn ($a, $b) => strtotime($b['created_at']) - strtotime($a['created_at']));
+        usort($alerts, fn ($a, $b) => Carbon::parse($b['created_at'])->timestamp - Carbon::parse($a['created_at'])->timestamp);
 
         // Slice to limit
         $alerts = array_slice($alerts, 0, $limit);

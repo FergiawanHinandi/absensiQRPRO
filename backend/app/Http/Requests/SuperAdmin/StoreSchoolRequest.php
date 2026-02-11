@@ -28,6 +28,10 @@ class StoreSchoolRequest extends FormRequest
             'address' => 'required',
             'email' => 'required|email|unique:schools,email',
             'phone' => 'nullable',
+            'timezone' => 'nullable|string|timezone',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'radius_meters' => 'nullable|integer|min:0|max:1000',
         ];
     }
 }

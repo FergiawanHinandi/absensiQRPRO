@@ -1,0 +1,72 @@
+name: PHPStan Static Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**/*.php'
+      - 'backend/phpstan.neon'
+      - 'backend/composer.json'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/**/*.php'
+      - 'backend/phpstan.neon'
+      - 'backend/composer.json'
+
+jobs:
+  phpstan:
+    name: PHPStan Analysis
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_pgsql, redis
+          coverage: none
+      
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+      
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+      
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress --no-suggest --optimize-autoloader
+      
+      - name: Create Laravel storage structure
+        run: |
+          mkdir -p storage/framework/cache
+          mkdir -p storage/framework/sessions
+          mkdir -p storage/framework/testing
+          mkdir -p storage/framework/views
+          mkdir -p storage/logs
+      
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+      
+      - name: Generate Laravel app key
+        run: php artisan key:generate --ansi
+      
+      - name: Run PHPStan
+        run: composer analyse
+      
+      - name: Annotate code with PHPStan results
+        if: failure()
+        run: |
+          echo "❌ PHPStan found issues that must be fixed before merge"
+          echo "Run 'composer analyse' locally to see detailed errors"

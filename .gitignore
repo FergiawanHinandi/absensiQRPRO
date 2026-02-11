@@ -1,0 +1,76 @@
+# ==============================================
+# AbsensiQRPro - Root .gitignore
+# ==============================================
+
+# ---- OS artifacts ----
+.DS_Store
+Thumbs.db
+Desktop.ini
+nul
+*.swp
+*.swo
+*~
+
+# ---- IDE / Editor ----
+.idea/
+.vscode/
+.fleet/
+.nova/
+.zed/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ---- Claude / AI temp files ----
+tmpclaude-*
+claude_output*
+
+# ---- AI-generated analysis docs (archived) ----
+docs/_archive/
+
+# ---- Node / JS ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- PHP / Composer ----
+/vendor/
+
+# ---- Environment files ----
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend-web/.env.example
+!AbsensiQRMobile/.env.example
+
+# ---- Build outputs ----
+dist/
+dist-ssr/
+build/
+*.local
+
+# ---- Logs ----
+logs/
+*.log
+
+# ---- Backup & archive files ----
+*.bak
+*.php.bak
+*.zip
+*.tar.gz
+*.rar
+
+# ---- Test artifacts ----
+coverage/
+*.lcov
+.phpunit.result.cache
+.phpunit.cache/
+
+# ---- Misc ----
+*.key
+test-login.json
+test_login.json

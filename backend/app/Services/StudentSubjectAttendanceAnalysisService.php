@@ -13,8 +13,7 @@ class StudentSubjectAttendanceAnalysisService
     public function analyzePerSubject(int $studentId): array
     {
         // Grouped query by subject_id
-        $rows = DB::table('attendances')
-            ->select([
+        $rows = Attendance::select([
                 'subject_id',
                 DB::raw('count(*) as total'),
                 DB::raw("sum(case when status = 'present' then 1 else 0 end) as present_count"),

@@ -125,23 +125,18 @@ class RiskDashboardController extends Controller
 
     private function getSuperAdminStats()
     {
-        // Aggregate risk stats per school
-        $stats = DB::table('schools')
-            ->select('schools.id', 'schools.name')
-            // This is a complex aggregation if we want "Latest" risks per student per school.
-            // Simplified approach: Join users, join risks.
-            // CAUTION: This counts ALL risk history if we aren't careful.
-            // We need "Latest Risk Per Student".
+        // Subquery: get the latest risk record ID per student (safe, no raw SQL with user input)
+        $latestRiskSubquery = DB::table('student_attendance_risk')
+            ->selectRaw('MAX(id) as max_id, student_id')
+            ->groupBy('student_id');
 
-            // Subquery for latest risks
+        // Aggregate risk stats per school using safe subquery join
+        $stats = DB::table('schools')
             ->leftJoin('users', 'schools.id', '=', 'users.school_id')
-            ->leftJoin('student_attendance_risk', function ($join) {
-                $join->on('users.id', '=', 'student_attendance_risk.student_id')
-                     // Ensure we only get the latest record?
-                     // Row_number() is best but complex in basic Eloquent.
-                     // Let's use a WHERE In subquery approach or just join the latest ID subquery again.
-                    ->whereRaw('student_attendance_risk.id = (SELECT MAX(id) FROM student_attendance_risk as sar WHERE sar.student_id = users.id)');
+            ->leftJoinSub($latestRiskSubquery, 'latest_risk', function ($join) {
+                $join->on('users.id', '=', 'latest_risk.student_id');
             })
+            ->leftJoin('student_attendance_risk', 'student_attendance_risk.id', '=', 'latest_risk.max_id')
             ->where('users.role_type', 'student')
             ->select(
                 'schools.id',

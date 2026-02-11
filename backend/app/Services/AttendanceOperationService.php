@@ -38,10 +38,13 @@ class AttendanceOperationService
     private const MAX_UPDATE_DAYS = 7;
 
     /**
-     * Update attendance status
+     * Update attendance metadata (notes, etc.) - NOT status
+     *
+     * IMPORTANT: Status changes MUST go through state machine methods.
+     * This method only updates non-state fields like notes.
      *
      * @param int $attendanceId
-     * @param array $data ['status', 'notes', 'reason']
+     * @param array $data ['notes', 'reason'] - status is NOT allowed
      * @param User $updatedBy
      * @return Attendance
      * @throws AttendanceException
@@ -55,34 +58,35 @@ class AttendanceOperationService
             // 2. Validate business rules
             $this->validateUpdateRules($attendance, $updatedBy);
 
-            // 3. Store old values for audit
-            $oldStatus = $attendance->status;
+            // 3. SECURITY: Remove status/state from data - use state machine instead
+            if (isset($data['status']) || isset($data['state'])) {
+                Log::channel('security')->warning('Attempted status bypass via update()', [
+                    'attendance_id' => $attendanceId,
+                    'attempted_status' => $data['status'] ?? $data['state'] ?? null,
+                    'user_id' => $updatedBy->id,
+                ]);
+                throw new AttendanceException(
+                    'Status tidak dapat diubah langsung. Gunakan metode yang sesuai: checkIn(), checkOut(), approve(), atau reject().'
+                );
+            }
+
+            // 4. Store old values for audit
             $oldNotes = $attendance->notes;
 
-            // 4. Update via model (triggers observers)
-            $attendance->status = $data['status'];
+            // 5. Update only allowed fields (status excluded)
             $attendance->notes = $data['notes'] ?? $attendance->notes;
             $attendance->updated_by = $updatedBy->id;
             $attendance->save();
 
-            // 5. Create audit log
+            // 6. Create audit log
             $this->createAuditLog($attendance, 'update', [
-                'old_status' => $oldStatus,
-                'new_status' => $data['status'],
                 'old_notes' => $oldNotes,
                 'new_notes' => $data['notes'] ?? null,
                 'reason' => $data['reason'] ?? null,
             ], $updatedBy);
 
-            // 6. Dispatch event
-            if (class_exists(AttendanceUpdated::class)) {
-                event(new AttendanceUpdated($attendance, $oldStatus, $data['status']));
-            }
-
-            Log::channel('attendance')->info('Attendance updated', [
+            Log::channel('attendance')->info('Attendance metadata updated', [
                 'attendance_id' => $attendance->id,
-                'old_status' => $oldStatus,
-                'new_status' => $data['status'],
                 'updated_by' => $updatedBy->id,
             ]);
 
@@ -133,7 +137,7 @@ class AttendanceOperationService
     }
 
     /**
-     * Approve correction request
+     * Approve correction request using state machine
      *
      * @param int $attendanceId
      * @param User $approver
@@ -149,10 +153,11 @@ class AttendanceOperationService
             $this->validateApproval($attendance, $approver);
 
             $oldStatus = $attendance->status;
-            $newStatus = $attendance->correction_requested_status;
 
-            // Apply correction
-            $attendance->status = $newStatus;
+            // Use state machine to approve
+            $attendance->approve($approver, $notes);
+            
+            // Update correction-specific fields
             $attendance->correction_status = 'approved';
             $attendance->correction_approved_at = now();
             $attendance->correction_approved_by = $approver->id;
@@ -162,15 +167,15 @@ class AttendanceOperationService
             // Create audit log
             $this->createAuditLog($attendance, 'correction_approved', [
                 'old_status' => $oldStatus,
-                'new_status' => $newStatus,
+                'new_state' => $attendance->getCurrentState()->value,
                 'notes' => $notes,
             ], $approver);
 
-            Log::channel('attendance')->info('Correction approved', [
+            Log::channel('attendance')->info('Correction approved via state machine', [
                 'attendance_id' => $attendance->id,
                 'approved_by' => $approver->id,
                 'old_status' => $oldStatus,
-                'new_status' => $newStatus,
+                'new_state' => $attendance->getCurrentState()->value,
             ]);
 
             return $attendance->fresh();
@@ -178,7 +183,7 @@ class AttendanceOperationService
     }
 
     /**
-     * Reject correction request
+     * Reject correction request using state machine
      *
      * @param int $attendanceId
      * @param User $rejecter
@@ -193,7 +198,10 @@ class AttendanceOperationService
             // Validate rejection
             $this->validateApproval($attendance, $rejecter);
 
-            // Mark as rejected
+            // Use state machine to reject
+            $attendance->reject($rejecter, $reason);
+
+            // Update correction-specific fields
             $attendance->correction_status = 'rejected';
             $attendance->correction_approved_at = now();
             $attendance->correction_approved_by = $rejecter->id;
@@ -203,12 +211,14 @@ class AttendanceOperationService
             // Create audit log
             $this->createAuditLog($attendance, 'correction_rejected', [
                 'reason' => $reason,
+                'new_state' => $attendance->getCurrentState()->value,
             ], $rejecter);
 
-            Log::channel('attendance')->info('Correction rejected', [
+            Log::channel('attendance')->info('Correction rejected via state machine', [
                 'attendance_id' => $attendance->id,
                 'rejected_by' => $rejecter->id,
                 'reason' => $reason,
+                'new_state' => $attendance->getCurrentState()->value,
             ]);
 
             return $attendance;
@@ -217,6 +227,7 @@ class AttendanceOperationService
 
     /**
      * Create attendance records from permission (izin sakit/ijin)
+     * Uses state machine for proper state management
      *
      * @param object $permission Permission record
      * @param User $approvedBy
@@ -229,8 +240,8 @@ class AttendanceOperationService
             $start = Carbon::parse($permission->start_date);
             $end = Carbon::parse($permission->end_date);
 
-            // Map permission type to attendance status
-            $status = match ($permission->type) {
+            // Map permission type to attendance status (for legacy field)
+            $permissionStatus = match ($permission->type) {
                 'sick' => 'sick',
                 'permit', 'izin' => 'permit',
                 default => 'excused',
@@ -243,36 +254,58 @@ class AttendanceOperationService
                     continue;
                 }
 
-                // Find or create attendance record
-                $attendance = Attendance::updateOrCreate(
-                    [
-                        'school_id' => $permission->school_id,
-                        'student_id' => $permission->student_id,
-                        'attendance_date' => $start->toDateString(),
-                    ],
-                    [
-                        'class_id' => $permission->class_id,
-                        'status' => $status,
-                        'is_manual' => true,
-                        'attendance_type' => 'permission',
-                        'notes' => "Izin Digital: {$permission->reason}",
-                        'recorded_by' => $approvedBy->id,
-                        'permission_id' => $permission->id,
-                    ]
-                );
+                // Find existing attendance
+                $attendance = Attendance::where('school_id', $permission->school_id)
+                    ->where('student_id', $permission->student_id)
+                    ->whereDate('attendance_date', $start->toDateString())
+                    ->first();
+
+                if ($attendance) {
+                    // Update existing record metadata (not status)
+                    $attendance->is_manual = true;
+                    $attendance->attendance_type = 'permission';
+                    $attendance->notes = "Izin Digital: {$permission->reason}";
+                    $attendance->recorded_by = $approvedBy->id;
+                    $attendance->permission_id = $permission->id;
+                    $attendance->save();
+                } else {
+                    // Create new attendance using firstOrCreate
+                    $attendance = Attendance::firstOrCreate(
+                        [
+                            'student_id' => $permission->student_id,
+                            'school_id' => $permission->school_id,
+                            'attendance_date' => $start->toDateString(),
+                        ],
+                        [
+                            'class_id' => $permission->class_id,
+                            'is_manual' => true,
+                            'attendance_type' => 'permission',
+                            'notes' => "Izin Digital: {$permission->reason}",
+                            'recorded_by' => $approvedBy->id,
+                            'permission_id' => $permission->id,
+                            'status' => $permissionStatus,
+                        ]
+                    );
+                    
+                    // Set initial state if newly created
+                    if ($attendance->wasRecentlyCreated) {
+                        $attendance->setStateInternal(\App\Enums\AttendanceState::CHECKED_IN);
+                        $attendance->save();
+                    }
+                }
 
                 // Create audit log
                 $this->createAuditLog($attendance, 'created_from_permission', [
                     'permission_id' => $permission->id,
                     'permission_type' => $permission->type,
-                    'status' => $status,
+                    'state' => $attendance->getCurrentState()->value,
                 ], $approvedBy);
 
                 $attendances->push($attendance);
                 $start->addDay();
             }
 
-            Log::channel('attendance')->info('Attendance created from permission', [
+            Log::channel('attendance')->info('Attendance created from permission via state machine', [
                 'permission_id' => $permission->id,
                 'student_id' => $permission->student_id,
                 'count' => $attendances->count(),

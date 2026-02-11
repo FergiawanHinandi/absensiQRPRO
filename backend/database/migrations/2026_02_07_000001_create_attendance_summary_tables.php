@@ -32,6 +32,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('daily_attendance_summaries')) {
+            return;
+        }
+
         Schema::create('daily_attendance_summaries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained('schools')->cascadeOnDelete();
@@ -51,6 +55,7 @@ return new class extends Migration
             // Pre-calculated rates
             $table->decimal('attendance_rate', 5, 2)->default(0); // (present+late)/total * 100
             $table->decimal('presence_rate', 5, 2)->default(0);   // present/total * 100
+            $table->decimal('late_rate', 5, 2)->default(0);       // late/total * 100
 
             // Schedule info
             $table->unsignedInteger('total_schedules')->default(0);
@@ -70,6 +75,7 @@ return new class extends Migration
         });
 
         // Create monthly summary table for long-term reports
+        if (!Schema::hasTable('monthly_attendance_summaries')) {
         Schema::create('monthly_attendance_summaries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained('schools')->cascadeOnDelete();
@@ -102,8 +108,10 @@ return new class extends Migration
             $table->index(['school_id', 'year', 'month'], 'idx_monthly_school');
             $table->index(['class_id', 'year', 'month'], 'idx_monthly_class');
         });
+        }
 
         // Create student attendance summary for per-student reports
+        if (!Schema::hasTable('student_attendance_summaries')) {
         Schema::create('student_attendance_summaries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('school_id')->constrained('schools')->cascadeOnDelete();
@@ -140,6 +148,7 @@ return new class extends Migration
             $table->index(['school_id', 'class_id', 'year', 'month'], 'idx_class_student_monthly');
             $table->index(['school_id', 'risk_level'], 'idx_risk_students');
         });
+        }
     }
 
     public function down(): void

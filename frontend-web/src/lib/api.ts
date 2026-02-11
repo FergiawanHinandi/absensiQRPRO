@@ -28,10 +28,23 @@ apiClient.interceptors.request.use((config) => {
 });
 
 /**
- * Response interceptor - handles auth errors and clears memory token
+ * Response interceptor - handles auth errors, clears memory token, and formats responses
  */
 apiClient.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        // Auto-unwrap Laravel response format
+        if (response.data && typeof response.data === 'object' && 'success' in response.data && 'data' in response.data) {
+            return {
+                ...response,
+                data: response.data.data, // Extract nested data
+                _meta: {
+                    success: response.data.success,
+                    message: response.data.message,
+                },
+            };
+        }
+        return response;
+    },
     (error: AxiosError) => {
         if (error.response) {
             const { status, data } = error.response;

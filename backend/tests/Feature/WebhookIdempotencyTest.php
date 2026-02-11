@@ -26,6 +26,8 @@ class WebhookIdempotencyTest extends TestCase
         // Create test data manually
         $this->school = \App\Models\School::create([
             'name' => 'Test School',
+            'npsn' => 'TEST-NPSN-001',
+            'school_level' => 'SMA',
             'email' => 'test@school.com',
             'phone' => '123456789',
             'address' => 'Test Address',
@@ -39,7 +41,7 @@ class WebhookIdempotencyTest extends TestCase
         $this->package = \App\Models\SubscriptionPackage::create([
             'name' => 'Premium',
             'price' => 500000,
-            'duration_months' => 12,
+            'billing_cycle' => 'yearly',
             'features' => json_encode([
                 'max_students' => 500,
                 'max_teachers' => 50,

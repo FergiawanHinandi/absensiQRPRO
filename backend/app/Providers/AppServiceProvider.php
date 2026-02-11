@@ -19,7 +19,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Enterprise domain architecture
+        $this->app->register(DomainServiceProvider::class);
     }
 
     /**
@@ -41,6 +42,8 @@ class AppServiceProvider extends ServiceProvider
         // Register model observers
         \App\Models\School::observe(\App\Observers\SchoolObserver::class);
         \App\Models\User::observe(\App\Observers\UserObserver::class);
+        
+        // ✅ OPTIMIZATION: Auto-invalidate cache when attendance changes
         \App\Models\Attendance::observe(\App\Observers\AttendanceObserver::class);
 
         // Enforce strict mode in development to prevent N+1 and attribute errors
@@ -63,12 +66,113 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
+        // ============================================================
+        // SLOW QUERY LISTENER - Enhanced Monitoring
+        // ============================================================
+        // Logs queries taking longer than 500ms for performance optimization
+        // 
+        // FEATURES:
+        // - SQL query with bindings
+        // - Execution time in milliseconds
+        // - Request context (URL, method, user)
+        // - Stack trace for debugging
+        // - Query type detection (SELECT, INSERT, UPDATE, DELETE)
+        // 
+        \Illuminate\Support\Facades\DB::listen(function ($query) {
+            $threshold = config('database.slow_query_threshold', 500); // Default 500ms
+            
+            if ($query->time > $threshold) {
+                // Detect query type
+                $sql = strtoupper(trim($query->sql));
+                $queryType = 'UNKNOWN';
+                if (str_starts_with($sql, 'SELECT')) {
+                    $queryType = 'SELECT';
+                } elseif (str_starts_with($sql, 'INSERT')) {
+                    $queryType = 'INSERT';
+                } elseif (str_starts_with($sql, 'UPDATE')) {
+                    $queryType = 'UPDATE';
+                } elseif (str_starts_with($sql, 'DELETE')) {
+                    $queryType = 'DELETE';
+                }
+                
+                // Get user context if available
+                $user = request()->user();
+                $userContext = $user ? [
+                    'user_id' => $user->id,
+                    'user_role' => $user->role ?? 'unknown',
+                    'school_id' => $user->school_id ?? null,
+                ] : null;
+                
+                // Get stack trace (limited to avoid log bloat)
+                $trace = collect(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 10))
+                    ->filter(function ($item) {
+                        // Filter out framework internals
+                        return isset($item['file']) && 
+                               !str_contains($item['file'], 'vendor/laravel') &&
+                               !str_contains($item['file'], 'vendor/illuminate');
+                    })
+                    ->map(function ($item) {
+                        return [
+                            'file' => basename($item['file'] ?? ''),
+                            'line' => $item['line'] ?? 0,
+                            'function' => $item['function'] ?? '',
+                        ];
+                    })
+                    ->take(5)
+                    ->values()
+                    ->toArray();
+                
+                Log::warning('Slow Query Detected', [
+                    'query_type' => $queryType,
+                    'sql' => $query->sql,
+                    'bindings' => $query->bindings,
+                    'time_ms' => round($query->time, 2),
+                    'threshold_ms' => $threshold,
+                    'connection' => $query->connectionName,
+                    'request' => [
+                        'url' => request()->fullUrl(),
+                        'method' => request()->method(),
+                        'ip' => request()->ip(),
+                    ],
+                    'user' => $userContext,
+                    'stack_trace' => $trace,
+                    'timestamp' => now()->toIso8601String(),
+                ]);
+                
+                // CRITICAL: If query is extremely slow (>2000ms), log as error
+                if ($query->time > 2000) {
+                    Log::error('CRITICAL: Extremely Slow Query', [
+                        'query_type' => $queryType,
+                        'sql' => $query->sql,
+                        'time_ms' => round($query->time, 2),
+                        'action_required' => 'Immediate optimization needed',
+                    ]);
+                }
+            }
+        });
+
         Response::macro('success', function ($data = [], ?string $message = null, int $status = 200, array $headers = []) {
             return response()->json([
                 'success' => true,
                 'data' => $data,
                 'message' => $message,
             ], $status, $headers);
+        });
+
+        // Login rate limiting - prevent brute force attacks
+        RateLimiter::for('login', function (Request $request) {
+            $key = strtolower($request->input('username')) . '|' . $request->ip();
+            return Limit::perMinute(5)->by($key)->response(function () {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Terlalu banyak percobaan login. Silakan coba lagi dalam beberapa menit.',
+                ], 429);
+            });
+        });
+
+        // Global API rate limiting
+        RateLimiter::for('global', function (Request $request) {
+            return Limit::perMinute(60)->by($request->ip());
         });
 
         RateLimiter::for('scan', function (Request $request) {
@@ -94,8 +198,93 @@ class AppServiceProvider extends ServiceProvider
             ]);
         }
 
-        // Validate critical environment variables
+        // Validate critical environment variables (strict in production)
         $this->validateCriticalEnvVars();
+    }
+
+    /**
+     * CRITICAL: Validate environment variables at boot time
+     * 
+     * In production: Fails fast with exception if critical vars missing
+     * In other envs: Logs warnings for missing/invalid vars
+     */
+    private function validateCriticalEnvVars(): void
+    {
+        $isProduction = $this->app->environment('production');
+        
+        // CRITICAL: These variables MUST exist in production
+        $criticalVars = [
+            'APP_KEY' => [
+                'required' => true,
+                'validate' => fn($v) => !empty($v) && strlen($v) >= 32,
+                'message' => 'APP_KEY must be at least 32 characters',
+            ],
+            'QR_SECRET_KEY' => [
+                'required' => true,
+                'validate' => fn($v) => !empty($v) && strlen($v) >= 32,
+                'message' => 'QR_SECRET_KEY must be at least 32 characters (HMAC security)',
+            ],
+            'DB_CONNECTION' => [
+                'required' => true,
+                'validate' => fn($v) => in_array($v, ['mysql', 'pgsql', 'sqlite']),
+                'message' => 'DB_CONNECTION must be a valid driver',
+            ],
+        ];
+
+        // Production-only strict requirements
+        $productionVars = [
+            'APP_DEBUG' => [
+                'validate' => fn($v) => $v === 'false' || $v === false || $v === '0',
+                'message' => 'APP_DEBUG must be false in production',
+            ],
+        ];
+
+        $errors = [];
+        $warnings = [];
+
+        // Validate critical vars
+        foreach ($criticalVars as $var => $config) {
+            $value = env($var);
+            
+            if ($config['required'] && empty($value)) {
+                $errors[] = "Missing critical ENV: {$var} - {$config['message']}";
+                continue;
+            }
+
+            if (!empty($value) && isset($config['validate']) && !$config['validate']($value)) {
+                $errors[] = "Invalid ENV: {$var} - {$config['message']}";
+            }
+        }
+
+        // Validate production-only vars
+        if ($isProduction) {
+            foreach ($productionVars as $var => $config) {
+                $value = env($var);
+                
+                if (!$config['validate']($value)) {
+                    $errors[] = "Production requirement failed: {$var} - {$config['message']}";
+                }
+            }
+        }
+
+        // In production, fail fast if critical errors
+        if ($isProduction && !empty($errors)) {
+            $errorList = implode("\n- ", $errors);
+            throw new \RuntimeException(
+                "CRITICAL: Application cannot start due to environment errors:\n- {$errorList}\n\n" .
+                "Fix these issues before deploying to production."
+            );
+        }
+
+        // In non-production, log warnings
+        if (!empty($errors)) {
+            foreach ($errors as $error) {
+                Log::warning("Environment validation: {$error}", [
+                    'environment' => config('app.env'),
+                    'action_required' => 'Fix before deploying to production',
+                ]);
+            }
+        }
     }
 
     /**
@@ -148,8 +337,8 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Check for default QR_SECRET_KEY
-        $qrSecret = config('qr.secret_key');
-        if (empty($qrSecret) || $qrSecret === 'your-secret-key-here' || strlen($qrSecret) < 32) {
+        $qrSecret = config('qr.secret');
+        if (empty($qrSecret) || $qrSecret === 'change-this-in-production-must-be-32-chars-minimum' || strlen($qrSecret) < 32) {
             Log::channel('security')->critical('Default or weak QR_SECRET_KEY detected!', [
                 'environment' => config('app.env'),
                 'key_length' => strlen($qrSecret ?? ''),
@@ -166,47 +355,6 @@ class AppServiceProvider extends ServiceProvider
                 'action_required' => 'Use strong database password',
                 'security_impact' => 'Database vulnerable to unauthorized access',
             ]);
-        }
-    }
-
-    /**
-     * Validate critical environment variables
-     * 
-     * Logs warnings for missing configuration that could impact functionality
-     */
-    private function validateCriticalEnvVars(): void
-    {
-        $criticalVars = [
-            'RATE_LIMIT_LOGIN' => [
-                'description' => 'Login rate limit configuration',
-                'impact' => 'Using default value (5), may not match production requirements',
-            ],
-            'RATE_LIMIT_QR_SCAN' => [
-                'description' => 'QR scan rate limit configuration',
-                'impact' => 'Using default value (30), may not match production requirements',
-            ],
-            'APP_KEY' => [
-                'description' => 'Application encryption key',
-                'impact' => 'CRITICAL: Application cannot function without encryption key',
-            ],
-            'QUEUE_CONNECTION' => [
-                'description' => 'Queue driver configuration',
-                'impact' => 'Using default queue driver, async jobs may not work as expected',
-            ],
-        ];
-
-        foreach ($criticalVars as $var => $info) {
-            $value = env($var);
-            
-            if ($value === null || $value === '') {
-                Log::warning("Missing critical environment variable: {$var}", [
-                    'variable' => $var,
-                    'description' => $info['description'],
-                    'impact' => $info['impact'],
-                    'environment' => config('app.env'),
-                    'action_required' => "Set {$var} in .env file",
-                ]);
-            }
         }
     }
 }

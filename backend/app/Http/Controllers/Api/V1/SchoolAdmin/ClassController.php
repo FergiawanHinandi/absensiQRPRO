@@ -175,6 +175,10 @@ class ClassController extends Controller
                 'success' => true,
                 'message' => 'Kelas berhasil dihapus',
             ]);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Kelas tidak ditemukan'], 404);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }

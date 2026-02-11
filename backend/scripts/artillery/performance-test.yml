@@ -1,0 +1,69 @@
+config:
+  target: "http://localhost:8000"
+  processor: "./processor.js"
+  phases:
+    - duration: 60
+      arrivalRate: 10
+      name: "Warm Up (10 users/sec)"
+    - duration: 60
+      arrivalRate: 100
+      name: "Normal Load (100 users/sec)"
+    - duration: 30
+      arrivalRate: 500
+      name: "High Load (Stress Test - 500 users/sec)"
+      
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+  
+  # Ensure we capture custom metrics (need Artillery plugin or custom JS logic)
+  plugins:
+    metrics-by-endpoint: {}
+    expect: {}
+
+  variables:
+    teacher_token: "YOUR_TEACHER_TOKEN_HERE" # User must replace this!
+
+  engines:
+    http:
+      timeout: 10
+
+scenarios:
+  - name: "Dashboard Read (Teacher)"
+    weight: 70 # 70% of traffic is checking dashboard
+    flow:
+      - get:
+          url: "/api/v1/teacher/dashboard"
+          headers:
+            Authorization: "Bearer {{ teacher_token }}"
+          expect:
+            - statusCode: 200
+            - contentType: json
+          capture:
+            json: "$.data.total_students"
+            as: "student_count"
+
+  - name: "Attendance Check-In (Write)"
+    weight: 30 # 30% is actual check-in
+    flow:
+      - function: "generateIdempotencyKey"
+      - function: "generateCheckInPayload"
+      - post:
+          url: "/api/v1/attendance/manual"
+          headers:
+            Authorization: "Bearer {{ teacher_token }}"
+            X-Idempotency-Key: "{{ idempotencyKey }}"
+          json:
+            student_id: "{{ studentId }}"
+            schedule_id: "{{ scheduleId }}"
+            attendance_date: "2026-02-07"
+            status: "present"
+            lat: "{{ lat }}"
+            lng: "{{ lng }}"
+            device_id: "{{ deviceId }}"
+          expect:
+            - statusCode: 201
+            # Or 409 if duplicate/idempotency hit (which is fine for stress test mix)
+            # Or 422 if student/schedule invalid
+            # Performance test cares about response time, not strictly business logic success

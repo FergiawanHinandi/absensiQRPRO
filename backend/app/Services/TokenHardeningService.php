@@ -94,6 +94,15 @@ class TokenHardeningService
 
             $accessToken = $user->createToken($tokenName, ['*'], $expiresAt);
 
+            // BIND DEVICE ID (Strict Binding)
+            $deviceId = $request->header('X-Device-Id') ?? $request->input('device_id');
+            if ($deviceId) {
+                $accessToken->accessToken->forceFill([
+                    'device_id' => $deviceId,
+                    'user_agent' => substr($request->userAgent(), 0, 500),
+                ])->save();
+            }
+
             // Add device binding to access token for admins
             if ($isAdmin) {
                 $this->bindAccessToken($accessToken->accessToken, $deviceInfo);
@@ -172,6 +181,19 @@ class TokenHardeningService
             throw new \Exception('Session limit reached. Please log in again.', 401);
         }
 
+        // SECURITY: Enforce absolute session lifetime (30 days max)
+        if ($refreshToken->hasExceededSessionLifetime()) {
+            $refreshToken->revoke(RefreshToken::REVOKED_EXPIRED);
+
+            Log::channel('security')->info('Session expired: absolute lifetime exceeded', [
+                'user_id' => $user->id,
+                'session_started_at' => $refreshToken->session_started_at?->toIso8601String(),
+                'max_days' => RefreshToken::MAX_SESSION_DAYS,
+            ]);
+
+            throw new \Exception('Session has expired. Please log in again.', 401);
+        }
+
         // Validate device/IP binding for admin roles
         $deviceInfo = $this->extractDeviceInfo($request);
         $isAdmin = $this->isAdminRole($user);
@@ -190,6 +212,15 @@ class TokenHardeningService
             // Create new access token
             $expiresAt = now()->addMinutes(self::ACCESS_TOKEN_LIFETIME_MINUTES);
             $accessToken = $user->createToken('auth', ['*'], $expiresAt);
+
+            // BIND DEVICE ID (Strict Binding - Refresh)
+            $deviceId = $request->header('X-Device-Id') ?? $request->input('device_id');
+            if ($deviceId) {
+                $accessToken->accessToken->forceFill([
+                    'device_id' => $deviceId,
+                    'user_agent' => substr($request->userAgent(), 0, 500),
+                ])->save();
+            }
 
             if ($isAdmin) {
                 $this->bindAccessToken($accessToken->accessToken, $deviceInfo);

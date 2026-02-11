@@ -421,15 +421,19 @@ class TeacherAttendanceService
                 return $existing;
             }
 
-            return TeacherAttendance::create([
-                'school_id' => $data['school_id'],
-                'teacher_id' => $data['teacher_id'],
-                'attendance_date' => $data['attendance_date'],
-                'status' => $data['status'],
-                'notes' => $data['notes'] ?? null,
-                'is_manual' => true,
-                'recorded_by' => $recordedBy,
-            ]);
+            return TeacherAttendance::firstOrCreate(
+                [
+                    'teacher_id' => $data['teacher_id'],
+                    'attendance_date' => $data['attendance_date'],
+                    'school_id' => $data['school_id'],
+                ],
+                [
+                    'status' => $data['status'],
+                    'notes' => $data['notes'] ?? null,
+                    'is_manual' => true,
+                    'recorded_by' => $recordedBy,
+                ]
+            );
         });
     }
 

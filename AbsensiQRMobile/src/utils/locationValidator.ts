@@ -154,19 +154,38 @@ export const getCurrentLocation = (): Promise<LocationResult> => {
 };
 
 /**
- * Get location for attendance with validation
+ * Get location for attendance with metadata
+ * 
+ * SECURITY PRINCIPLE: Send mock flag to server, don't block client-side.
+ * Server has full visibility to log and decide on enforcement.
  * 
  * This function:
  * 1. Gets current GPS location
- * 2. Checks for mock/spoofed location
- * 3. Returns location or throws if mocked
+ * 2. Detects mock/spoofed location
+ * 3. Returns location WITH mock flag (server decides enforcement)
  */
 export const getValidatedLocation = async (): Promise<LocationResult> => {
     const location = await getCurrentLocation();
     
     if (location.isMocked) {
-        // Log security event
-        console.warn('SECURITY: Mock location detected!');
+        // Log security event but DON'T block - server will handle
+        console.warn('SECURITY: Mock location detected - sending flag to server');
+    }
+    
+    // Always return location with mock flag - server validates
+    return location;
+};
+
+/**
+ * @deprecated Use getValidatedLocation instead.
+ * This strict version blocks on mock detection client-side.
+ * Kept for backwards compatibility only.
+ */
+export const getValidatedLocationStrict = async (): Promise<LocationResult> => {
+    const location = await getCurrentLocation();
+    
+    if (location.isMocked) {
+        console.warn('SECURITY: Mock location detected - blocking scan');
         throw {
             code: 'MOCK_LOCATION',
             message: 'Terdeteksi lokasi palsu. Matikan aplikasi mock location.',
@@ -179,4 +198,5 @@ export const getValidatedLocation = async (): Promise<LocationResult> => {
 export default {
     getCurrentLocation,
     getValidatedLocation,
+    getValidatedLocationStrict, // Deprecated - use getValidatedLocation
 };

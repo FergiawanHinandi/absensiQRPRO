@@ -43,20 +43,22 @@ use Illuminate\Support\Str;
 final class AttendanceCheckInService
 {
     /**
-     * Lock timeout for preventing race conditions (seconds)
+     * @deprecated Use AttendanceLockService instead
      */
-    private const LOCK_TIMEOUT = 5;
+    private const LOCK_TIMEOUT = 10;  // Increased from 5 to 10 seconds
 
     /**
-     * Lock wait time (seconds)
+     * @deprecated Use AttendanceLockService instead
      */
-    private const LOCK_WAIT = 3;
+    private const LOCK_WAIT = 8;  // Increased from 3 to 8 seconds
 
     public function __construct(
         private StudentQrService $qrService,
         private AttendanceLogger $logger,
         private StudentNotificationService $notificationService,
         private GamificationService $gamificationService,
+        private AttendanceLockService $lockService,
+        private AttendanceIdempotencyService $idempotencyService,
         private ?QRSignatureService $signatureService = null,
         private ?QrReplayPreventionService $replayPreventionService = null,
         private ?SecurityAlertService $alertService = null,
@@ -122,25 +124,81 @@ final class AttendanceCheckInService
         // STEP 3: Check for active schedule
         $schedule = $this->findActiveSchedule($scheduleId, $student->school_id, $request);
 
-        // STEP 4: Validate device (anti-joki)
-        $this->validateDevice($student, $data['device_id'] ?? null, $request);
+        /*
+         * STEP 3.5: REDIS IDEMPOTENCY CHECK (FASTEST LAYER)
+         * =================================================
+         *
+         * This is the FASTEST protection layer against duplicates (~1ms).
+         * Uses Redis SET NX (Set if Not eXists) to atomically check and set a key.
+         *
+         * Key format: attendance_scan:{schedule_id}:{student_id}:{date}
+         * TTL: 120 seconds
+         *
+         * If this fails, we already have an attendance being processed.
+         * Return early to prevent:
+         * - Expensive database transactions
+         * - Concurrent lock contention
+         * - Multiple validations for same scan
+         *
+         * This complements (not replaces) the other protection layers:
+         * - Database transaction with row lock
+         * - Unique constraint
+         */
+        $serverDate = now()->toDateString();
+        if (!$this->idempotencyService->tryAcquire($schedule->id, $student->id, $serverDate)) {
+            Log::channel('attendance')->info('Redis idempotency blocked duplicate scan', [
+                'schedule_id' => $schedule->id,
+                'student_id' => $student->id,
+                'date' => $serverDate,
+            ]);
 
-        // STEP 5: Validate geofence
-        $this->validateLocation($student->school, $data['lat'] ?? null, $data['lng'] ?? null, $request);
+            // Try to return existing attendance record
+            $existingAttendance = $this->idempotencyService->getExistingAttendance(
+                $schedule->id,
+                $student->id,
+                $serverDate
+            );
 
-        // STEP 6: Validate time window
-        $attendanceStatus = $this->validateTimeWindow($schedule, $student->school);
+            if ($existingAttendance) {
+                return new AttendanceResult(
+                    success: true,
+                    attendance: $existingAttendance,
+                    message: 'Absensi sudah tercatat sebelumnya.',
+                    status: $existingAttendance->status,
+                    isIdempotentRetry: true
+                );
+            }
 
-        // STEP 7: Atomic check-in with race condition prevention
-        $attendance = $this->atomicCheckIn(
-            $student,
-            $schedule,
-            $attendanceStatus,
-            $data,
-            $requestId,
-            $nonce,
-            $request
-        );
+            // If no record found yet, another request is still processing
+            throw AttendanceException::alreadyRecorded();
+        }
+
+        // Wrap validation steps in try-catch to release idempotency key on failure
+        try {
+            // STEP 4: Validate device (anti-joki)
+            $this->validateDevice($student, $data['device_id'] ?? null, $request);
+
+            // STEP 5: Validate geofence
+            $this->validateLocation($student->school, $data['lat'] ?? null, $data['lng'] ?? null, $request);
+
+            // STEP 6: Validate time window
+            $attendanceStatus = $this->validateTimeWindow($schedule, $student->school);
+
+            // STEP 7: Atomic check-in with race condition prevention
+            $attendance = $this->atomicCheckIn(
+                $student,
+                $schedule,
+                $attendanceStatus,
+                $data,
+                $requestId,
+                $nonce,
+                $request
+            );
+        } catch (\Exception $e) {
+            // Release idempotency key if validation fails, allowing retry
+            $this->idempotencyService->release($schedule->id, $student->id, $serverDate);
+            throw $e;
+        }
 
         // STEP 8: Send Notification (Async/Fire & Forget)
         try {
@@ -196,19 +254,23 @@ final class AttendanceCheckInService
                 return $existing;
             }
 
-            // Create new attendance record
-            return Attendance::create([
-                'school_id' => $data['school_id'],
-                'schedule_id' => $data['schedule_id'],
-                'student_id' => $data['student_id'],
-                'attendance_date' => $data['attendance_date'],
-                'status' => $data['status'],
-                'notes' => $data['notes'] ?? null,
-                'is_manual' => true,
-                'attendance_type' => 'manual',
-                'recorded_by' => $recordedBy,
-                'check_in_time' => now(),
-            ]);
+            // Create new attendance record (using firstOrCreate)
+            return Attendance::firstOrCreate(
+                [
+                    'student_id' => $data['student_id'],
+                    'schedule_id' => $data['schedule_id'],
+                    'attendance_date' => $data['attendance_date'],
+                    'school_id' => $data['school_id'],
+                ],
+                [
+                    'status' => $data['status'],
+                    'notes' => $data['notes'] ?? null,
+                    'is_manual' => true,
+                    'attendance_type' => 'manual',
+                    'recorded_by' => $recordedBy,
+                    'check_in_time' => now(),
+                ]
+            );
         });
     }
 
@@ -664,89 +726,89 @@ final class AttendanceCheckInService
          * Layer 1: Application-Level Lock (Cache/Redis)
          * - Provides fast, distributed lock before touching the database
          * - Reduces database contention under high load
-         * - Works across multiple app servers
+         * MULTI-LAYER CONCURRENCY PROTECTION
+         * ===================================
          *
-         * Layer 2: Database Transaction
-         * - Ensures all-or-nothing semantics
-         * - Auto-rollback on any failure
+         * Layer 1: Application-level distributed lock (NEW: AttendanceLockService)
+         * - Prevents concurrent requests from different app servers
+         * - Retry mechanism with exponential backoff
+         * - Comprehensive logging
          *
-         * Layer 3: Database Row Lock (SELECT ... FOR UPDATE)
-         * - Locks specific row(s) for the duration of transaction
-         * - Other transactions WAIT until lock is released
-         * - Prevents concurrent modifications to same row
+         * Layer 2: Database transaction with serializable isolation
+         * - Ensures atomicity of read-check-insert
+         * - Rollback on any error
          *
-         * Layer 4: Gap Lock (for non-existent rows)
-         * - When no row exists, acquires lock on the "gap" in the index
+         * Layer 3: Row-level locking (SELECT ... FOR UPDATE)
          * - Prevents concurrent INSERTs of the same unique row
          * - Requires proper composite index on (student_id, schedule_id, attendance_date)
          */
 
-        // Layer 1: Application-level distributed lock
-        $lockKey = "attendance_checkin:{$student->id}:{$schedule->id}:".now()->toDateString();
+        // Layer 1: Application-level distributed lock with retry
+        return $this->lockService->lockStudentCheckIn(
+            $student->id,
+            $schedule->id,
+            now()->toDateString(),
+            function () use ($student, $schedule, $status, $data, $requestId, $nonce, $request) {
+                // Layer 2: Database transaction with serializable isolation for this critical section
+                return DB::transaction(function () use ($student, $schedule, $status, $data, $requestId, $nonce, $request) {
+                    // SERVER TIME - Used for all timestamp comparisons
+                    $serverNow = now();
+                    $serverDate = $serverNow->toDateString();
 
-        return Cache::lock($lockKey, self::LOCK_TIMEOUT)->block(self::LOCK_WAIT, function () use (
-            $student, $schedule, $status, $data, $requestId, $nonce, $request
-        ) {
-            // Layer 2: Database transaction with serializable isolation for this critical section
-            return DB::transaction(function () use ($student, $schedule, $status, $data, $requestId, $nonce, $request) {
-                // SERVER TIME - Used for all timestamp comparisons
-                $serverNow = now();
-                $serverDate = $serverNow->toDateString();
+                    /*
+                     * Layer 3 & 4: Row Lock with Gap Lock Fallback
+                     *
+                     * CRITICAL: This MUST happen INSIDE the transaction
+                     *
+                     * Case A: Row EXISTS
+                     * - lockForUpdate() acquires exclusive lock on the row
+                     * - Other transactions WAIT at this point
+                     * - When lock is acquired, we check and reject duplicate
+                     *
+                     * Case B: Row DOES NOT EXIST
+                     * - lockForUpdate() returns NULL (no row to lock)
+                     * - We acquire a "gap lock" on the unique index
+                     * - This prevents concurrent INSERT with same (student, schedule, date)
+                     */
 
-                /*
-                 * Layer 3 & 4: Row Lock with Gap Lock Fallback
-                 *
-                 * CRITICAL: This MUST happen INSIDE the transaction
-                 *
-                 * Case A: Row EXISTS
-                 * - lockForUpdate() acquires exclusive lock on the row
-                 * - Other transactions WAIT at this point
-                 * - When lock is acquired, we check and reject duplicate
-                 *
-                 * Case B: Row DOES NOT EXIST
-                 * - lockForUpdate() returns NULL (no row to lock)
-                 * - We acquire a "gap lock" on the unique index
-                 * - This prevents concurrent INSERT with same (student, schedule, date)
-                 */
+                    // Acquire lock on existing row OR gap in index
+                    $existing = $this->findExistingAttendanceWithLock(
+                        $student->id,
+                        $schedule->id,
+                        $serverDate
+                    );
 
-                // Acquire lock on existing row OR gap in index
-                $existing = $this->findExistingAttendanceWithLock(
-                    $student->id,
-                    $schedule->id,
-                    $serverDate
-                );
+                    if ($existing) {
+                        // Row exists - we have exclusive lock on it
 
-                if ($existing) {
-                    // Row exists - we have exclusive lock on it
+                        // Idempotency: same request_id returns original (for retry handling)
+                        if ($requestId && $existing->request_id === $requestId) {
+                            Log::channel('attendance')->debug('Idempotent retry detected', [
+                                'attendance_id' => $existing->id,
+                                'request_id' => $requestId,
+                            ]);
 
-                    // Idempotency: same request_id returns original (for retry handling)
-                    if ($requestId && $existing->request_id === $requestId) {
-                        Log::channel('attendance')->debug('Idempotent retry detected', [
-                            'attendance_id' => $existing->id,
-                            'request_id' => $requestId,
-                        ]);
+                            return $existing;
+                        }
 
-                        return $existing;
+                        // Different request trying to check in = duplicate attempt
+                        if ($request) {
+                            $this->logger->checkInDuplicate($request, $existing->id, [
+                                'schedule_id' => $schedule->id,
+                                'existing_check_in_time' => $existing->check_in_time?->toTimeString(),
+                                'new_request_id' => $requestId,
+                            ]);
+                        }
+
+                        throw AttendanceException::alreadyRecorded();
                     }
 
-                    // Different request trying to check in = duplicate attempt
-                    if ($request) {
-                        $this->logger->checkInDuplicate($request, $existing->id, [
-                            'schedule_id' => $schedule->id,
-                            'existing_check_in_time' => $existing->check_in_time?->toTimeString(),
-                            'new_request_id' => $requestId,
-                        ]);
+                    // No existing row - we hold gap lock, safe to INSERT
+
+                    // A. Validate nonce for race condition prevention
+                    if ($nonce) {
+                        $this->validateNonce($nonce, $student->id, $schedule->id);
                     }
-
-                    throw AttendanceException::alreadyRecorded();
-                }
-
-                // No existing row - we hold gap lock, safe to INSERT
-
-                // A. Validate nonce for race condition prevention
-                if ($nonce) {
-                    $this->validateNonce($nonce, $student->id, $schedule->id);
-                }
 
                 // B. Register device if first time
                 if (empty($student->device_id) && ! empty($data['device_id'])) {
@@ -760,25 +822,29 @@ final class AttendanceCheckInService
                 $recordedBy = $request ? null : auth()->id();
                 
                 try {
-                    $attendance = Attendance::create([
-                        'school_id' => $student->school_id,
-                        'schedule_id' => $schedule->id,
-                        'student_id' => $student->id,
-                        'attendance_date' => $serverDate,
-                        'status' => $status,
-                        'check_in_time' => $serverNow,
-                        'lat_in' => $data['lat'] ?? null,
-                        'lng_in' => $data['lng'] ?? null,
-                        'device_id_in' => $data['device_id'] ?? null,
-                        'is_manual' => false,
-                        'attendance_type' => $attendanceType,
-                        'recorded_by' => $recordedBy,
-                        'request_id' => $requestId,
-                        'nonce' => $nonce,
-                        'client_scanned_at' => isset($data['scanned_at'])
-                            ? Carbon::parse($data['scanned_at'])->toDateTimeString()
-                            : null,
-                    ]);
+                    $attendance = Attendance::firstOrCreate(
+                        [
+                            'student_id' => $student->id,
+                            'schedule_id' => $schedule->id,
+                            'attendance_date' => $serverDate,
+                            'school_id' => $student->school_id,
+                        ],
+                        [
+                            'status' => $status,
+                            'check_in_time' => $serverNow,
+                            'lat_in' => $data['lat'] ?? null,
+                            'lng_in' => $data['lng'] ?? null,
+                            'device_id_in' => $data['device_id'] ?? null,
+                            'is_manual' => false,
+                            'attendance_type' => $attendanceType,
+                            'recorded_by' => $recordedBy,
+                            'request_id' => $requestId,
+                            'nonce' => $nonce,
+                            'client_scanned_at' => isset($data['scanned_at'])
+                                ? Carbon::parse($data['scanned_at'])->toDateTimeString()
+                                : null,
+                        ]
+                    );
                 } catch (\Illuminate\Database\QueryException $e) {
                     // Handle race condition edge case: unique constraint violation
                     // This can happen if gap lock wasn't acquired (e.g., MyISAM table)
@@ -788,6 +854,19 @@ final class AttendanceCheckInService
                             'schedule_id' => $schedule->id,
                             'date' => $serverDate,
                         ]);
+
+                        // IMPROVEMENT: Return existing record instead of throwing
+                        // This makes the API idempotent for concurrent requests
+                        $existingRecord = Attendance::where('student_id', $student->id)
+                            ->where('schedule_id', $schedule->id)
+                            ->whereDate('attendance_date', $serverDate)
+                            ->first();
+
+                        if ($existingRecord) {
+                            return $existingRecord;
+                        }
+
+                        // If we can't find the record (edge case), throw
                         throw AttendanceException::alreadyRecorded();
                     }
                     throw $e;
@@ -1056,24 +1135,22 @@ final class AttendanceCheckInService
             throw AttendanceException::studentNotInClass();
         }
 
-        // 7. Atomic Check-in
-        $lockKey = "student_attendance_{$student->id}_{$schedule->id}_" . today()->format('Y-m-d');
-        $lock = Cache::lock($lockKey, 5);
-
-        if (! $lock->get()) {
-            throw new AttendanceException('Sedang memproses absensi. Coba lagi dalam beberapa detik.');
-        }
-
-        try {
-            return DB::transaction(function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken) {
-                // Nonce Check
-                if ($nonce && $this->replayPreventionService) {
-                     if ($this->replayPreventionService->checkNonceReplay($nonce, $schoolId)) {
-                         $this->replayPreventionService->logRepeatedAttempt($student->id, $schedule->id, $schoolId, $nonce, 'teacher_scan_nonce_replay');
-                         $this->logSecurityEvent('nonce_replay', $teacher, $qrToken, 'QR nonce already used');
-                         throw AttendanceException::replayDetected();
-                     }
-                }
+        // 7. Atomic Check-in with retry mechanism
+        return $this->lockService->lockTeacherCheckIn(
+            $teacher->id,
+            $student->id,
+            $schedule->id,
+            today()->format('Y-m-d'),
+            function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken) {
+                return DB::transaction(function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken) {
+                    // Nonce Check
+                    if ($nonce && $this->replayPreventionService) {
+                         if ($this->replayPreventionService->checkNonceReplay($nonce, $schoolId)) {
+                             $this->replayPreventionService->logRepeatedAttempt($student->id, $schedule->id, $schoolId, $nonce, 'teacher_scan_nonce_replay');
+                             $this->logSecurityEvent('nonce_replay', $teacher, $qrToken, 'QR nonce already used');
+                             throw AttendanceException::replayDetected();
+                         }
+                    }
 
                 // Check Existing
                 $existingAttendance = $this->findExistingAttendanceWithLock($student->id, $schedule->id, today()->toDateString());
@@ -1098,26 +1175,30 @@ final class AttendanceCheckInService
                     }
                 }
 
-                // Create
+                // Create (using firstOrCreate)
                 $status = $this->determineAttendanceStatus($schedule, $teacher->school_id);
-                $attendance = Attendance::create([
-                    'school_id' => $teacher->school_id,
-                    'class_id' => $schedule->class_id,
-                    'schedule_id' => $schedule->id,
-                    'subject_id' => $schedule->subject_id,
-                    'student_id' => $student->id,
-                    'attendance_date' => today(),
-                    'attendance_type' => 'teacher_scan',
-                    'status' => $status,
-                    'check_in_time' => now(),
-                    'lat_in' => $lat,
-                    'lng_in' => $lng,
-                    'device_id_in' => $deviceId,
-                    'is_manual' => false,
-                    'recorded_by' => $teacher->id,
-                    'request_id' => $reqId,
-                    'nonce' => $nonce,
-                ]);
+                $attendance = Attendance::firstOrCreate(
+                    [
+                        'student_id' => $student->id,
+                        'schedule_id' => $schedule->id,
+                        'attendance_date' => today(),
+                        'school_id' => $teacher->school_id,
+                    ],
+                    [
+                        'class_id' => $schedule->class_id,
+                        'subject_id' => $schedule->subject_id,
+                        'attendance_type' => 'teacher_scan',
+                        'status' => $status,
+                        'check_in_time' => now(),
+                        'lat_in' => $lat,
+                        'lng_in' => $lng,
+                        'device_id_in' => $deviceId,
+                        'is_manual' => false,
+                        'recorded_by' => $teacher->id,
+                        'request_id' => $reqId,
+                        'nonce' => $nonce,
+                    ]
+                );
 
                 // Post-Create Actions
                 if ($nonce && $this->replayPreventionService) {
@@ -1133,9 +1214,7 @@ final class AttendanceCheckInService
                     'schedule' => $schedule
                 ];
             });
-        } finally {
-            $lock->release();
-        }
+        });
     }
 
     private function logSecurityAnomaly(string $type, array $context): void

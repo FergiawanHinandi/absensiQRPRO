@@ -49,6 +49,13 @@ class RefreshToken extends Model
     public const MAX_ROTATIONS = 100;
 
     /**
+     * Maximum absolute session lifetime in days.
+     * After this period from the initial login, re-authentication is required
+     * regardless of refresh token validity or rotation count.
+     */
+    public const MAX_SESSION_DAYS = 30;
+
+    /**
      * Revocation reasons
      */
     public const REVOKED_MANUAL = 'manual';
@@ -87,6 +94,7 @@ class RefreshToken extends Model
         'revoked_reason',
         'previous_token_id',
         'rotation_count',
+        'session_started_at',
     ];
 
     protected $casts = [
@@ -94,6 +102,7 @@ class RefreshToken extends Model
         'last_used_at' => 'datetime',
         'revoked_at' => 'datetime',
         'rotation_count' => 'integer',
+        'session_started_at' => 'datetime',
     ];
 
     /**
@@ -144,6 +153,17 @@ class RefreshToken extends Model
         $plaintext = Str::random(64);
         $hash = hash('sha256', $plaintext);
 
+        // Determine session start time:
+        // - New login (no previous token): session starts now
+        // - Token rotation: carry forward from previous token
+        $sessionStartedAt = now();
+        if ($previousTokenId) {
+            $previousToken = self::find($previousTokenId);
+            if ($previousToken && $previousToken->session_started_at) {
+                $sessionStartedAt = $previousToken->session_started_at;
+            }
+        }
+
         $token = self::create([
             'user_id' => $user->id,
             'token_hash' => $hash,
@@ -161,6 +181,7 @@ class RefreshToken extends Model
             'expires_at' => now()->addDays(self::EXPIRATION_DAYS),
             'previous_token_id' => $previousTokenId,
             'rotation_count' => $rotationCount,
+            'session_started_at' => $sessionStartedAt,
         ]);
 
         return [
@@ -213,6 +234,19 @@ class RefreshToken extends Model
     public function hasReachedRotationLimit(): bool
     {
         return $this->rotation_count >= self::MAX_ROTATIONS;
+    }
+
+    /**
+     * Check if the absolute session lifetime has been exceeded.
+     * Forces re-login after MAX_SESSION_DAYS regardless of refresh token validity.
+     */
+    public function hasExceededSessionLifetime(): bool
+    {
+        if (! $this->session_started_at) {
+            return false;
+        }
+
+        return $this->session_started_at->addDays(self::MAX_SESSION_DAYS)->isPast();
     }
 
     // =========================================================================

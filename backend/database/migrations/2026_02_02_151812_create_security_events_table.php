@@ -23,9 +23,13 @@ return new class extends Migration
                 $table->string('event_type', 50);
                 $table->enum('severity', ['low', 'medium', 'high', 'critical'])->default('medium');
 
+                $table->string('user_type')->nullable()->comment('student, teacher, admin');
                 $table->string('ip_address', 45)->nullable();
                 $table->string('device_id')->nullable();
                 $table->text('user_agent')->nullable();
+                $table->decimal('latitude', 10, 7)->nullable();
+                $table->decimal('longitude', 10, 7)->nullable();
+                $table->text('message')->nullable();
                 $table->json('details')->nullable();
 
                 $table->boolean('reviewed')->default(false);

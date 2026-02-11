@@ -2,485 +2,354 @@
 
 namespace App\Policies;
 
+use App\Models\User;
 use App\Models\Attendance;
 use App\Models\Schedule;
-use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
-use Illuminate\Auth\Access\Response;
+use Illuminate\Support\Facades\Log;
 
 /**
- * AttendancePolicy - Comprehensive Authorization for Attendance Records
- *
- * SECURITY MODEL:
- * - School isolation: Users can ONLY access data from their own school
- * - Role-based access: Different permissions per role
- * - Super admin bypass: Full access to all data
- *
+ * AttendancePolicy - Zero Trust Multi-Tenant Authorization
+ * 
+ * SECURITY PRINCIPLES:
+ * 1. ALWAYS check school_id (tenant isolation)
+ * 2. NEVER trust client-provided IDs without validation
+ * 3. Log all authorization failures for audit
+ * 4. Fail closed - deny by default
+ * 
  * ROLE HIERARCHY:
- * 1. super_admin     → Full access to ALL schools
- * 2. school_admin    → Full access to own school
- * 3. principal       → View all + manage reports for own school
- * 4. homeroom_teacher→ View/manage classes they're assigned to
- * 5. teacher         → View/manage schedules they teach
- * 6. student         → View only their own attendance
- * 7. parent          → View only linked children's attendance
- *
- * CRITICAL: This policy acts as LAST LINE OF DEFENSE even if:
- * - Global scopes are bypassed with withoutGlobalScope()
- * - Raw DB::table queries are used
- * - Joins don't include school_id filtering
+ * - super_admin: All access (bypass tenant restriction)
+ * - school_admin: Full school access
+ * - principal/vice_principal: View-only school-wide access
+ * - teacher/homeroom_teacher: Own schedules/classes only
+ * - student: Own records only
+ * - parent: Linked children only
+ * 
+ * IDOR PROTECTION:
+ * - All methods MUST validate school_id matches user's school_id
+ * - Teacher methods MUST validate ownership (teacher_id, class_id)
+ * - Student/Parent methods MUST validate relationship
  */
 class AttendancePolicy
 {
     use HandlesAuthorization;
 
     /**
-     * Role constants for better maintainability
-     */
-    private const SUPER_ADMIN = 'super_admin';
-
-    private const SCHOOL_ADMIN = 'school_admin';
-
-    private const ADMIN = 'admin';
-
-    private const PRINCIPAL = 'principal';
-
-    private const HOMEROOM_TEACHER = 'homeroom_teacher';
-
-    private const TEACHER = 'teacher';
-
-    private const STUDENT = 'student';
-
-    private const PARENT = 'parent';
-
-    /**
-     * Roles that can manage attendance (create/update/delete)
-     */
-    private const MANAGEMENT_ROLES = [
-        self::SUPER_ADMIN,
-        self::SCHOOL_ADMIN,
-        self::ADMIN,
-        self::PRINCIPAL,
-        self::HOMEROOM_TEACHER,
-        self::TEACHER,
-    ];
-
-    /**
-     * Roles that can view attendance
-     */
-    private const VIEW_ROLES = [
-        self::SUPER_ADMIN,
-        self::SCHOOL_ADMIN,
-        self::ADMIN,
-        self::PRINCIPAL,
-        self::HOMEROOM_TEACHER,
-        self::TEACHER,
-        self::STUDENT,
-        self::PARENT,
-    ];
-
-    /**
-     * Perform pre-authorization checks (before any specific method)
-     *
-     * This is called BEFORE every policy method.
-     * Return null to fall through to specific method.
+     * Super admin bypass - runs BEFORE all other policy methods
+     * 
+     * WARNING: Super admin actions are logged for audit compliance
      */
     public function before(User $user, string $ability): ?bool
     {
-        // Super admin bypasses checks, BUT historical protection must still apply
-        // We let update/delete/forceDelete fall through to their specific methods
-        if ($this->isSuperAdmin($user)) {
-            if (in_array($ability, ['update', 'delete', 'forceDelete', 'restore'])) {
-                return null;
-            }
-
+        if ($user->role_type === 'super_admin') {
+            Log::channel('audit')->info('super_admin_policy_bypass', [
+                'user_id' => $user->id,
+                'ability' => $ability,
+                'timestamp' => now()->toIso8601String(),
+            ]);
             return true;
         }
+        
+        return null; // Fall through to specific policy method
+    }
 
-        // Inactive users cannot do anything
-        if (! $user->is_active) {
+    /**
+     * Can user view the attendance list?
+     * 
+     * Used for: index endpoints
+     */
+    public function viewAny(User $user): bool
+    {
+        // Only active users can view
+        if (!$user->is_active) {
+            return false;
+        }
+        
+        return in_array($user->role_type, [
+            'student',        // Own records
+            'parent',         // Children's records
+            'teacher',        // Own schedules
+            'homeroom_teacher',
+            'principal',
+            'vice_principal',
+            'admin',
+            'school_admin',
+        ]);
+    }
+
+    /**
+     * Can user view a specific attendance record?
+     * 
+     * IDOR Protection: Validates tenant + ownership
+     */
+    public function view(User $user, Attendance $attendance): bool
+    {
+        // CRITICAL: Tenant isolation check
+        if ($user->school_id !== $attendance->school_id) {
+            $this->logUnauthorizedAccess($user, 'view', $attendance, 'tenant_mismatch');
             return false;
         }
 
-        return null; // Fall through to specific method
+        return match ($user->role_type) {
+            // Student can only view their own attendance
+            'student' => $user->id === $attendance->student_id,
+            
+            // Parent can view their linked children's attendance
+            'parent' => $this->isParentOfStudent($user, $attendance->student_id),
+            
+            // Teacher can view attendance from their schedules or homeroom class
+            'teacher', 'homeroom_teacher' => $this->canTeacherViewAttendance($user, $attendance),
+            
+            // Admins can view all within their school
+            'admin', 'school_admin', 'principal', 'vice_principal' => true,
+            
+            default => false,
+        };
     }
 
     /**
-     * Determine if user can view any attendance records (list view)
-     *
-     * Used for: Index pages, dashboard widgets
+     * Can user create attendance (Student QR scan)
      */
-    public function viewAny(User $user): Response
+    public function create(User $user): bool
     {
-        if (in_array($user->role_type, self::VIEW_ROLES)) {
-            return Response::allow();
-        }
-
-        return Response::deny('Anda tidak memiliki akses untuk melihat data absensi.');
+        // Only active students can scan QR
+        return $user->is_active && $user->role_type === 'student';
     }
 
     /**
-     * Determine if user can view a specific attendance record
-     *
-     * CRITICAL: Always enforce school isolation first
+     * Can user create manual attendance entry?
+     * 
+     * IDOR Protection: Validates schedule ownership
      */
-    public function view(User $user, Attendance $attendance): Response
+    public function manualEntry(User $user, Schedule $schedule): bool
     {
-        // SECURITY CHECK 1: School isolation
-        if (! $this->isSameSchool($user, $attendance)) {
-            return Response::deny('Anda tidak dapat mengakses data dari sekolah lain.');
+        // CRITICAL: Tenant isolation
+        if ($user->school_id !== $schedule->school_id) {
+            $this->logUnauthorizedAccess($user, 'manualEntry', $schedule, 'tenant_mismatch');
+            return false;
         }
 
-        // Students can only view their own attendance
-        if ($user->role_type === self::STUDENT) {
-            if ($user->id === $attendance->student_id) {
-                return Response::allow();
-            }
-
-            return Response::deny('Anda hanya dapat melihat absensi Anda sendiri.');
-        }
-
-        // Parents can only view their children's attendance
-        if ($user->role_type === self::PARENT) {
-            if ($this->isParentOfStudent($user, $attendance->student_id)) {
-                return Response::allow();
-            }
-
-            return Response::deny('Anda hanya dapat melihat absensi anak Anda.');
-        }
-
-        // Teachers can view attendance for their schedules/classes
-        if (in_array($user->role_type, [self::TEACHER, self::HOMEROOM_TEACHER])) {
-            if ($this->canTeacherViewAttendance($user, $attendance)) {
-                return Response::allow();
-            }
-
-            return Response::deny('Anda tidak mengajar kelas ini.');
-        }
-
-        // Admins and principals can view all in their school
-        if (in_array($user->role_type, [self::ADMIN, self::SCHOOL_ADMIN, self::PRINCIPAL])) {
-            return Response::allow();
-        }
-
-        return Response::deny('Akses ditolak.');
+        return match ($user->role_type) {
+            // Teacher can only create for their OWN schedules
+            'teacher' => $user->id === $schedule->teacher_id,
+            
+            // Homeroom teacher can create for homeroom schedules
+            'homeroom_teacher' => $user->id === $schedule->teacher_id 
+                || $this->isHomeroomTeacherOfClass($user, $schedule->class_id),
+            
+            // Admins can create for any schedule in their school
+            'admin', 'school_admin' => true,
+            
+            default => false,
+        };
     }
 
     /**
-     * Determine if user can create attendance records
-     *
-     * Used for: Manual attendance input, QR scan recording
+     * Can user update an attendance record?
+     * 
+     * IDOR Protection: Validates tenant + ownership chain
      */
-    public function create(User $user): Response
+    public function update(User $user, Attendance $attendance): bool
     {
-        if (in_array($user->role_type, self::MANAGEMENT_ROLES)) {
-            return Response::allow();
+        // CRITICAL: Tenant isolation
+        if ($user->school_id !== $attendance->school_id) {
+            $this->logUnauthorizedAccess($user, 'update', $attendance, 'tenant_mismatch');
+            return false;
         }
 
-        // Students can create via QR scan (handled separately)
-        if ($user->role_type === self::STUDENT) {
-            return Response::allow();
-        }
-
-        return Response::deny('Anda tidak memiliki akses untuk membuat data absensi.');
+        return match ($user->role_type) {
+            // Teacher can update attendance from their schedules
+            'teacher' => $this->isTeacherOfSchedule($user, $attendance->schedule_id),
+            
+            // Homeroom teacher can update for their homeroom class
+            'homeroom_teacher' => $this->isTeacherOfSchedule($user, $attendance->schedule_id)
+                || $this->isHomeroomTeacherOfAttendance($user, $attendance),
+            
+            // Admins can update any attendance in their school
+            'admin', 'school_admin' => true,
+            
+            default => false,
+        };
     }
 
     /**
-     * Determine if user can create manual attendance
-     *
-     * Used for: Teacher/Admin manual input form
+     * Can user delete (soft) an attendance record?
      */
-    public function createManual(User $user): Response
+    public function delete(User $user, Attendance $attendance): bool
     {
-        if (in_array($user->role_type, [
-            self::TEACHER,
-            self::HOMEROOM_TEACHER,
-            self::ADMIN,
-            self::SCHOOL_ADMIN,
-        ])) {
-            return Response::allow();
+        // CRITICAL: Tenant isolation
+        if ($user->school_id !== $attendance->school_id) {
+            $this->logUnauthorizedAccess($user, 'delete', $attendance, 'tenant_mismatch');
+            return false;
         }
 
-        return Response::deny('Hanya guru dan admin yang dapat input absensi manual.');
+        // Only admins can delete attendance records
+        return in_array($user->role_type, ['admin', 'school_admin']);
     }
 
     /**
-     * Determine if user can update an attendance record
-     *
-     * SECURITY: Only manual attendance can be updated
+     * Can user restore a soft-deleted attendance?
      */
-    public function update(User $user, Attendance $attendance): Response
+    public function restore(User $user, Attendance $attendance): bool
     {
-        // SUPER ADMIN CHECK: Historical Data Protection
-        if ($this->isSuperAdmin($user)) {
-            if ($attendance->created_at < now()->subHours(24)) {
-                return Response::deny('Super Admin cannot edit historical data (>24h old) for audit integrity.');
-            }
-
-            return Response::allow();
-        }
-
-        // SECURITY CHECK 1: School isolation
-        if (! $this->isSameSchool($user, $attendance)) {
-            return Response::deny('Anda tidak dapat mengubah data dari sekolah lain.');
-        }
-
-        // BUSINESS RULE: Only manual attendance can be updated
-        if (! $attendance->is_manual) {
-            return Response::deny('Absensi otomatis (via QR) tidak dapat diubah.');
-        }
-
-        // Teachers can only update their own classes/schedules
-        if (in_array($user->role_type, [self::TEACHER, self::HOMEROOM_TEACHER])) {
-            if ($this->canTeacherManageAttendance($user, $attendance)) {
-                return Response::allow();
-            }
-
-            return Response::deny('Anda hanya dapat mengubah absensi kelas yang Anda ajar.');
-        }
-
-        // Admins can update any in their school
-        if (in_array($user->role_type, [self::ADMIN, self::SCHOOL_ADMIN])) {
-            return Response::allow();
-        }
-
-        return Response::deny('Akses ditolak.');
-    }
-
-    /**
-     * Determine if user can delete an attendance record
-     *
-     * SECURITY: Highly restricted operation
-     */
-    public function delete(User $user, Attendance $attendance): Response
-    {
-        // SUPER ADMIN CHECK: Historical Data Protection
-        if ($this->isSuperAdmin($user)) {
-            if ($attendance->created_at < now()->subHours(24)) {
-                return Response::deny('Super Admin cannot delete historical data (>24h old) for audit integrity.');
-            }
-
-            return Response::allow();
-        }
-
-        // SECURITY CHECK 1: School isolation
-        if (! $this->isSameSchool($user, $attendance)) {
-            return Response::deny('Anda tidak dapat menghapus data dari sekolah lain.');
-        }
-
-        // Only admins can delete
-        if (in_array($user->role_type, [self::ADMIN, self::SCHOOL_ADMIN])) {
-            return Response::allow();
-        }
-
-        return Response::deny('Hanya administrator yang dapat menghapus data absensi.');
-    }
-
-    /**
-     * Determine if user can restore a soft-deleted attendance record
-     */
-    public function restore(User $user, Attendance $attendance): Response
-    {
-        // Same rules as delete
         return $this->delete($user, $attendance);
     }
 
     /**
-     * Determine if user can permanently delete (force delete)
-     *
-     * SECURITY: Only super admin can force delete
+     * Can user permanently delete (force delete)?
+     * 
+     * DANGER: Should rarely be allowed - audit trail destruction
      */
-    public function forceDelete(User $user, Attendance $attendance): Response
+    public function forceDelete(User $user, Attendance $attendance): bool
     {
-        if ($this->isSuperAdmin($user)) {
-            if ($attendance->created_at < now()->subHours(24)) {
-                return Response::deny('Super Admin cannot force delete historical data (>24h old).');
-            }
-
-            return Response::allow();
-        }
-
-        return Response::deny('Penghapusan permanen tidak diizinkan.');
-    }
-
-    /**
-     * Determine if student can scan QR code
-     */
-    public function scan(User $user): Response
-    {
-        if ($user->role_type !== self::STUDENT) {
-            return Response::deny('Hanya siswa yang dapat melakukan scan QR.');
-        }
-
-        if (! $user->is_active) {
-            return Response::deny('Akun Anda tidak aktif.');
-        }
-
-        return Response::allow();
-    }
-
-    /**
-     * Determine if teacher can scan student QR
-     */
-    public function scanStudent(User $user): Response
-    {
-        if (! in_array($user->role_type, [self::TEACHER, self::HOMEROOM_TEACHER])) {
-            return Response::deny('Hanya guru yang dapat melakukan scan siswa.');
-        }
-
-        if (! $user->is_active) {
-            return Response::deny('Akun Anda tidak aktif.');
-        }
-
-        return Response::allow();
-    }
-
-    /**
-     * Determine if user can view attendance reports
-     */
-    public function viewReports(User $user): Response
-    {
-        if (in_array($user->role_type, [
-            self::ADMIN,
-            self::SCHOOL_ADMIN,
-            self::PRINCIPAL,
-            self::HOMEROOM_TEACHER,
-        ])) {
-            return Response::allow();
-        }
-
-        return Response::deny('Anda tidak memiliki akses ke laporan absensi.');
-    }
-
-    /**
-     * Determine if user can export attendance data
-     */
-    public function export(User $user): Response
-    {
-        if (in_array($user->role_type, [
-            self::ADMIN,
-            self::SCHOOL_ADMIN,
-            self::PRINCIPAL,
-        ])) {
-            return Response::allow();
-        }
-
-        return Response::deny('Hanya administrator yang dapat mengekspor data.');
-    }
-
-    /**
-     * Determine if user can view attendance for a specific schedule
-     */
-    public function viewBySchedule(User $user, Schedule $schedule): Response
-    {
-        // School isolation
-        if ($user->school_id !== $schedule->school_id) {
-            return Response::deny('Anda tidak dapat mengakses jadwal dari sekolah lain.');
-        }
-
-        // Teacher must own the schedule
-        if (in_array($user->role_type, [self::TEACHER, self::HOMEROOM_TEACHER])) {
-            if ($schedule->teacher_id === $user->id) {
-                return Response::allow();
-            }
-
-            return Response::deny('Anda bukan pengajar jadwal ini.');
-        }
-
-        // Admins can view all
-        if (in_array($user->role_type, [self::ADMIN, self::SCHOOL_ADMIN, self::PRINCIPAL])) {
-            return Response::allow();
-        }
-
-        return Response::deny('Akses ditolak.');
-    }
-
-    // =========================================================================
-    // HELPER METHODS
-    // =========================================================================
-
-    /**
-     * Check if user is super admin
-     */
-    private function isSuperAdmin(User $user): bool
-    {
-        if ($user->role_type === self::SUPER_ADMIN) {
-            return true;
-        }
-
-        // Check via Spatie if available
-        if (method_exists($user, 'hasRole')) {
-            return $user->hasRole(self::SUPER_ADMIN);
-        }
-
+        // Force delete is NEVER allowed at policy level
+        // Even super_admin bypass is logged and should be reviewed
         return false;
     }
 
     /**
-     * Check if user belongs to same school as attendance
+     * Can user view attendance reports?
      */
-    private function isSameSchool(User $user, Attendance $attendance): bool
+    public function viewReports(User $user): bool
     {
-        return $user->school_id === $attendance->school_id;
+        return in_array($user->role_type, [
+            'teacher',
+            'homeroom_teacher',
+            'principal',
+            'vice_principal',
+            'admin',
+            'school_admin',
+        ]);
     }
 
     /**
-     * Check if parent is linked to the student
+     * Can user export attendance data?
+     */
+    public function export(User $user): bool
+    {
+        return in_array($user->role_type, [
+            'admin',
+            'school_admin',
+            'principal',
+        ]);
+    }
+
+    /**
+     * Can user view attendance by schedule?
+     * 
+     * IDOR Protection: Validates schedule ownership
+     */
+    public function viewBySchedule(User $user, Schedule $schedule): bool
+    {
+        // CRITICAL: Tenant isolation
+        if ($user->school_id !== $schedule->school_id) {
+            $this->logUnauthorizedAccess($user, 'viewBySchedule', $schedule, 'tenant_mismatch');
+            return false;
+        }
+
+        return match ($user->role_type) {
+            'teacher' => $user->id === $schedule->teacher_id,
+            'homeroom_teacher' => $user->id === $schedule->teacher_id 
+                || $this->isHomeroomTeacherOfClass($user, $schedule->class_id),
+            'admin', 'school_admin', 'principal', 'vice_principal' => true,
+            default => false,
+        };
+    }
+
+    // =========================================================================
+    // HELPER METHODS - IDOR Protection Queries
+    // =========================================================================
+
+    /**
+     * Check if user is the parent of a specific student
      */
     private function isParentOfStudent(User $parent, int $studentId): bool
     {
-        // Assuming there's a parent_student pivot table
-        return \DB::table('parent_students')
-            ->where('parent_id', $parent->id)
-            ->where('student_id', $studentId)
+        return $parent->children()
+            ->where('users.id', $studentId)
+            ->where('users.school_id', $parent->school_id) // Extra tenant check
             ->exists();
     }
 
     /**
-     * Check if teacher can view attendance (owns schedule or is homeroom)
+     * Check if teacher can view this attendance (schedule or homeroom)
      */
     private function canTeacherViewAttendance(User $teacher, Attendance $attendance): bool
     {
-        // Method 1: Teacher owns the schedule
-        if ($attendance->schedule && $attendance->schedule->teacher_id === $teacher->id) {
+        // Check if teacher owns the schedule
+        if ($this->isTeacherOfSchedule($teacher, $attendance->schedule_id)) {
             return true;
         }
+        
+        // Check if homeroom teacher of the student's class
+        return $this->isHomeroomTeacherOfAttendance($teacher, $attendance);
+    }
 
-        // Method 2: Teacher is homeroom for the class
-        if ($teacher->role_type === self::HOMEROOM_TEACHER) {
-            $isHomeroom = \DB::table('teacher_roles')
-                ->where('user_id', $teacher->id)
-                ->where('class_id', $attendance->class_id)
-                ->where('role_name', 'homeroom')
-                ->exists();
+    /**
+     * Check if user is the teacher of a specific schedule
+     */
+    private function isTeacherOfSchedule(User $teacher, ?int $scheduleId): bool
+    {
+        if (!$scheduleId) {
+            return false;
+        }
+        
+        return Schedule::where('id', $scheduleId)
+            ->where('teacher_id', $teacher->id)
+            ->where('school_id', $teacher->school_id) // Extra tenant check
+            ->exists();
+    }
 
-            if ($isHomeroom) {
+    /**
+     * Check if user is homeroom teacher of a specific class
+     */
+    private function isHomeroomTeacherOfClass(User $teacher, ?int $classId): bool
+    {
+        if (!$classId) {
+            return false;
+        }
+        
+        return \App\Models\ClassModel::where('id', $classId)
+            ->where('homeroom_teacher_id', $teacher->id)
+            ->where('school_id', $teacher->school_id) // Extra tenant check
+            ->exists();
+    }
+
+    /**
+     * Check if user is homeroom teacher of the student's class in this attendance
+     */
+    private function isHomeroomTeacherOfAttendance(User $teacher, Attendance $attendance): bool
+    {
+        // Load the student's class through attendance
+        $attendance->loadMissing('student.classes');
+        
+        foreach ($attendance->student->classes ?? [] as $class) {
+            if ($class->homeroom_teacher_id === $teacher->id 
+                && $class->school_id === $teacher->school_id) {
                 return true;
             }
         }
-
+        
         return false;
     }
 
     /**
-     * Check if teacher can manage (update/delete) attendance
+     * Log unauthorized access attempts for security monitoring
      */
-    private function canTeacherManageAttendance(User $teacher, Attendance $attendance): bool
+    private function logUnauthorizedAccess(User $user, string $ability, $resource, string $reason): void
     {
-        // Must own the schedule to manage
-        if ($attendance->schedule && $attendance->schedule->teacher_id === $teacher->id) {
-            return true;
-        }
-
-        // Homeroom teachers can manage their class
-        if ($teacher->role_type === self::HOMEROOM_TEACHER) {
-            return \DB::table('teacher_roles')
-                ->where('user_id', $teacher->id)
-                ->where('class_id', $attendance->class_id)
-                ->where('role_name', 'homeroom')
-                ->exists();
-        }
-
-        return false;
+        Log::channel('security')->warning('attendance_policy_denied', [
+            'user_id' => $user->id,
+            'user_school_id' => $user->school_id,
+            'user_role' => $user->role_type,
+            'ability' => $ability,
+            'resource_type' => get_class($resource),
+            'resource_id' => $resource->id ?? null,
+            'resource_school_id' => $resource->school_id ?? null,
+            'reason' => $reason,
+            'timestamp' => now()->toIso8601String(),
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
     }
 }

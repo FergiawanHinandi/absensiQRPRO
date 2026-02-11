@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/useAuthStore';
 import { authService } from '../services/authService';
+import type { AuthResponse } from '../types';
 import { Input } from '../../../components/ui/Input';
 import { getErrorMessage } from '../../../utils/errorHandler';
 
@@ -15,63 +16,26 @@ export const LoginForm: React.FC = () => {
 
     const login = useAuthStore((state) => state.login);
 
-    const handleSubmit = async (e: any) => {
-        try {
-            console.log('[LOGIN_FORM] handleSubmit called - event:', e);
-            console.log('[LOGIN_FORM] event.constructor:', e?.constructor?.name);
-            for (const key in e) {
-                if (typeof e[key] !== 'function') {
-                    console.log(`[LOGIN_FORM] event[${key}]:`, e[key]);
-                }
-            }
-            e.preventDefault();
-            console.log('[LOGIN_FORM] after preventDefault');
-        } catch (err) {
-            console.error('[LOGIN_FORM] ERROR on preventDefault:', err);
-            return;
-        }
-        console.log('[LOGIN] Form submitted with:', { username, password: '***' });
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
         setError('');
         setLoading(true);
 
         try {
-            console.log('[LOGIN] Calling login API...');
-            const data = await authService.login({ username, password });
-            console.log('[LOGIN] API success:', { token: data.token?.substring(0, 20) + '...', role: data.user.role_type });
+            const data: AuthResponse = await authService.login({ username, password });
 
-            // Store token in sessionStorage (secure)
-            console.log('[LOGIN] Calling login() to store token...');
+            // Store token in sessionStorage
             login(data.token, data.user);
 
-            // Determine redirect path based on role
-            const { role_type } = data.user;
-            let targetPath = '/login';
-
-            if (['teacher', 'homeroom_teacher'].includes(role_type)) {
-                targetPath = '/teacher/dashboard';
-            } else if (role_type === 'super_admin') {
-                targetPath = '/super-admin/dashboard';
-            } else if (role_type === 'school_admin') {
-                targetPath = '/admin/dashboard';
-            } else if (role_type === 'principal') {
-                targetPath = '/principal/dashboard';
-            } else if (role_type === 'student') {
-                targetPath = '/student/dashboard';
-            } else if (role_type === 'parent') {
-                targetPath = '/parent/dashboard';
-            } else {
-                setError('Akses ditolak. Peran pengguna tidak dikenali.');
-                setLoading(false);
-                return;
-            }
-
+            // ✅ Server provides redirect URL - no manual role checking
+            const redirectUrl = data.redirect_url || '/dashboard';
+            
             // Use React Router navigation (preserves state)
-            console.log('[LOGIN] Navigating to:', targetPath);
-            navigate(targetPath, { replace: true });
-            setLoading(false);
+            navigate(redirectUrl, { replace: true });
         } catch (err: unknown) {
             console.error('[LOGIN] Error:', err);
             setError(getErrorMessage(err));
+        } finally {
             setLoading(false);
         }
     };

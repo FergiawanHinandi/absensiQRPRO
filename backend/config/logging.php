@@ -2,6 +2,7 @@
 
 use App\Logging\CentralizedLoggerFactory;
 use App\Logging\JsonLogFormatter;
+use App\Logging\LogContextProcessor;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -59,6 +60,22 @@ return [
 
         /*
         |----------------------------------------------------------------------
+        | Enterprise Structured JSON Channel
+        |----------------------------------------------------------------------
+        | Default for production. Auto-enriches with tenant context,
+        | correlation IDs, and business context.
+        */
+
+        'structured' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/structured.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 30,
+            'formatter' => \App\Infrastructure\Logging\StructuredJsonFormatter::class,
+        ],
+
+        /*
+        |----------------------------------------------------------------------
         | Centralized Logging Channels
         |----------------------------------------------------------------------
         | These channels ship logs to ELK/Loki/Graylog for centralized logging.
@@ -110,6 +127,7 @@ return [
             'level' => 'debug',
             'days' => 7,
             'formatter' => JsonLogFormatter::class,
+            'processors' => [LogContextProcessor::class, PsrLogMessageProcessor::class],
         ],
 
         /*
@@ -125,6 +143,7 @@ return [
             'level' => 'debug',
             'days' => 30, // Keep auth logs longer for security audit
             'formatter' => JsonLogFormatter::class,
+            'processors' => [LogContextProcessor::class, PsrLogMessageProcessor::class],
         ],
 
         /*
@@ -140,6 +159,7 @@ return [
             'level' => 'debug',
             'days' => 14,
             'formatter' => JsonLogFormatter::class,
+            'processors' => [LogContextProcessor::class, PsrLogMessageProcessor::class],
         ],
 
         /*
@@ -269,6 +289,24 @@ return [
             'path' => storage_path('logs/attendance_security.log'),
             'level' => 'debug',
             'days' => 90, // Keep attendance security logs for 90 days
+            'replace_placeholders' => true,
+        ],
+
+        // Tenant scope bypass audit logging
+        'tenant_bypass' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/tenant_bypass.log'),
+            'level' => 'debug',
+            'days' => 365, // Keep for 1 year for compliance
+            'replace_placeholders' => true,
+        ],
+
+        // Audit trail for compliance
+        'audit' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/audit.log'),
+            'level' => 'info',
+            'days' => 365, // Keep for 1 year for compliance
             'replace_placeholders' => true,
         ],
 

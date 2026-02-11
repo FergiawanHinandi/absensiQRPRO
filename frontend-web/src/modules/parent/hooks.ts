@@ -1,71 +1,141 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '../../lib/api';
 
-// Mock Data for MVP
-const MOCK_STUDENT = {
-    id: 1,
-    name: 'Budi Santoso',
-    class_name: 'XI IPA 1',
-    nis: '2023001',
-    photo_url: 'https://ui-avatars.com/api/?name=Budi+Santoso&background=random'
+/**
+ * Parent Module API Hooks
+ *
+ * RULES:
+ * 1. ALL data comes from API - no client-side calculations
+ * 2. Status (present/late/absent) is determined by backend
+ * 3. Attendance rates are pre-calculated by backend
+ * 4. Error messages come from API response
+ */
+
+// API Response Types (match backend)
+interface StudentInfo {
+    id: number;
+    name: string;
+    class_name: string;
+    nis: string;
+    photo_url: string | null;
+    school_name: string;
+    grade_level: string;
+}
+
+interface TodayAttendance {
+    date: string;
+    status: 'present' | 'late' | 'absent' | 'sick' | 'permit' | 'alpha';
+    status_label: string;  // Human-readable from backend
+    check_in: string | null;
+    check_out: string | null;
+    location: string | null;
+    is_late: boolean;  // Determined by backend, not client
+}
+
+interface AttendanceHistoryItem {
+    date: string;
+    status: 'present' | 'late' | 'absent' | 'sick' | 'permit' | 'alpha';
+    status_label: string;
+    check_in: string | null;
+    check_out: string | null;
+    subject_name: string | null;
+}
+
+interface AttendanceSummary {
+    total_days: number;
+    present_count: number;
+    late_count: number;
+    absent_count: number;
+    sick_count: number;
+    permit_count: number;
+    attendance_rate: number;  // Pre-calculated by backend
+    attendance_rate_formatted: string;  // "95.5%"
+}
+
+/**
+ * Fetch student info for parent's child
+ */
+export const useStudentInfo = (studentId?: number) => {
+    return useQuery<StudentInfo>({
+        queryKey: ['parent', 'student', studentId],
+        queryFn: async () => {
+            const endpoint = studentId
+                ? `/parent/children/${studentId}`
+                : '/parent/children/primary';
+            const response = await apiClient.get<{ data: StudentInfo }>(endpoint);
+            return response.data.data;
+        },
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
 };
 
-const MOCK_TODAY = {
-    date: new Date().toISOString().split('T')[0],
-    status: 'present', // present, late, absent, alpha
-    check_in: '06:45',
-    check_out: null,
-    location: 'Gerbang Utama'
+/**
+ * Fetch today's attendance status
+ * Status is determined by backend based on:
+ * - Check-in time vs schedule start time
+ * - School's late threshold configuration
+ * - Leave/permission records
+ */
+export const useTodayAttendance = (studentId?: number) => {
+    return useQuery<TodayAttendance | null>({
+        queryKey: ['parent', 'attendance', 'today', studentId],
+        queryFn: async () => {
+            const params = studentId ? { student_id: studentId } : {};
+            const response = await apiClient.get<{ data: TodayAttendance | null }>(
+                '/parent/attendance/today',
+                { params }
+            );
+            return response.data.data;
+        },
+        staleTime: 60 * 1000, // 1 minute - refresh frequently for today's data
+    });
 };
 
-const MOCK_HISTORY = [
-    { date: '2024-01-24', status: 'present', check_in: '06:50', check_out: '14:00' },
-    { date: '2024-01-23', status: 'present', check_in: '06:45', check_out: '14:05' },
-    { date: '2024-01-22', status: 'late', check_in: '07:15', check_out: '14:00' },
-    { date: '2024-01-21', status: 'sick', check_in: null, check_out: null },
-    { date: '2024-01-20', status: 'present', check_in: '06:55', check_out: '12:00' },
-];
-
-export const useStudentInfo = () => {
-    const [data, setData] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        // Simulate API call
-        setTimeout(() => {
-            setData(MOCK_STUDENT);
-            setIsLoading(false);
-        }, 500);
-    }, []);
-
-    return { data, isLoading };
+/**
+ * Fetch attendance history
+ * All status calculations done by backend
+ */
+export const useAttendanceHistory = (
+    studentId?: number,
+    options?: { limit?: number; startDate?: string; endDate?: string }
+) => {
+    return useQuery<AttendanceHistoryItem[]>({
+        queryKey: ['parent', 'attendance', 'history', studentId, options],
+        queryFn: async () => {
+            const params = {
+                student_id: studentId,
+                limit: options?.limit ?? 30,
+                start_date: options?.startDate,
+                end_date: options?.endDate,
+            };
+            const response = await apiClient.get<{ data: AttendanceHistoryItem[] }>(
+                '/parent/attendance/history',
+                { params }
+            );
+            return response.data.data;
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 };
 
-export const useTodayAttendance = () => {
-    const [data, setData] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        // Simulate API call
-        setTimeout(() => {
-            setData(MOCK_TODAY);
-            setIsLoading(false);
-        }, 600);
-    }, []);
-
-    return { data, isLoading };
-};
-
-export const useAttendanceHistory = () => {
-    const [data, setData] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        // Simulate API call
-        setTimeout(() => {
-            setData(MOCK_HISTORY);
-            setIsLoading(false);
-        }, 700);
-    }, []);
-
-    return { data, isLoading };
+/**
+ * Fetch attendance summary/statistics
+ * All rates and percentages pre-calculated by backend
+ */
+export const useAttendanceSummary = (studentId?: number, period?: 'week' | 'month' | 'semester') => {
+    return useQuery<AttendanceSummary>({
+        queryKey: ['parent', 'attendance', 'summary', studentId, period],
+        queryFn: async () => {
+            const params = {
+                student_id: studentId,
+                period: period ?? 'month',
+            };
+            const response = await apiClient.get<{ data: AttendanceSummary }>(
+                '/parent/attendance/summary',
+                { params }
+            );
+            return response.data.data;
+        },
+        staleTime: 5 * 60 * 1000,
+    });
 };

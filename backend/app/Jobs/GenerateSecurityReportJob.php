@@ -5,21 +5,19 @@ namespace App\Jobs;
 use App\Models\SecurityReport;
 use App\Models\User;
 use App\Services\TeacherSecurityReportService;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Job to auto-generate security investigation reports
  * when critical behavior is detected.
+ * 
+ * USAGE:
+ * GenerateSecurityReportJob::dispatch($teacherId, $schoolId, '7d', 'critical_behavior_detected');
+ * 
+ * @version 2.0.0 - Updated to extend TenantAwareJob for tenant safety
  */
-class GenerateSecurityReportJob implements ShouldQueue
+class GenerateSecurityReportJob extends TenantAwareJob
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
     public int $tries = 3;
 
     public int $backoff = 60;
@@ -37,9 +35,11 @@ class GenerateSecurityReportJob implements ShouldQueue
      */
     public function __construct(
         int $teacherId,
+        int $schoolId,
         string $range = '7d',
         string $triggerReason = 'critical_behavior_detected'
     ) {
+        parent::__construct($schoolId);
         $this->teacherId = $teacherId;
         $this->range = $range;
         $this->triggerReason = $triggerReason;
@@ -52,18 +52,26 @@ class GenerateSecurityReportJob implements ShouldQueue
      */
     public function handle(TeacherSecurityReportService $reportService): void
     {
-        $teacher = User::with('school')->find($this->teacherId);
+        // ✅ Ensure tenant context
+        $teacher = User::where('school_id', $this->schoolId)
+            ->with('school')
+            ->find($this->teacherId);
 
         if (! $teacher) {
-            Log::channel('security')->warning('Auto-report generation skipped: teacher not found', [
+            Log::channel('security')->warning('Auto-report generation skipped: teacher not found or wrong school', [
                 'teacher_id' => $this->teacherId,
+                'school_id' => $this->schoolId,
             ]);
 
             return;
         }
 
+        // Validate teacher belongs to this school
+        $this->ensureTenantContext($teacher);
+
         // Check if a recent report already exists (within last 24 hours)
         $recentReport = SecurityReport::where('teacher_id', $this->teacherId)
+            ->where('school_id', $this->schoolId)
             ->where('generation_type', SecurityReport::GENERATION_AUTO)
             ->where('created_at', '>=', now()->subHours(24))
             ->exists();
@@ -78,12 +86,12 @@ class GenerateSecurityReportJob implements ShouldQueue
         }
 
         // Find a super_admin or school_admin to attribute the report to
-        $systemAdmin = $this->findSystemAdmin($teacher->school_id);
+        $systemAdmin = $this->findSystemAdmin($this->schoolId);
 
         if (! $systemAdmin) {
             Log::channel('security')->error('Auto-report generation failed: no admin found', [
                 'teacher_id' => $this->teacherId,
-                'school_id' => $teacher->school_id,
+                'school_id' => $this->schoolId,
             ]);
 
             return;
@@ -101,7 +109,7 @@ class GenerateSecurityReportJob implements ShouldQueue
                 'report_id' => $report->id,
                 'teacher_id' => $this->teacherId,
                 'teacher_name' => $teacher->name,
-                'school_id' => $teacher->school_id,
+                'school_id' => $this->schoolId,
                 'risk_level' => $report->risk_level,
                 'trigger_reason' => $this->triggerReason,
                 'generated_by' => $systemAdmin->id,
@@ -147,12 +155,12 @@ class GenerateSecurityReportJob implements ShouldQueue
      */
     protected function notifyAdmins(SecurityReport $report, User $teacher): void
     {
-        // Find admins to notify
-        $admins = User::where(function ($query) use ($teacher) {
+        // Find admins to notify - only for this school
+        $admins = User::where(function ($query) {
             $query->where('role_type', 'super_admin')
-                ->orWhere(function ($q) use ($teacher) {
+                ->orWhere(function ($q) {
                     $q->whereIn('role_type', ['admin', 'school_admin'])
-                        ->where('school_id', $teacher->school_id);
+                        ->where('school_id', $this->schoolId);
                 });
         })
             ->where('is_active', true)
@@ -161,7 +169,7 @@ class GenerateSecurityReportJob implements ShouldQueue
         foreach ($admins as $admin) {
             // Create security alert for auto-generated report
             $alert = \App\Models\SecurityAlert::createAlert([
-                'school_id' => $teacher->school_id,
+                'school_id' => $this->schoolId,
                 'type' => 'auto_security_report',
                 'severity' => $report->risk_level === 'high' ? 'high' : 'medium',
                 'description' => "Auto-generated security report for {$teacher->name} - Risk Level: ".strtoupper($report->risk_level),

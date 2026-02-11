@@ -43,12 +43,6 @@ class SecurityAlert extends Model
         'updated_at' => 'datetime',
     ];
 
-    public function school()
-    {
-        return $this->belongsTo(School::class);
-    }
-}
-
     /**
      * Relationship with School
      */

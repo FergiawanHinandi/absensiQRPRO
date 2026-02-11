@@ -62,18 +62,27 @@ class ReportController extends Controller
         $lastMonthStart = Carbon::now()->subMonth()->startOfMonth()->toDateString();
         $lastMonthEnd = Carbon::now()->subMonth()->endOfMonth()->toDateString();
 
-        // Get Stats for Both Periods
+        // Get Stats for Both Periods - SECURITY: Using selectRaw with parameter bindings
         $improvementStats = DB::table('classes')
             ->leftJoin('attendances', 'classes.id', '=', 'attendances.class_id')
             ->where('classes.school_id', $schoolId)
             ->where('classes.is_active', true)
-            ->select(
-                'classes.id',
-                'classes.name',
-                DB::raw("sum(case when attendances.attendance_date BETWEEN '$startOfMonth' AND '$today' then 1 else 0 end) as current_total"),
-                DB::raw("sum(case when attendances.attendance_date BETWEEN '$startOfMonth' AND '$today' AND attendances.status IN ('present', 'late') then 1 else 0 end) as current_present"),
-                DB::raw("sum(case when attendances.attendance_date BETWEEN '$lastMonthStart' AND '$lastMonthEnd' then 1 else 0 end) as prev_total"),
-                DB::raw("sum(case when attendances.attendance_date BETWEEN '$lastMonthStart' AND '$lastMonthEnd' AND attendances.status IN ('present', 'late') then 1 else 0 end) as prev_present")
+            ->selectRaw('classes.id, classes.name')
+            ->selectRaw(
+                "sum(case when attendances.attendance_date BETWEEN ? AND ? then 1 else 0 end) as current_total",
+                [$startOfMonth, $today]
+            )
+            ->selectRaw(
+                "sum(case when attendances.attendance_date BETWEEN ? AND ? AND attendances.status IN ('present', 'late') then 1 else 0 end) as current_present",
+                [$startOfMonth, $today]
+            )
+            ->selectRaw(
+                "sum(case when attendances.attendance_date BETWEEN ? AND ? then 1 else 0 end) as prev_total",
+                [$lastMonthStart, $lastMonthEnd]
+            )
+            ->selectRaw(
+                "sum(case when attendances.attendance_date BETWEEN ? AND ? AND attendances.status IN ('present', 'late') then 1 else 0 end) as prev_present",
+                [$lastMonthStart, $lastMonthEnd]
             )
             ->groupBy('classes.id', 'classes.name')
             ->get()

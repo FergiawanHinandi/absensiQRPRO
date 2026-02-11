@@ -2,9 +2,9 @@
 
 namespace App\Traits;
 
+use App\Models\ClassModel;
 use App\Models\School;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 
 trait HasSchoolLimits
 {
@@ -37,7 +37,7 @@ trait HasSchoolLimits
                 break;
             case 'classes':
                 $limit = $school->max_classes;
-                $current = DB::table('classes')->where('school_id', $schoolId)->count();
+                $current = ClassModel::where('school_id', $schoolId)->count();
                 break;
         }
 

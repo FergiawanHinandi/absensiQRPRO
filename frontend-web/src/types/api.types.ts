@@ -17,6 +17,7 @@ export interface User {
 export interface AuthResponse {
     token: string;
     user: User;
+    redirect_url?: string; // Server-provided redirect URL
 }
 
 export interface Schedule {

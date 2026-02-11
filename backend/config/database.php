@@ -46,8 +46,40 @@ return [
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
+            
+            /*
+            |------------------------------------------------------------------
+            | Read/Write Split Configuration (Primary + Replica)
+            |------------------------------------------------------------------
+            |
+            | When DB_READ_HOST is set, Laravel will automatically route:
+            | - SELECT queries → Replica (read)
+            | - INSERT/UPDATE/DELETE → Primary (write)
+            |
+            | If DB_READ_HOST is null, all queries use primary (fallback).
+            | This ensures zero downtime if replica is unavailable.
+            |
+            */
+            'read' => env('DB_READ_HOST') ? [
+                'host' => [
+                    env('DB_READ_HOST'),
+                    // Add more read replicas here for load balancing
+                    // env('DB_READ_HOST_2'),
+                    // env('DB_READ_HOST_3'),
+                ],
+                'port' => env('DB_READ_PORT', env('DB_PORT', '3306')),
+            ] : null,
+            
+            'write' => [
+                'host' => env('DB_HOST', '127.0.0.1'),
+                'port' => env('DB_PORT', '3306'),
+            ],
+            
+            // Sticky connections: after write, subsequent reads use write connection
+            // Prevents reading stale data immediately after writing
+            'sticky' => env('DB_STICKY', true),
+            
+            // Shared configuration for both read and write
             'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),

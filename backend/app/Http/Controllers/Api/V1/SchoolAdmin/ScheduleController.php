@@ -274,10 +274,8 @@ class ScheduleController extends Controller
             ->where('day_of_week', $day)
             ->where('is_active', true)
             ->where(function ($q) use ($start, $end) {
-                $q->where(function ($q2) use ($start, $end) {
-                    $q2->where('start_time', '<', $end)
-                        ->where('end_time', '>', $start);
-                });
+                $q->where('start_time', '<', $end)
+                  ->where('end_time', '>', $start);
             })
             ->when($ignoreId, function ($q, $id) {
                 $q->where('id', '!=', $id);
@@ -285,7 +283,9 @@ class ScheduleController extends Controller
             ->exists();
 
         if ($exists) {
-            throw ValidationException::withMessages(['time' => 'Schedule overlaps with an existing class session.']);
+            throw ValidationException::withMessages([
+                'start_time' => ['Jadwal kelas bertabrakan dengan sesi lain pada waktu ini.'],
+            ]);
         }
     }
 
@@ -296,10 +296,8 @@ class ScheduleController extends Controller
             ->where('day_of_week', $day)
             ->where('is_active', true)
             ->where(function ($q) use ($start, $end) {
-                $q->where(function ($q2) use ($start, $end) {
-                    $q2->where('start_time', '<', $end)
-                        ->where('end_time', '>', $start);
-                });
+                $q->where('start_time', '<', $end)
+                  ->where('end_time', '>', $start);
             })
             ->when($ignoreId, function ($q, $id) {
                 $q->where('id', '!=', $id);
@@ -307,7 +305,9 @@ class ScheduleController extends Controller
             ->exists();
 
         if ($exists) {
-            throw ValidationException::withMessages(['teacher_id' => 'Teacher is already booked for this time slot.']);
+            throw ValidationException::withMessages([
+                'teacher_id' => ['Guru sudah memiliki jadwal mengajar di kelas lain pada waktu ini.'],
+            ]);
         }
     }
 }

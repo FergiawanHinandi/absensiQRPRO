@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\DB;
+use App\Models\Attendance;
 
 class StudentArrivalConsistencyService
 {
@@ -12,8 +12,7 @@ class StudentArrivalConsistencyService
     public function calculateConsistencyScore(int $studentId): array
     {
         // Ambil semua jam check-in (dalam menit dari 00:00)
-        $times = DB::table('attendances')
-            ->where('student_id', $studentId)
+        $times = Attendance::where('student_id', $studentId)
             ->whereNotNull('check_in_time')
             ->pluck('check_in_time')
             ->map(function ($time) {

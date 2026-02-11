@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\SecurityEvent;
 use App\Models\SuspiciousDevice;
 use App\Models\SuspiciousStudent;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -45,7 +46,10 @@ class SecurityMonitoringService
      */
     protected function checkAndFlagStudent(int $studentId, string $eventType): void
     {
-        $student = DB::table('students')->find($studentId);
+        $student = User::where('id', $studentId)
+            ->where('role_type', 'student')
+            ->first();
+            
         if (! $student) {
             return;
         }

@@ -46,6 +46,21 @@ class SchoolController extends Controller
     }
 
     /**
+     * Get single school details
+     */
+    public function show($id)
+    {
+        $school = School::with(['users' => function ($query) {
+            $query->select('id', 'name', 'email', 'role_type', 'school_id', 'is_active');
+        }])->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data' => $school,
+        ]);
+    }
+
+    /**
      * Store new school (Super Admin Manual Create)
      */
     public function store(StoreSchoolRequest $request)

@@ -121,7 +121,7 @@ return [
          * AES-256 encryption password from environment.
          * This uses a separate encryption key, not the app key.
          */
-        'password' => config('backup.encryption.key'),
+        'password' => env('BACKUP_ENCRYPTION_KEY'),
 
         /*
          * Use AES-256 encryption for maximum security.

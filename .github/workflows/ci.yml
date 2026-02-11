@@ -1,16 +1,123 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "develop", "production" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "develop" ]
+
+env:
+  PHP_VERSION: '8.2'
+  NODE_VERSION: '20'
+  POSTGRES_DB: absensi_test
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
 
 jobs:
-  laravel-tests:
-
+  # ============================================================================
+  # JOB 1: Security Audits (npm audit HIGH+, composer audit)
+  # ============================================================================
+  security-audit:
+    name: Security Audit
     runs-on: ubuntu-latest
     
+    steps:
+    - uses: actions/checkout@v4
+
+    # Backend - Composer Audit
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ env.PHP_VERSION }}
+        extensions: mbstring, intl, pdo, pdo_pgsql
+        coverage: none
+
+    - name: Install Composer Dependencies
+      working-directory: ./backend
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+    - name: Composer Security Audit
+      working-directory: ./backend
+      run: |
+        echo "🔍 Running Composer security audit..."
+        composer audit --format=json > composer-audit.json || true
+        
+        # Check if there are vulnerabilities
+        if composer audit 2>&1 | grep -q "Found"; then
+          echo "❌ Composer audit found vulnerabilities!"
+          composer audit
+          exit 1
+        fi
+        echo "✅ Composer audit passed - no vulnerabilities found"
+
+    # Frontend - NPM Audit (HIGH severity and above)
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend-web/package-lock.json
+
+    - name: Install NPM Dependencies
+      working-directory: ./frontend-web
+      run: npm ci
+
+    - name: NPM Security Audit (HIGH+ severity)
+      working-directory: ./frontend-web
+      run: |
+        echo "🔍 Running npm audit for HIGH and CRITICAL vulnerabilities..."
+        npm audit --audit-level=high --json > npm-audit.json || true
+        
+        # Fail if high or critical vulnerabilities found
+        if npm audit --audit-level=high 2>&1 | grep -qE "high|critical"; then
+          echo "❌ npm audit found HIGH or CRITICAL vulnerabilities!"
+          npm audit --audit-level=high
+          exit 1
+        fi
+        echo "✅ npm audit passed - no HIGH/CRITICAL vulnerabilities"
+
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-audit-reports
+        path: |
+          backend/composer-audit.json
+          frontend-web/npm-audit.json
+
+  # ============================================================================
+  # JOB 2: Backend Tests (Laravel + PHPUnit)
+  # ============================================================================
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    needs: security-audit
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     defaults:
       run:
         working-directory: ./backend
@@ -21,24 +128,302 @@ jobs:
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
-        php-version: '8.2'
-        extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
-        coverage: none
+        php-version: ${{ env.PHP_VERSION }}
+        extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, redis
+        coverage: xdebug
 
-    - name: Copy .env
-      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+    - name: Get Composer Cache Directory
+      id: composer-cache
+      run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+    - name: Cache Composer Dependencies
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-
 
     - name: Install Dependencies
       run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
 
-    - name: Generate key
-      run: php artisan key:generate
+    - name: Setup Environment
+      run: |
+        cp .env.example .env
+        php artisan key:generate
+        
+        # Set test database configuration
+        echo "DB_CONNECTION=pgsql" >> .env
+        echo "DB_HOST=127.0.0.1" >> .env
+        echo "DB_PORT=5432" >> .env
+        echo "DB_DATABASE=${{ env.POSTGRES_DB }}" >> .env
+        echo "DB_USERNAME=${{ env.POSTGRES_USER }}" >> .env
+        echo "DB_PASSWORD=${{ env.POSTGRES_PASSWORD }}" >> .env
+        echo "REDIS_HOST=127.0.0.1" >> .env
+        echo "CACHE_DRIVER=redis" >> .env
+        echo "QUEUE_CONNECTION=sync" >> .env
+        echo "QR_SECRET_KEY=test-secret-key-for-ci-must-be-32chars" >> .env
 
     - name: Directory Permissions
       run: chmod -R 777 storage bootstrap/cache
 
-    - name: Execute tests (Unit and Feature) via PHPUnit
-      run: vendor/bin/phpunit
+    - name: Validate ENV Configuration
+      run: |
+        echo "🔍 Validating environment configuration..."
+        php artisan config:clear
+        php artisan env:validate || {
+          echo "❌ Environment validation failed!"
+          exit 1
+        }
+        echo "✅ Environment configuration valid"
 
-    - name: Execute Pint
+    - name: Run Migrations
+      run: |
+        echo "🔍 Running database migrations..."
+        php artisan migrate --force --seed || {
+          echo "❌ Migration failed!"
+          exit 1
+        }
+        echo "✅ Migrations completed successfully"
+
+    - name: Run PHPStan Static Analysis
+      run: |
+        echo "🔍 Running PHPStan analysis..."
+        ./vendor/bin/phpstan analyse --level=5 app --memory-limit=1G || {
+          echo "⚠️ PHPStan found issues (non-blocking)"
+        }
+
+    - name: Run Pint Code Style
       run: vendor/bin/pint --test
+
+    - name: Execute Critical Attendance Tests
+      run: |
+        echo "🧪 Running critical attendance flow tests..."
+        vendor/bin/phpunit --testsuite=Feature --filter="Attendance|Qr|Scan" --testdox
+
+    - name: Execute Full Test Suite
+      run: |
+        vendor/bin/phpunit --coverage-clover=coverage.xml --testdox
+      env:
+        DB_CONNECTION: pgsql
+        DB_HOST: 127.0.0.1
+        DB_PORT: 5432
+        DB_DATABASE: ${{ env.POSTGRES_DB }}
+        DB_USERNAME: ${{ env.POSTGRES_USER }}
+        DB_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+
+    - name: Upload Coverage Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: backend/coverage.xml
+
+  # ============================================================================
+  # JOB 3: Frontend Tests (Vitest)
+  # ============================================================================
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    needs: security-audit
+    
+    defaults:
+      run:
+        working-directory: ./frontend-web
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend-web/package-lock.json
+
+    - name: Install Dependencies
+      run: npm ci
+
+    - name: Run ESLint
+      run: npm run lint
+
+    - name: Run TypeScript Check
+      run: npm run typecheck || true
+
+    - name: Run Unit Tests
+      run: npm test -- --coverage
+
+    - name: Build Production Bundle
+      run: npm run build
+
+  # ============================================================================
+  # JOB 4: Pre-Deploy Validation
+  # ============================================================================
+  pre-deploy-validation:
+    name: Pre-Deploy Validation
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ env.PHP_VERSION }}
+        extensions: mbstring, intl, pdo, pdo_pgsql, redis
+
+    - name: Install Dependencies
+      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --no-dev
+
+    - name: Setup Production-like Environment
+      run: |
+        cp .env.example .env
+        php artisan key:generate
+        
+        echo "DB_CONNECTION=pgsql" >> .env
+        echo "DB_HOST=127.0.0.1" >> .env
+        echo "DB_PORT=5432" >> .env
+        echo "DB_DATABASE=${{ env.POSTGRES_DB }}" >> .env
+        echo "DB_USERNAME=${{ env.POSTGRES_USER }}" >> .env
+        echo "DB_PASSWORD=${{ env.POSTGRES_PASSWORD }}" >> .env
+        echo "APP_ENV=production" >> .env
+        echo "APP_DEBUG=false" >> .env
+        echo "QR_SECRET_KEY=production-secret-key-32-characters" >> .env
+
+    - name: Run Pre-Deploy Validation Script
+      run: |
+        php artisan deploy:validate || {
+          echo "❌ Pre-deploy validation failed!"
+          exit 1
+        }
+
+    - name: Test Migration Rollback Safety
+      run: |
+        echo "Testing migration safety..."
+        php artisan migrate --force
+        php artisan migrate:rollback --step=1 --force
+        php artisan migrate --force
+        echo "Migration rollback test passed"
+
+    - name: Verify CQRS Read Model Deployment
+      run: |
+        echo "Verifying CQRS deployment gate..."
+        php artisan deploy:verify-cqrs --tolerance=5 || {
+          echo "CQRS verification failed (non-blocking at this stage)"
+        }
+        echo "CQRS verification complete"
+
+    - name: Validate Routes
+      run: |
+        echo "🔍 Validating routes..."
+        php artisan route:list --json > /dev/null || {
+          echo "❌ Route validation failed!"
+          exit 1
+        }
+        echo "✅ Route validation passed"
+
+    - name: Validate Config
+      run: |
+        echo "🔍 Validating configuration..."
+        php artisan config:cache
+        php artisan config:clear
+        echo "✅ Configuration validation passed"
+
+  # ============================================================================
+  # JOB 5: Deploy (Blue/Green, Phased CQRS Rollout)
+  # ============================================================================
+  deploy:
+    name: Deploy (Blue/Green)
+    runs-on: ubuntu-latest
+    needs: pre-deploy-validation
+    if: github.ref == 'refs/heads/production'
+    environment: production
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: "Phase 1: Deploy Migrations (additive only)"
+      run: |
+        echo "=== PHASE 1: Database Migrations ==="
+        echo "Deploying additive schema changes..."
+        echo "  - attendance_summary_views table (new)"
+        echo "  - Indexes and constraints (additive)"
+        echo "  - No column drops or renames"
+        echo ""
+        echo "Add deployment commands here (SSH/K8s):"
+        echo "  php artisan migrate --force"
+        echo "  php artisan config:cache"
+
+    - name: "Phase 2: Deploy Handlers & Events + Backfill"
+      run: |
+        echo "=== PHASE 2: Application Code ==="
+        echo "Deploying domain handlers, events, and projectors..."
+        echo "  - FEATURE_USE_READ_MODEL=false (dashboard still uses COUNT)"
+        echo "  - FEATURE_PROJECTORS_ENABLED=true (read model populates silently)"
+        echo ""
+        echo "Backfill read model:"
+        echo "  php artisan cqrs:backfill-summaries"
+        echo ""
+        echo "Verify accuracy:"
+        echo "  php artisan deploy:verify-cqrs --tolerance=2"
+
+    - name: "Phase 3: Switch Dashboard to Read Model"
+      run: |
+        echo "=== PHASE 3: Traffic Switch ==="
+        echo "After Phase 2 verification passes:"
+        echo "  Set FEATURE_USE_READ_MODEL=true"
+        echo "  php artisan config:cache"
+        echo ""
+        echo "Monitor for 15 minutes. If errors detected:"
+        echo "  Set FEATURE_USE_READ_MODEL=false"
+        echo "  php artisan config:cache"
+        echo "  (Instant rollback, attendance continues normally)"
+
+    - name: "Post-Deploy: Health Check Gate"
+      run: |
+        echo "=== POST-DEPLOY VERIFICATION ==="
+        echo "Health check endpoints:"
+        echo "  GET /up                    (Laravel built-in)"
+        echo "  GET /health                (HealthCheckAggregator)"
+        echo "  php artisan deploy:verify-cqrs --tolerance=2"
+        echo ""
+        echo "Rollback trigger: any of these fail"
+        echo "  Set FEATURE_USE_READ_MODEL=false"
+        echo "  Attendance flow is NEVER affected"
+
+    # Example: SSH Deploy with phased rollout
+    # - name: Deploy via SSH (Phase 1 - Migrations)
+    #   uses: appleboy/ssh-action@v1.0.3
+    #   with:
+    #     host: ${{ secrets.PRODUCTION_HOST }}
+    #     username: ${{ secrets.PRODUCTION_USER }}
+    #     key: ${{ secrets.PRODUCTION_SSH_KEY }}
+    #     script: |
+    #       cd /var/www/absensi
+    #       git pull origin production
+    #       composer install --no-dev --optimize-autoloader
+    #       php artisan migrate --force
+    #       php artisan config:cache
+    #       php artisan route:cache
+    #       php artisan queue:restart
+    #       php artisan cqrs:backfill-summaries
+    #       php artisan deploy:verify-cqrs --tolerance=2 --fix

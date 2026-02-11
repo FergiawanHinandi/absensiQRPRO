@@ -6,6 +6,8 @@ import { LoginPage } from './modules/auth/pages/LoginPage';
 // Remove AuthDebug - no longer needed
 
 import TeacherDashboard from './pages/Teacher/TeacherDashboard';
+import AttendanceQR from './pages/Teacher/AttendanceQR';
+import ManualAttendancePage from './pages/Teacher/ManualAttendancePage';
 import ParentDashboard from './pages/Parent/ParentDashboard';
 
 // Placeholder Pages
@@ -157,6 +159,21 @@ function App() {
               <Route path="dashboard" element={
                 <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
                   <TeacherDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance/qr" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <AttendanceQR />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance/manual" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <ManualAttendancePage />
+                </ProtectedRoute>
+              } />
+              <Route path="attendance/manual/:sessionId" element={
+                <ProtectedRoute allowedRoles={['teacher', 'homeroom_teacher']}>
+                  <ManualAttendancePage />
                 </ProtectedRoute>
               } />
               <Route path="*" element={

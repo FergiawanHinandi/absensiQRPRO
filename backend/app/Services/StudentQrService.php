@@ -61,6 +61,7 @@ final class StudentQrService
             }
 
             // 5. Check expiry if exists (student QR cards may not expire)
+            // Note: Using UTC for token expiry check (standard practice)
             if (isset($payload['exp']) && $payload['exp'] < now()->timestamp) {
                 throw new QrExpiredException('QR Card sudah kadaluarsa');
             }
@@ -217,7 +218,7 @@ final class StudentQrService
             array_merge($context, [
                 'ip' => request()?->ip(),
                 'user_agent' => request()?->userAgent(),
-                'timestamp' => now()->toIso8601String(),
+                'timestamp' => now()->toIso8601String(), // UTC for security logs
             ])
         );
 
@@ -249,7 +250,7 @@ final class StudentQrService
             'sid' => $studentId,      // Student ID
             'sch' => $schoolId,       // School ID
             'typ' => 'student_card',  // Type
-            'iat' => now()->timestamp,
+            'iat' => now()->timestamp, // UTC for token timestamps (standard)
             'nonce' => Str::random(16),
             'v' => 1,
         ];

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Attendance;
+use App\Models\StudentAttendanceRisk;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -30,8 +31,7 @@ class RiskAnalysisService
         // 1. Attendance Rate (Last 30 Days)
         // We calculate based on recorded attendance days (assuming 'absent' is actively recorded)
         // Logic: (Present + Late) / Total Records
-        $recentStats = DB::table('attendances')
-            ->where('student_id', $student->id)
+        $recentStats = Attendance::where('student_id', $student->id)
             ->whereBetween('attendance_date', [$thirtyDaysAgo, $today])
             ->selectRaw("
                 count(*) as total,
@@ -95,8 +95,7 @@ class RiskAnalysisService
 
         // 4. Sudden Drop (>15% vs previous month)
         // Calculate previous 30 days (days 31-60 ago)
-        $prevStats = DB::table('attendances')
-            ->where('student_id', $student->id)
+        $prevStats = Attendance::where('student_id', $student->id)
             ->whereBetween('attendance_date', [$sixtyDaysAgo, $thirtyDaysAgo])
             ->selectRaw("
                 count(*) as total,
@@ -135,8 +134,7 @@ class RiskAnalysisService
         $trendMessage = 'Stable';
 
         // Find risk record closest to 14 days ago (range 10-20 days)
-        $historicalRisk = DB::table('student_attendance_risk')
-            ->where('student_id', $student->id)
+        $historicalRisk = StudentAttendanceRisk::where('student_id', $student->id)
             ->whereBetween('calculated_at', [$today->copy()->subDays(20), $today->copy()->subDays(10)])
             ->orderBy('calculated_at', 'desc')
             ->first();

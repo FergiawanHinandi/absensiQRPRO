@@ -29,6 +29,11 @@ class Attendance extends Model
 {
     use BelongsToSchool, HasAttendanceStateMachine, HasFactory, SoftDeletes;
 
+    /**
+     * SECURITY: 'status' and 'state' are EXCLUDED from $fillable
+     * All state changes MUST go through state machine methods.
+     * @see HasAttendanceStateMachine
+     */
     protected $fillable = [
         'school_id',
         'schedule_id',
@@ -36,23 +41,27 @@ class Attendance extends Model
         'student_id',
         'attendance_date',
         'attendance_type',
-        'state',           // NEW: State machine state
-        'status',          // LEGACY: Keep for backward compatibility
+        'session_type',
+        // 'state' - REMOVED: Use state machine methods only
+        // 'status' - REMOVED: Legacy field, use state machine
         'check_in_time',
         'check_out_time',
+        'scanned_at',
         'is_manual',
+        'source',
         'notes',
         'attachment_url',
         'recorded_by',
+        'verified_by',
         'qr_code_id',
         'lat_in',
         'lng_in',
-        'lat_out',         // NEW: Check-out location
-        'lng_out',         // NEW: Check-out location
+        'lat_out',
+        'lng_out',
         'device_id_in',
-        'device_id_out',   // NEW: Check-out device
+        'device_id_out',
         'request_id',
-        // Approval workflow fields
+        // Approval workflow fields - managed by state machine
         'correction_reason',
         'correction_requested_by',
         'correction_requested_at',
@@ -64,10 +73,17 @@ class Attendance extends Model
         'rejection_reason',
     ];
 
+    /**
+     * Attributes that are guarded from mass assignment
+     * CRITICAL: status and state must NEVER be mass-assignable
+     */
+    protected $guarded = ['id', 'status', 'state'];
+
     protected $casts = [
         'attendance_date' => 'date',
         'check_in_time' => 'datetime',
         'check_out_time' => 'datetime',
+        'scanned_at' => 'datetime',
         'correction_requested_at' => 'datetime',
         'approved_at' => 'datetime',
         'rejected_at' => 'datetime',
@@ -80,8 +96,32 @@ class Attendance extends Model
      */
     protected $attributes = [
         'state' => 'init',
+        'status' => 'absent', // Default status for INIT state
         'is_manual' => false,
     ];
+
+    /**
+     * Boot method - set default state during creation
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // Ensure default state is set during creation
+        static::creating(function ($attendance) {
+            if (empty($attendance->attributes['state'])) {
+                // Set default state internally (bypassing mutator)
+                $attendance->isInternalStateChange = true;
+                $attendance->attributes['state'] = 'init';
+                $attendance->isInternalStateChange = false;
+            }
+            
+            // Sync legacy status from state
+            if (empty($attendance->attributes['status'])) {
+                $attendance->attributes['status'] = 'absent'; // Default for INIT state
+            }
+        });
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     // RELATIONSHIPS
@@ -176,5 +216,81 @@ class Attendance extends Model
     public function getStateColorAttribute(): string
     {
         return $this->getCurrentState()->color();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // MUTATORS - BLOCK DIRECT STATUS/STATE MODIFICATION
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Block direct status modification ALWAYS
+     * 
+     * Status is automatically synced from state via syncLegacyStatus()
+     * 
+     * @throws \App\Exceptions\StateViolationException
+     */
+    public function setStatusAttribute($value): void
+    {
+        // ✅ ALWAYS block direct modification (even during creation)
+        throw \App\Exceptions\StateViolationException::directModificationBlocked(
+            'status',
+            'Use state machine methods: checkIn(), checkOut(), approve(), reject()'
+        );
+    }
+
+    /**
+     * Block direct state modification via mass assignment
+     * State can ONLY be changed via transitionTo() in HasAttendanceStateMachine
+     * 
+     * @throws \App\Exceptions\StateViolationException
+     */
+    public function setStateAttribute($value): void
+    {
+        // Allow only from state machine (via internal flag)
+        if (!$this->isInternalStateChange) {
+            throw \App\Exceptions\StateViolationException::directModificationBlocked(
+                'state',
+                'Use state machine methods: checkIn(), checkOut(), approve(), reject()'
+            );
+        }
+        
+        $this->attributes['state'] = $value instanceof \App\Enums\AttendanceState 
+            ? $value->value 
+            : $value;
+    }
+
+    /**
+     * Flag to allow internal state changes from state machine
+     */
+    protected bool $isInternalStateChange = false;
+
+    /**
+     * Allow state machine to set state internally
+     */
+    public function setStateInternal(\App\Enums\AttendanceState $state): void
+    {
+        $this->isInternalStateChange = true;
+        $this->state = $state;
+        $this->isInternalStateChange = false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // LEGACY STATUS SYNC
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Sync legacy status field with state (for backward compatibility)
+     * Called automatically after state transitions
+     */
+    public function syncLegacyStatus(): void
+    {
+        $this->attributes['status'] = match($this->getCurrentState()) {
+            \App\Enums\AttendanceState::INIT => 'absent',
+            \App\Enums\AttendanceState::CHECKED_IN => 'present',
+            \App\Enums\AttendanceState::CHECKED_OUT => 'present',
+            \App\Enums\AttendanceState::PENDING_APPROVAL => 'pending',
+            \App\Enums\AttendanceState::APPROVED => 'present',
+            \App\Enums\AttendanceState::REJECTED => 'rejected',
+        };
     }
 }

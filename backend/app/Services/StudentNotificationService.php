@@ -75,8 +75,7 @@ class StudentNotificationService
         $startOfMonth = Carbon::now()->startOfMonth();
         $today = Carbon::now();
 
-        $stats = DB::table('attendances')
-            ->where('student_id', $student->id)
+        $stats = Attendance::where('student_id', $student->id)
             ->whereBetween('attendance_date', [$startOfMonth, $today])
             ->selectRaw("
                 count(*) as total,

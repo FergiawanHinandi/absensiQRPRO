@@ -201,7 +201,7 @@ class SecureAttendanceScanController extends Controller
             'sch' => $schoolId,
             'iat' => is_numeric($result['generated_at'])
                 ? $result['generated_at']
-                : strtotime($result['generated_at']),
+                : \Carbon\Carbon::parse($result['generated_at'])->timestamp,
             'typ' => 'secure_scan',
             'n' => Str::random(16),
             'v' => 1,

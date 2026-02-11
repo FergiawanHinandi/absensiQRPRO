@@ -54,6 +54,35 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\StreakAchieved::class => [
             \App\Listeners\SendStreakNotification::class,
         ],
+        \Illuminate\Auth\Events\Failed::class => [
+            \App\Listeners\LogFailedLogin::class,
+        ],
+        // Observability Events
+        \App\Events\SlowResponseDetected::class => [
+            \App\Listeners\SendMonitoringAlert::class,
+        ],
+        \App\Events\HighErrorRateDetected::class => [
+            \App\Listeners\SendMonitoringAlert::class,
+        ],
+        
+        // CQRS: Domain Events for Read Model Synchronization
+        \App\Domain\Attendance\Events\AttendanceRecorded::class => [
+            \App\Listeners\UpdateAttendanceSummaryListener::class . '@handleAttendanceRecorded',
+            \App\Listeners\PublishDomainEvent::class,
+        ],
+        \App\Domain\Attendance\Events\AttendanceStatusChanged::class => [
+            \App\Listeners\UpdateAttendanceSummaryListener::class . '@handleAttendanceStatusChanged',
+            \App\Listeners\PublishDomainEvent::class,
+        ],
+    ];
+
+    /**
+     * The subscriber classes to register.
+     *
+     * @var array
+     */
+    protected $subscribe = [
+        \App\Listeners\SendMonitoringAlert::class,
     ];
 
     /**
@@ -61,7 +90,7 @@ class EventServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        \App\Models\Attendance::observe(\App\Observers\AttendanceAuditObserver::class);
     }
 
     /**

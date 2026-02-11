@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\Teacher\TeacherDashboardController;
 use App\Http\Controllers\Api\V1\Teacher\TeacherAttendanceController;
+use App\Http\Controllers\Api\V1\Teacher\TeacherScheduleController;
+use App\Http\Controllers\Api\V1\Teacher\TeacherStudentAttendanceController;
 
 Route::middleware('role:teacher')->prefix('teacher')->group(function () {
     Route::get('/dashboard', [TeacherDashboardController::class, 'index'])
@@ -13,18 +15,17 @@ Route::middleware('role:teacher')->prefix('teacher')->group(function () {
 
     Route::get('/teaching/monitoring', [TeacherDashboardController::class, 'getSessionMonitoring'])
         ->middleware('ability:teacher:view_dashboard');
-        
-    // Schedules for teaching
-    // Note: I saw getWeeklyScheduleByTeacher in Admin controller, check if Teacher has own schedule route
-    // The previous output didn't show specific teacher schedule routes other than dashboard stats.
-    // I will assume dashboard covers it or it was in the truncated part. 
-    // Wait, I saw Route::get('/teaching/schedules/{id}/students', ...) in the truncated output.
-    // I should add that.
-    
-    // Adding what I saw in truncated output for Teacher:
-     Route::get('/teaching/schedules/{id}/students', [TeacherDashboardController::class, 'getScheduleStudents']);
 
-    // Attendance (Self)
+    // Teacher Schedules (own schedules only)
+    Route::prefix('schedules')->group(function () {
+        Route::get('/', [TeacherScheduleController::class, 'index']);      // GET /api/v1/teacher/schedules?week=2026-W06
+        Route::get('/today', [TeacherScheduleController::class, 'today']); // GET /api/v1/teacher/schedules/today
+        Route::get('/{id}', [TeacherScheduleController::class, 'show']);   // GET /api/v1/teacher/schedules/{id}
+        Route::get('/{id}/students', [TeacherDashboardController::class, 'getScheduleStudents']); // Legacy support
+        Route::get('/{id}/attendance', [TeacherStudentAttendanceController::class, 'getScheduleAttendance']); // Students with attendance status
+    });
+
+    // Teacher Self Attendance (Check-in/Check-out)
     Route::prefix('attendance')->group(function () {
         Route::post('/check-in', [TeacherAttendanceController::class, 'checkIn'])
             ->middleware('school.rate.limit:10,1');
@@ -34,5 +35,12 @@ Route::middleware('role:teacher')->prefix('teacher')->group(function () {
         Route::get('/history', [TeacherAttendanceController::class, 'history']);
         Route::get('/summary', [TeacherAttendanceController::class, 'summary']);
         Route::get('/devices', [TeacherAttendanceController::class, 'devices']);
+        
+        // Student Attendance Management (Manual Entry)
+        Route::get('/today-sessions', [TeacherStudentAttendanceController::class, 'todaySessions']);
+        Route::post('/manual', [TeacherStudentAttendanceController::class, 'manual'])
+            ->middleware('school.rate.limit:30,1');
+        Route::post('/manual/bulk', [TeacherStudentAttendanceController::class, 'bulkManual'])
+            ->middleware('school.rate.limit:10,1');
     });
 });

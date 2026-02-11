@@ -91,11 +91,11 @@ class BackupMonitoringCleanupCommand extends Command
         $this->newLine();
         $this->info('📋 Cleaning up old log files...');
 
-        $logPaths = [
+            $logPaths = [
             storage_path('logs/backup.log'),
             storage_path('logs/rollback.log'),
-            storage_path('logs/backup-' . date('Y-m-d') . '.log'),
-            storage_path('logs/rollback-' . date('Y-m-d') . '.log'),
+            storage_path('logs/backup-' . now()->format('Y-m-d') . '.log'),
+            storage_path('logs/rollback-' . now()->format('Y-m-d') . '.log'),
         ];
 
         $totalSize = 0;
@@ -118,7 +118,7 @@ class BackupMonitoringCleanupCommand extends Command
             
             foreach ($rotatedLogs as $logFile) {
                 $fileTime = filemtime($logFile);
-                if ($fileTime < strtotime("-{$retentionDays} days")) {
+                if ($fileTime < now()->subDays($retentionDays)->timestamp) {
                     $fileSize = filesize($logFile);
                     $totalSize += $fileSize;
                     $fileCount++;
@@ -144,7 +144,7 @@ class BackupMonitoringCleanupCommand extends Command
 
             // Delete rotated log files older than retention period
             $deletedFiles = 0;
-            $cutoffTime = strtotime("-{$retentionDays} days");
+            $cutoffTime = now()->subDays($retentionDays)->timestamp;
             
             foreach ($rotatedLogs as $logFile) {
                 if (filemtime($logFile) < $cutoffTime) {

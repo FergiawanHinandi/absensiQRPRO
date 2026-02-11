@@ -3,22 +3,21 @@
 namespace App\Events;
 
 use App\Models\Attendance;
-use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class AttendanceRecorded implements ShouldBroadcast
+class AttendanceRecorded
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable, SerializesModels;
 
-    public function __construct(public Attendance $attendance) {}
+    /**
+     * @var Attendance
+     */
+    public $attendance;
 
-    public function broadcastOn(): array
+    public function __construct(Attendance $attendance)
     {
-        return [
-            new PrivateChannel('user.'.$this->attendance->student_id),
-        ];
+        // Serialize model for queue transport
+        $this->attendance = $attendance;
     }
 }

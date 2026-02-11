@@ -127,19 +127,25 @@ class AttendanceReportController extends Controller
                 ->first();
 
             // OPTIMIZED: Single query per-student breakdown
+            // SECURITY FIX: Use leftJoinSub with parameter bindings instead of raw variable interpolation
+            $attendanceSub = DB::table('attendances')
+                ->select(
+                    'student_id',
+                    DB::raw("SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present"),
+                    DB::raw("SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late"),
+                    DB::raw("SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent")
+                )
+                ->where('class_id', $classId)
+                ->whereRaw('EXTRACT(MONTH FROM attendance_date) = ?', [$month])
+                ->whereRaw('EXTRACT(YEAR FROM attendance_date) = ?', [$year])
+                ->groupBy('student_id');
+
+            $schoolDaysInt = (int) $schoolDays;
             $studentBreakdown = DB::table('class_students')
                 ->join('users', 'class_students.student_id', '=', 'users.id')
-                ->leftJoin(DB::raw("(
-                    SELECT student_id,
-                        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
-                        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
-                        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent
-                    FROM attendances
-                    WHERE class_id = {$classId}
-                        AND EXTRACT(MONTH FROM attendance_date) = {$month}
-                        AND EXTRACT(YEAR FROM attendance_date) = {$year}
-                    GROUP BY student_id
-                ) as att"), 'class_students.student_id', '=', 'att.student_id')
+                ->leftJoinSub($attendanceSub, 'att', function ($join) {
+                    $join->on('class_students.student_id', '=', 'att.student_id');
+                })
                 ->where('class_students.class_id', $classId)
                 ->where('class_students.status', 'active')
                 ->select(
@@ -148,10 +154,9 @@ class AttendanceReportController extends Controller
                     DB::raw('COALESCE(att.present, 0) as present'),
                     DB::raw('COALESCE(att.late, 0) as late'),
                     DB::raw('COALESCE(att.absent, 0) as absent'),
-                    DB::raw($schoolDays > 0
-                        ? "ROUND(((COALESCE(att.present, 0) + COALESCE(att.late, 0)) / {$schoolDays}) * 100, 2)"
-                        : '0'
-                    . ' as attendance_rate')
+                    DB::raw($schoolDaysInt > 0
+                        ? "ROUND(((COALESCE(att.present, 0) + COALESCE(att.late, 0)) / " . $schoolDaysInt . ") * 100, 2) as attendance_rate"
+                        : "0 as attendance_rate")
                 )
                 ->orderBy('users.name')
                 ->get();
@@ -249,25 +254,32 @@ class AttendanceReportController extends Controller
         $cacheKey = "school_monthly_attendance_{$schoolId}_{$month}_{$year}_v2";
         $data = Cache::remember($cacheKey, 300, function () use ($schoolId, $month, $year) {
             // OPTIMIZED: Single query for all classes with aggregation
+            // SECURITY FIX: Use leftJoinSub with parameter bindings
+            $attendanceSub = DB::table('attendances')
+                ->select(
+                    'class_id',
+                    DB::raw("COUNT(DISTINCT attendance_date) as school_days"),
+                    DB::raw("SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present"),
+                    DB::raw("SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late"),
+                    DB::raw("SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent")
+                )
+                ->where('school_id', $schoolId)
+                ->whereRaw('EXTRACT(MONTH FROM attendance_date) = ?', [$month])
+                ->whereRaw('EXTRACT(YEAR FROM attendance_date) = ?', [$year])
+                ->groupBy('class_id');
+
+            $studentCountSub = DB::table('class_students')
+                ->select('class_id', DB::raw('COUNT(*) as total_students'))
+                ->where('status', 'active')
+                ->groupBy('class_id');
+
             $classStats = DB::table('classes')
-                ->leftJoin(DB::raw("(
-                    SELECT class_id,
-                        COUNT(DISTINCT attendance_date) as school_days,
-                        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
-                        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
-                        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent
-                    FROM attendances
-                    WHERE school_id = {$schoolId}
-                        AND EXTRACT(MONTH FROM attendance_date) = {$month}
-                        AND EXTRACT(YEAR FROM attendance_date) = {$year}
-                    GROUP BY class_id
-                ) as att"), 'classes.id', '=', 'att.class_id')
-                ->leftJoin(DB::raw("(
-                    SELECT class_id, COUNT(*) as total_students
-                    FROM class_students
-                    WHERE status = 'active'
-                    GROUP BY class_id
-                ) as cs"), 'classes.id', '=', 'cs.class_id')
+                ->leftJoinSub($attendanceSub, 'att', function ($join) {
+                    $join->on('classes.id', '=', 'att.class_id');
+                })
+                ->leftJoinSub($studentCountSub, 'cs', function ($join) {
+                    $join->on('classes.id', '=', 'cs.class_id');
+                })
                 ->where('classes.school_id', $schoolId)
                 ->where('classes.is_active', true)
                 ->select(

@@ -54,9 +54,9 @@
     </div>
 
     <div class="info">
-        <p><strong>Periode:</strong> {{ date('d-m-Y', strtotime($start_date)) }} s/d {{ date('d-m-Y', strtotime($end_date)) }}</p>
+        <p><strong>Periode:</strong> {{ \Carbon\Carbon::parse($start_date)->format('d-m-Y') }} s/d {{ \Carbon\Carbon::parse($end_date)->format('d-m-Y') }}</p>
         <p><strong>Total Data:</strong> {{ $attendances->count() }} records</p>
-    </div>
+    
 
     <table>
         <thead>

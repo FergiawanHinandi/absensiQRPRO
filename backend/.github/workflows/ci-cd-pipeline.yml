@@ -1,0 +1,543 @@
+name: CI/CD Pipeline - Production Safe
+
+on:
+  push:
+    branches: [main, staging, develop]
+  pull_request:
+    branches: [main, staging]
+
+env:
+  PHP_VERSION: '8.2'
+  NODE_VERSION: '20'
+  COVERAGE_THRESHOLD: 85
+
+jobs:
+  # ============================================
+  # STAGE 1: Static Analysis
+  # ============================================
+  static-analysis:
+    name: 🔍 Static Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, xml, ctype, json, bcmath, redis
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run PHPStan (Level 8)
+        run: vendor/bin/phpstan analyse --level=8 --memory-limit=2G
+        continue-on-error: false
+
+      - name: Run Rector (Dry Run)
+        run: vendor/bin/rector process --dry-run
+        continue-on-error: true
+
+      - name: Check for DB::table usage in tenant models
+        run: |
+          echo "🔍 Checking for DB::table usage in tenant-scoped models..."
+          if grep -r "DB::table" app/Models/ | grep -v "// allowed"; then
+            echo "❌ Found DB::table usage in Models! Use Eloquent instead."
+            exit 1
+          else
+            echo "✅ No DB::table usage found in Models"
+          fi
+
+      - name: Check for missing tenant scopes
+        run: |
+          echo "🔍 Checking for missing tenant scopes..."
+          php artisan app:check-tenant-scopes
+        continue-on-error: true
+
+  # ============================================
+  # STAGE 2: Unit & Integration Tests
+  # ============================================
+  tests:
+    name: 🧪 Tests (Coverage ${{ env.COVERAGE_THRESHOLD }}%)
+    runs-on: ubuntu-latest
+    needs: static-analysis
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: testing
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, xml, ctype, json, bcmath, redis, pdo_mysql
+          coverage: xdebug
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('**/composer.lock') }}
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Copy .env.testing
+        run: cp .env.testing .env
+
+      - name: Generate application key
+        run: php artisan key:generate
+
+      - name: Run migrations
+        run: php artisan migrate --force
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: testing
+          DB_USERNAME: root
+          DB_PASSWORD: password
+
+      - name: Run tests (Parallel)
+        run: php artisan test --parallel --processes=4 --coverage --min=${{ env.COVERAGE_THRESHOLD }}
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          REDIS_HOST: 127.0.0.1
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Run Domain Tests
+        run: php artisan test tests/Unit/Domain --stop-on-failure
+
+      - name: Run Integration Tests
+        run: php artisan test tests/Feature --stop-on-failure
+
+      - name: Run Concurrency Tests
+        run: php artisan test tests/Concurrency
+        continue-on-error: true
+
+      - name: Run Security Tests
+        run: php artisan test tests/Security --stop-on-failure
+
+  # ============================================
+  # STAGE 3: Security Scan
+  # ============================================
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: static-analysis
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Composer Audit
+        run: composer audit --no-dev
+        continue-on-error: false
+
+      - name: NPM Audit
+        run: |
+          cd frontend-web
+          npm audit --production
+        continue-on-error: true
+
+      - name: Check for secrets in code
+        run: |
+          echo "🔍 Scanning for secrets..."
+          if grep -r "APP_KEY=" . --exclude-dir={vendor,node_modules,.git}; then
+            echo "❌ Found APP_KEY in code!"
+            exit 1
+          fi
+          if grep -r "DB_PASSWORD=" . --exclude-dir={vendor,node_modules,.git} --exclude=".env.example"; then
+            echo "❌ Found DB_PASSWORD in code!"
+            exit 1
+          fi
+          echo "✅ No secrets found"
+
+      - name: Dependency vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ============================================
+  # STAGE 4: Build
+  # ============================================
+  build:
+    name: 🏗️ Build Application
+    runs-on: ubuntu-latest
+    needs: [tests, security-scan]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, xml, ctype, json, bcmath, redis
+
+      - name: Install Composer dependencies (production)
+        run: composer install --prefer-dist --no-dev --optimize-autoloader --no-interaction
+
+      - name: Cache config
+        run: php artisan config:cache
+
+      - name: Cache routes
+        run: php artisan route:cache
+
+      - name: Cache events
+        run: php artisan event:cache
+
+      - name: Cache views
+        run: php artisan view:cache
+
+      - name: Build frontend assets
+        run: |
+          cd frontend-web
+          npm ci
+          npm run build
+
+      - name: Create deployment artifact
+        run: |
+          tar -czf deployment.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='tests' \
+            --exclude='.env' \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-artifact
+          path: deployment.tar.gz
+          retention-days: 7
+
+  # ============================================
+  # STAGE 5: Deploy to Staging
+  # ============================================
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/staging'
+    environment:
+      name: staging
+      url: https://staging.absensiqr.com
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: deployment-artifact
+
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /var/www/staging
+            
+            # Backup current version
+            echo "📦 Creating backup..."
+            tar -czf backup-$(date +%Y%m%d-%H%M%S).tar.gz current/
+            
+            # Extract new version
+            echo "📥 Extracting new version..."
+            mkdir -p releases/$(date +%Y%m%d-%H%M%S)
+            tar -xzf deployment.tar.gz -C releases/$(date +%Y%m%d-%H%M%S)
+            
+            # Run migrations (safe mode)
+            echo "🗄️ Running migrations..."
+            cd releases/$(date +%Y%m%d-%H%M%S)
+            php artisan migrate --force
+            
+            # Switch symlink
+            echo "🔄 Switching to new version..."
+            ln -sfn releases/$(date +%Y%m%d-%H%M%S) /var/www/staging/current
+            
+            # Restart services
+            echo "♻️ Restarting services..."
+            sudo systemctl reload php8.2-fpm
+            sudo supervisorctl restart laravel-worker:*
+
+      - name: Health check
+        run: |
+          echo "🏥 Running health checks..."
+          sleep 10
+          curl -f https://staging.absensiqr.com/api/health || exit 1
+
+      - name: Smoke test
+        run: |
+          echo "🧪 Running smoke tests..."
+          curl -f https://staging.absensiqr.com/api/health/redis || exit 1
+          curl -f https://staging.absensiqr.com/api/health/database || exit 1
+          curl -f https://staging.absensiqr.com/api/health/queue || exit 1
+
+  # ============================================
+  # STAGE 6: Deploy to Production (Blue/Green)
+  # ============================================
+  deploy-production:
+    name: 🚀 Deploy to Production (Blue/Green)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://absensiqr.com
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: deployment-artifact
+
+      - name: Deploy to Blue environment
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /var/www/production
+            
+            # Determine current and target environments
+            CURRENT=$(readlink current | grep -o 'blue\|green')
+            if [ "$CURRENT" = "blue" ]; then
+              TARGET="green"
+            else
+              TARGET="blue"
+            fi
+            
+            echo "📍 Current: $CURRENT, Target: $TARGET"
+            
+            # Backup database
+            echo "💾 Backing up database..."
+            php artisan backup:run --only-db
+            
+            # Extract to target environment
+            echo "📥 Deploying to $TARGET..."
+            tar -xzf deployment.tar.gz -C $TARGET/
+            
+            # Run migrations with lock check
+            echo "🗄️ Running migrations..."
+            cd $TARGET
+            php artisan migrate --force
+            
+            # Clear caches
+            php artisan cache:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan event:cache
+            
+            # Warm up caches
+            php artisan queue:restart
+            
+            echo "✅ $TARGET environment ready"
+
+      - name: Health check on Blue environment
+        run: |
+          echo "🏥 Health check on target environment..."
+          sleep 5
+          
+          # Check Redis
+          curl -f https://blue.absensiqr.com/api/health/redis || exit 1
+          
+          # Check Database
+          curl -f https://blue.absensiqr.com/api/health/database || exit 1
+          
+          # Check Queue
+          curl -f https://blue.absensiqr.com/api/health/queue || exit 1
+          
+          # Test attendance scan
+          curl -f https://blue.absensiqr.com/api/health/attendance-test || exit 1
+
+      - name: Switch traffic (Blue/Green)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /var/www/production
+            
+            CURRENT=$(readlink current | grep -o 'blue\|green')
+            if [ "$CURRENT" = "blue" ]; then
+              TARGET="green"
+            else
+              TARGET="blue"
+            fi
+            
+            echo "🔄 Switching traffic from $CURRENT to $TARGET..."
+            ln -sfn $TARGET current
+            
+            # Reload web server
+            sudo systemctl reload nginx
+            sudo systemctl reload php8.2-fpm
+            
+            echo "✅ Traffic switched to $TARGET"
+
+      - name: Post-deployment verification
+        run: |
+          echo "🔍 Post-deployment verification..."
+          sleep 10
+          
+          # Verify main site
+          curl -f https://absensiqr.com/api/health || exit 1
+          
+          # Check error rate
+          ERROR_RATE=$(curl -s https://absensiqr.com/api/metrics/error-rate | jq -r '.rate')
+          if (( $(echo "$ERROR_RATE > 5" | bc -l) )); then
+            echo "❌ Error rate too high: $ERROR_RATE%"
+            exit 1
+          fi
+          
+          echo "✅ Deployment successful!"
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: '🎉 Production deployment successful!'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: success()
+
+      - name: Rollback on failure
+        uses: appleboy/ssh-action@master
+        if: failure()
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /var/www/production
+            
+            # Switch back to previous environment
+            CURRENT=$(readlink current | grep -o 'blue\|green')
+            if [ "$CURRENT" = "blue" ]; then
+              PREVIOUS="green"
+            else
+              PREVIOUS="blue"
+            fi
+            
+            echo "⚠️ Rolling back to $PREVIOUS..."
+            ln -sfn $PREVIOUS current
+            
+            # Reload services
+            sudo systemctl reload nginx
+            sudo systemctl reload php8.2-fpm
+            
+            # Clear caches
+            php artisan cache:clear
+            php artisan queue:restart
+            
+            echo "✅ Rollback complete"
+
+      - name: Notify rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'failure'
+          text: '⚠️ Production deployment failed! Rolled back.'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: failure()
+
+  # ============================================
+  # STAGE 7: Post-Deploy Monitoring
+  # ============================================
+  post-deploy-monitoring:
+    name: 📊 Post-Deploy Monitoring
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Monitor for 5 minutes
+        run: |
+          echo "📊 Monitoring deployment for 5 minutes..."
+          
+          for i in {1..10}; do
+            echo "Check $i/10..."
+            
+            # Check error rate
+            ERROR_RATE=$(curl -s https://absensiqr.com/api/metrics/error-rate | jq -r '.rate')
+            echo "Error rate: $ERROR_RATE%"
+            
+            if (( $(echo "$ERROR_RATE > 5" | bc -l) )); then
+              echo "❌ Error rate exceeded threshold!"
+              exit 1
+            fi
+            
+            # Check response time
+            RESPONSE_TIME=$(curl -s https://absensiqr.com/api/metrics/response-time | jq -r '.avg')
+            echo "Avg response time: ${RESPONSE_TIME}ms"
+            
+            if (( $(echo "$RESPONSE_TIME > 1000" | bc -l) )); then
+              echo "⚠️ Response time high!"
+            fi
+            
+            sleep 30
+          done
+          
+          echo "✅ Monitoring complete - all metrics healthy"
+
+      - name: Trigger rollback if needed
+        if: failure()
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: trigger-rollback
+          client-payload: '{"reason": "Post-deploy monitoring failed"}'

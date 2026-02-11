@@ -4,7 +4,14 @@ import type { AuthResponse, LoginCredentials, User } from '../types';
 export const authService = {
     login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
         try {
-            const response = await apiClient.post<{ success: boolean; data: { access_token: string; user: User } }>('/auth/login', credentials);
+            const response = await apiClient.post<{ 
+                success: boolean; 
+                data: { 
+                    access_token: string; 
+                    user: User;
+                    redirect_url?: string;
+                } 
+            }>('/auth/login', credentials);
             
             // Validate response structure
             if (!response.data?.success || !response.data?.data?.access_token || !response.data?.data?.user) {
@@ -14,7 +21,8 @@ export const authService = {
             // Transform backend response to match frontend expectations
             return {
                 token: response.data.data.access_token,
-                user: response.data.data.user
+                user: response.data.data.user,
+                redirect_url: response.data.data.redirect_url, // Server-provided redirect URL
             };
         } catch (error: any) {
             // Handle specific error cases

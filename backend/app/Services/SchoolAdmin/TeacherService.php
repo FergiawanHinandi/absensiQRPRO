@@ -3,6 +3,7 @@
 namespace App\Services\SchoolAdmin;
 
 use App\Models\User;
+use App\Models\UserProfile;
 use App\Traits\HasSchoolLimits;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -35,14 +36,13 @@ class TeacherService
                     'is_active' => true,
                 ]);
 
-                DB::table('user_profiles')->updateOrInsert(
+                UserProfile::updateOrCreate(
                     ['user_id' => $existing->id],
                     [
                         'full_name' => $validated['name'],
                         'nip' => $validated['nip'],
                         'phone' => $validated['phone'] ?? null,
                         'gender' => $validated['gender'],
-                        'updated_at' => now(),
                     ]
                 );
 
@@ -67,14 +67,12 @@ class TeacherService
                 'is_active' => true,
             ]);
 
-            DB::table('user_profiles')->insert([
+            UserProfile::create([
                 'user_id' => $teacher->id,
                 'full_name' => $validated['name'],
                 'nip' => $validated['nip'],
                 'phone' => $validated['phone'] ?? null,
                 'gender' => $validated['gender'],
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
 
             DB::commit();
@@ -175,14 +173,13 @@ class TeacherService
 
             $teacher->update($userUpdate);
 
-            DB::table('user_profiles')->updateOrInsert(
+            UserProfile::updateOrCreate(
                 ['user_id' => $teacher->id],
                 [
                     'full_name' => $validated['name'],
                     'nip' => $validated['nip'],
                     'phone' => $validated['phone'] ?? null,
                     'gender' => $validated['gender'],
-                    'updated_at' => now(),
                 ]
             );
 
@@ -245,7 +242,7 @@ class TeacherService
                 }
 
                 if (! empty($profileData)) {
-                    DB::table('user_profiles')->insert($profileData);
+                    UserProfile::insert($profileData);
                 }
             }
 

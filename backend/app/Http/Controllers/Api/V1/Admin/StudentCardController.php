@@ -96,8 +96,14 @@ class StudentCardController extends Controller
             ], 422);
         }
         if ($students->count() > 300) {
-            // Dispatch queue job
-            \App\Jobs\BulkGenerateStudentCards::dispatch($students->pluck('id')->all(), $admin->id, $filters, $forceRegenerate);
+            // Dispatch queue job with tenant context
+            \App\Jobs\BulkGenerateStudentCards::dispatch(
+                $students->pluck('id')->all(), 
+                $admin->id, 
+                $admin->school_id,  // ✅ Pass school_id for tenant context
+                $filters, 
+                $forceRegenerate
+            );
 
             return response()->json([
                 'success' => true,

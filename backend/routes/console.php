@@ -47,51 +47,42 @@ Schedule::command('security:backup-hashes --verify')
 // ============================================================
 
 // Daily FULL database backup at 02:00 AM
-// - Compressed with Gzip
-// - Encrypted with AES-256 (BACKUP_ENCRYPTION_KEY)
+// - Monitored execution (logs to BackupRestoreMonitoringService)
+// - Encrypted with AES-256 (via Spatie config)
 // - Stored locally then synced to S3
-// - Retained for 30 days
 Schedule::command('backup:run --only-db')
     ->dailyAt('02:00')
     ->withoutOverlapping()
     ->runInBackground()
-    ->onSuccess(function () {
-        \Illuminate\Support\Facades\Log::channel('backup')
-            ->info('Daily database backup completed successfully', [
-                'type' => 'database',
-                'scheduled_time' => '02:00',
-                'timestamp' => now()->toIso8601String(),
-            ]);
-    })
     ->onFailure(function () {
-        \Illuminate\Support\Facades\Log::channel('backup')
-            ->critical('Daily database backup FAILED', [
-                'type' => 'database',
-                'scheduled_time' => '02:00',
-                'timestamp' => now()->toIso8601String(),
-            ]);
+        \Illuminate\Support\Facades\Log::channel('security')
+            ->critical('Daily DB Backup Failed');
     });
+
+// INCREMENTAL database backup every 15 minutes
+// - Captures recent changes to minimize data loss (RPO: 15 mins)
+// - Monitored execution
+Schedule::command('backup:run --only-db --disable-notifications')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Monthly Automated Restore Validation
+// - Verifies backup integrity by performing a real restore to a temp DB
+// - Run on the 1st of every month at 04:00 AM (low traffic)
+Schedule::command('backup:validate-restore')
+    ->monthlyOn(1, '04:00')
+    ->withoutOverlapping()
+    ->runInBackground();
 
 // Daily files backup at 02:45 AM (after security hash backup at 02:30)
 Schedule::command('backup:run --only-files')
     ->dailyAt('02:45')
     ->withoutOverlapping()
     ->runInBackground()
-    ->onSuccess(function () {
-        \Illuminate\Support\Facades\Log::channel('backup')
-            ->info('Daily files backup completed successfully', [
-                'type' => 'files',
-                'scheduled_time' => '02:45',
-                'timestamp' => now()->toIso8601String(),
-            ]);
-    })
     ->onFailure(function () {
-        \Illuminate\Support\Facades\Log::channel('backup')
-            ->critical('Daily files backup FAILED', [
-                'type' => 'files',
-                'scheduled_time' => '02:45',
-                'timestamp' => now()->toIso8601String(),
-            ]);
+        \Illuminate\Support\Facades\Log::channel('security')
+            ->critical('Daily Files Backup Failed');
     });
 
 // Backup cleanup - runs daily at 03:00 AM (removes backups older than 30 days)
@@ -122,3 +113,20 @@ Schedule::command('queue:autoscale --os=linux')->everyMinute()->withoutOverlappi
 
 // 🚨 System Health Monitoring (Alerting)
 Schedule::command('monitor:system')->everyMinute()->runInBackground();
+
+// ============================================================
+// OBSERVABILITY & LOG MAINTENANCE
+// ============================================================
+
+// Queue Worker Heartbeat - dispatches job to verify workers
+Schedule::job(new \App\Jobs\QueueWorkerHeartbeat)->everyMinute()->withoutOverlapping();
+
+// Log Rotation - cleanup old log files daily at 04:00 AM
+Schedule::command('logs:rotate --days=30 --max-size=100')
+    ->dailyAt('04:00')
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->onSuccess(function () {
+        \Illuminate\Support\Facades\Log::channel('system')
+            ->info('Log rotation completed successfully');
+    });

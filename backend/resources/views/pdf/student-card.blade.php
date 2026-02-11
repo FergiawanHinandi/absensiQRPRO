@@ -178,7 +178,7 @@
             </div>
 
             <div class="academic-year">
-                TA: {{ $academicYear ? $academicYear->name : date('Y') }}
+                TA: {{ $academicYear ? $academicYear->name : now()->year }}
             </div>
 
             <div class="qr-container">

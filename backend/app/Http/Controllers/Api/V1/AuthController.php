@@ -35,12 +35,21 @@ class AuthController extends Controller
     /**
      * Login - Generate Sanctum token with advanced brute force protection
      *
+     * SECURITY: Timing Attack Mitigation
+     * - Always perform Hash::check even if user not found (constant time)
+     * - Use generic error messages that don't reveal user existence
+     * - Rate limiting applied BEFORE any database queries
+     *
      * @return \Illuminate\Http\JsonResponse
      */
     public function login(LoginRequest $request)
     {
         // CRITICAL: Check rate limiting BEFORE database query
         $this->ensureIsNotRateLimited($request);
+
+        // Start timing measurement for consistent response time
+        $startTime = hrtime(true);
+        $minResponseTimeNs = 100_000_000; // 100ms minimum response time
 
         $user = User::where(function ($query) use ($request) {
             $query->where('username', $request->username)
@@ -50,22 +59,20 @@ class AuthController extends Controller
             ->with('school') // Load school relation
             ->first();
 
-        // CRITICAL: Check if account is locked
-        if ($user && $this->rateLimiter->isAccountLocked($user)) {
-            $remainingSeconds = $this->rateLimiter->lockoutRemainingSeconds($user);
-            $remainingMinutes = ceil($remainingSeconds / 60);
+        // CRITICAL: Timing Attack Mitigation
+        // Always perform hash check to maintain constant response time
+        // Use dummy hash when user not found to prevent timing analysis
+        $dummyHash = '$2y$12$K4O0R4b5xQYzKj0xH4bWoOvB2Y9d8q0Z3X5n6l7m8kJhIgFeDcBa.'; // Pre-computed bcrypt hash
+        $passwordToCheck = $user ? $user->password : $dummyHash;
+        $passwordValid = Hash::check($request->password, $passwordToCheck);
 
-            throw ValidationException::withMessages([
-                'email' => [
-                    'Akun Anda telah dikunci karena terlalu banyak percobaan login yang gagal. '
-                        . "Silakan coba lagi dalam {$remainingMinutes} menit.",
-                ],
-            ]);
-        }
-
-        // Verify credentials
-        if (! $user || ! Hash::check($request->password, $user->password)) {
-            // CRITICAL: Record failed attempt ONLY if user exists
+        // SECURITY FIX: Check credentials FIRST, then lockout
+        // This prevents user enumeration via lockout response differences.
+        // Previously, the lockout check was before credential validation,
+        // allowing attackers to distinguish existing users (get "account locked")
+        // from non-existing users (get "invalid credentials").
+        if (! $user || ! $passwordValid) {
+            // CRITICAL: Record failed attempt
             if ($user) {
                 $this->rateLimiter->recordFailedAttempt($user);
 
@@ -87,17 +94,37 @@ class AuthController extends Controller
                 // User doesn't exist, just increment rate limiter
                 $this->rateLimiter->hit($request, $request->username);
 
-                // Log to security channel for aggregation
+                // Log to security channel - use generic reason to not leak info in logs
                 \Illuminate\Support\Facades\Log::channel('security')->warning('Failed Login Attempt', [
                     'username' => $request->username,
                     'ip' => $request->ip(),
-                    'reason' => 'User Not Found',
+                    'reason' => 'Invalid Credentials', // Generic - don't reveal user not found
                 ]);
             }
+
+            // CRITICAL: Enforce minimum response time before throwing error
+            $this->enforceMinimumResponseTime($startTime, $minResponseTimeNs);
 
             // CRITICAL: Generic error message (don't reveal which field is wrong)
             throw ValidationException::withMessages([
                 'email' => ['Kredensial yang Anda masukkan tidak valid. Silakan periksa kembali.'],
+            ]);
+        }
+
+        // CRITICAL: Check if account is locked (only AFTER credentials verified)
+        // Lockout message only shown when correct password is provided,
+        // preventing attackers from using lockout responses for user enumeration
+        if ($this->rateLimiter->isAccountLocked($user)) {
+            $this->enforceMinimumResponseTime($startTime, $minResponseTimeNs);
+
+            $remainingSeconds = $this->rateLimiter->lockoutRemainingSeconds($user);
+            $remainingMinutes = ceil($remainingSeconds / 60);
+
+            throw ValidationException::withMessages([
+                'email' => [
+                    'Akun Anda telah dikunci karena terlalu banyak percobaan login yang gagal. '
+                        . "Silakan coba lagi dalam {$remainingMinutes} menit.",
+                ],
             ]);
         }
 
@@ -267,6 +294,8 @@ class AuthController extends Controller
                 'expires_at' => $tokens['expires_at'],
                 // Refresh token sent in response for mobile, cookie for web
                 'refresh_token' => $platform !== 'web' ? $tokens['refresh_token'] : null,
+                // Server-determined redirect URL (no client-side role checking)
+                'redirect_url' => $this->getRedirectUrlForRole($user->role_type),
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -554,5 +583,55 @@ class AuthController extends Controller
                 "Terlalu banyak percobaan login. Silakan coba lagi dalam {$minutes} menit.",
             ],
         ]);
+    }
+
+    /**
+     * TIMING ATTACK MITIGATION
+     * 
+     * Enforce a minimum response time to prevent timing-based user enumeration.
+     * This ensures that:
+     * - Valid user + wrong password takes same time as invalid user
+     * - Response time doesn't leak information about user existence
+     * 
+     * @param int $startTime Start time in nanoseconds (from hrtime(true))
+     * @param int $minTimeNs Minimum response time in nanoseconds
+     */
+    protected function enforceMinimumResponseTime(int $startTime, int $minTimeNs): void
+    {
+        $elapsed = hrtime(true) - $startTime;
+        $remainingNs = $minTimeNs - $elapsed;
+        
+        if ($remainingNs > 0) {
+            // Convert nanoseconds to microseconds for usleep
+            $remainingUs = (int) ($remainingNs / 1000);
+            
+            // Add small random jitter (0-10ms) to prevent statistical analysis
+            $jitterUs = random_int(0, 10000);
+            
+            usleep($remainingUs + $jitterUs);
+        }
+    }
+
+    /**
+     * Get redirect URL based on user role
+     * Server determines where user should go after login
+     * 
+     * @param string $roleType
+     * @return string
+     */
+    protected function getRedirectUrlForRole(string $roleType): string
+    {
+        return match ($roleType) {
+            'super_admin' => '/super-admin/dashboard',
+            'school_admin' => '/admin/dashboard',
+            'principal' => '/principal/dashboard',
+            'vice_principal' => '/principal/dashboard',
+            'teacher' => '/teacher/dashboard',
+            'homeroom_teacher' => '/teacher/dashboard',
+            'staff' => '/staff/dashboard',
+            'student' => '/student/dashboard',
+            'parent' => '/parent/dashboard',
+            default => '/dashboard',
+        };
     }
 }

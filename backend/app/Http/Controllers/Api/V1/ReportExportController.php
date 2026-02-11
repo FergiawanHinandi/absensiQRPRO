@@ -27,7 +27,7 @@ class ReportExportController extends Controller
             $validated['class_id'] ?? null
         );
 
-        $filename = 'attendance_report_'.date('Y-m-d_His').'.xlsx';
+        $filename = 'attendance_report_'.now()->format('Y-m-d_His').'.xlsx';
 
         return Excel::download($export, $filename);
     }
@@ -65,7 +65,7 @@ class ReportExportController extends Controller
         ];
 
         $pdf = Pdf::loadView('reports.attendance', $data);
-        $filename = 'attendance_report_'.date('Y-m-d_His').'.pdf';
+        $filename = 'attendance_report_'.now()->format('Y-m-d_His').'.pdf';
 
         return $pdf->download($filename);
     }
@@ -90,7 +90,7 @@ class ReportExportController extends Controller
             ->get();
 
         $startDate = "{$validated['year']}-{$validated['month']}-01";
-        $endDate = date('Y-m-t', strtotime($startDate));
+        $endDate = \Carbon\Carbon::parse($startDate)->endOfMonth()->format('Y-m-d');
 
         // ✅ FIX N+1: Fetch ALL attendances in ONE query
         $studentIds = $students->pluck('id')->toArray();

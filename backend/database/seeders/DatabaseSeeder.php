@@ -86,6 +86,7 @@ class DatabaseSeeder extends Seeder
                 'address' => "Jl. Pendidikan $upperLevel No. 123",
                 'email' => "info.$level@harapanbangsa.com",
                 'phone' => '021-555'.rand(1000, 9999),
+                'timezone' => 'Asia/Jakarta',
                 'is_active' => true,
             ]);
 

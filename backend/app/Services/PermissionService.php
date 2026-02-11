@@ -201,18 +201,22 @@ class PermissionService
                     'notes' => $notes,
                 ]);
             } else {
-                // Create new
-                Attendance::create([
-                    'student_id' => $permission->student_id,
-                    'school_id' => $permission->school_id,
-                    'class_id' => $permission->class_id,
-                    'attendance_date' => $dateString,
-                    'status' => $status,
-                    'check_in_time' => null,
-                    'check_out_time' => null,
-                    'is_manual' => true,
-                    'notes' => $notes,
-                ]);
+                // Create new (using firstOrCreate)
+                Attendance::firstOrCreate(
+                    [
+                        'student_id' => $permission->student_id,
+                        'school_id' => $permission->school_id,
+                        'attendance_date' => $dateString,
+                    ],
+                    [
+                        'class_id' => $permission->class_id,
+                        'status' => $status,
+                        'check_in_time' => null,
+                        'check_out_time' => null,
+                        'is_manual' => true,
+                        'notes' => $notes,
+                    ]
+                );
             }
         }
 

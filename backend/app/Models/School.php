@@ -25,6 +25,11 @@ class School extends Model
         'logo_url',
         'settings',
         'is_active',
+        'package_type',
+        'max_students',
+        'max_teachers',
+        'max_classes',
+        'package_updated_at',
     ];
 
     protected $casts = [
@@ -48,6 +53,33 @@ class School extends Model
     public function classes(): HasMany
     {
         return $this->hasMany(SchoolClass::class);
+    }
+
+    /**
+     * Get the subscription for the school.
+     */
+    public function subscription(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Subscription::class);
+    }
+
+    /**
+     * Get the active subscription for the school.
+     */
+    public function activeSubscription(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Subscription::class)
+            ->where('is_active', true)
+            ->where('expires_at', '>=', now())
+            ->where('starts_at', '<=', now());
+    }
+
+    /**
+     * Check if school has an active subscription
+     */
+    public function hasActiveSubscription(): bool
+    {
+        return $this->activeSubscription()->exists();
     }
 
     /**

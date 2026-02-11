@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\SecurityPolicy;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -121,26 +121,22 @@ class SecurityPolicyService
         ) {
             // 1. School-specific
             if ($schoolId) {
-                $schoolPolicy = DB::table('security_policies')
-                    ->where('scope_type', 'school')
-                    ->where('scope_id', $schoolId)
-                    ->where('key', $key)
+                $schoolPolicy = SecurityPolicy::forSchool($schoolId)
+                    ->byKey($key)
                     ->first();
 
                 if ($schoolPolicy) {
-                    return $this->decodeValue($schoolPolicy->value);
+                    return $schoolPolicy->getDecodedValue();
                 }
             }
 
             // 2. Global
-            $globalPolicy = DB::table('security_policies')
-                ->where('scope_type', 'global')
-                ->whereNull('scope_id')
-                ->where('key', $key)
+            $globalPolicy = SecurityPolicy::global()
+                ->byKey($key)
                 ->first();
 
             if ($globalPolicy) {
-                return $this->decodeValue($globalPolicy->value);
+                return $globalPolicy->getDecodedValue();
             }
 
             // 3. Fallback to custom default or DEFAULTS constant
@@ -148,15 +144,7 @@ class SecurityPolicyService
         });
     }
 
-    /**
-     * Decode JSON value from database
-     */
-    protected function decodeValue(string $value): mixed
-    {
-        $decoded = json_decode($value, true);
 
-        return $decoded ?? $value;
-    }
 
     /**
      * Generate cache key for a policy.
@@ -402,10 +390,8 @@ class SecurityPolicyService
     protected function getPolicyScope(string $key, ?int $schoolId): string
     {
         if ($schoolId) {
-            $schoolPolicy = DB::table('security_policies')
-                ->where('scope_type', 'school')
-                ->where('scope_id', $schoolId)
-                ->where('key', $key)
+            $schoolPolicy = SecurityPolicy::forSchool($schoolId)
+                ->byKey($key)
                 ->exists();
 
             if ($schoolPolicy) {
@@ -413,10 +399,8 @@ class SecurityPolicyService
             }
         }
 
-        $globalPolicy = DB::table('security_policies')
-            ->where('scope_type', 'global')
-            ->whereNull('scope_id')
-            ->where('key', $key)
+        $globalPolicy = SecurityPolicy::global()
+            ->byKey($key)
             ->exists();
 
         return $globalPolicy ? 'global' : 'default';
@@ -433,7 +417,7 @@ class SecurityPolicyService
     ): bool {
         $scopeType = $schoolId ? 'school' : 'global';
 
-        $result = DB::table('security_policies')->updateOrInsert(
+        $policy = SecurityPolicy::updateOrCreate(
             [
                 'scope_type' => $scopeType,
                 'scope_id' => $schoolId,
@@ -443,8 +427,6 @@ class SecurityPolicyService
                 'value' => json_encode($value),
                 'description' => self::DESCRIPTIONS[$key] ?? null,
                 'updated_by' => $updatedBy,
-                'updated_at' => now(),
-                'created_at' => now(),
             ],
         );
 
@@ -459,7 +441,7 @@ class SecurityPolicyService
             'updated_by' => $updatedBy,
         ]);
 
-        return $result;
+        return $policy->wasRecentlyCreated || $policy->wasChanged();
     }
 
     /**
@@ -467,11 +449,16 @@ class SecurityPolicyService
      */
     public function delete(string $key, ?int $schoolId): bool
     {
-        $result = DB::table('security_policies')
-            ->where('key', $key)
-            ->where('scope_type', $schoolId ? 'school' : 'global')
-            ->where('scope_id', $schoolId)
-            ->delete();
+        $query = SecurityPolicy::where('key', $key)
+            ->where('scope_type', $schoolId ? 'school' : 'global');
+
+        if ($schoolId) {
+            $query->where('scope_id', $schoolId);
+        } else {
+            $query->whereNull('scope_id');
+        }
+
+        $result = $query->delete();
 
         $this->clearCache($key, $schoolId);
 

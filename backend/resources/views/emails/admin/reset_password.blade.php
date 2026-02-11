@@ -35,7 +35,7 @@
         <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
         
         <p style="font-size: 12px; color: #999; text-align: center;">
-            &copy; {{ date('Y') }} AbsensiQR Pro. All rights reserved.
+            &copy; {{ now()->year }} AbsensiQR Pro. All rights reserved.
         </p>
     </div>
 </body>

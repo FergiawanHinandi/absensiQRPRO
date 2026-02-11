@@ -34,31 +34,22 @@ class AttendanceReportController extends Controller
     ) {}
 
     /**
-     * List attendance records (paginated)
+     * List attendance records (Optimized for > 5M rows)
      *
-     * Policy: viewAny - Can user view attendance list?
-     * Eager Loading: schedule, student (prevents N+1)
+     * OPTIMIZATION STRATEGY:
+     * 1. Specific Select: Reducse memory footprint
+     * 2. Eager Loading: Prevents N+1 queries
+     * 3. Composite Index: Uses idx_attendance_report for filtering
+     * 4. Cursor Pagination: O(1) offset for deep pagination
      */
     public function index(Request $request): JsonResponse
     {
-        // STEP 1: Authorize the action
         $this->authorize('viewAny', Attendance::class);
-
         $user = $request->user();
         $perPage = min($request->input('per_page', 20), 100);
 
-        // STEP 2: Build query with eager loading
+        // OPTIMIZED QUERY
         $query = Attendance::query()
-            // SECURITY: Scope to user's school (defense in depth)
-            ->where('school_id', $user->school_id)
-            // OPTIMIZATION: Eager load with specific columns
-            ->with([
-                'student:id,name,username,class_id',
-                'schedule:id,subject_id,class_id,teacher_id,start_time',
-                'schedule.subject:id,name,code',
-                'schedule.class:id,name,grade_level',
-            ])
-            // OPTIMIZATION: Select only needed columns
             ->select([
                 'id',
                 'student_id',
@@ -67,22 +58,41 @@ class AttendanceReportController extends Controller
                 'status',
                 'check_in_time',
                 'is_manual',
+            ])
+            ->where('school_id', $user->school_id)
+            ->with([
+                'student:id,name,username,class_id',
+                'schedule:id,subject_id,class_id,start_time',
+                'schedule.subject:id,name,code',
+                'schedule.class:id,name,grade_level',
             ]);
 
-        // Filter by date range
-        if ($request->has('start_date')) {
-            $query->where('attendance_date', '>=', $request->input('start_date'));
-        }
-        if ($request->has('end_date')) {
-            $query->where('attendance_date', '<=', $request->input('end_date'));
-        }
-
-        // Filter by status
+        // FILTERS (Index-Aware)
+        // Composite Index Strategy: school_id + status + attendance_date
+        
         if ($request->has('status')) {
             $query->where('status', $request->input('status'));
         }
 
-        $attendances = $query->orderByDesc('attendance_date')->paginate($perPage);
+        if ($request->has('start_date')) {
+            $query->where('attendance_date', '>=', $request->input('start_date'));
+        }
+        
+        if ($request->has('end_date')) {
+            $query->where('attendance_date', '<=', $request->input('end_date'));
+        }
+
+        // PAGINATION
+        // Use cursorPaginate for large datasets (avoids slow COUNT(*) and OFFSET)
+        // Fallback to simplePaginate if page numbers are strictly required
+        if ($request->boolean('use_cursor', true)) {
+            $attendances = $query->orderBy('attendance_date', 'desc')
+                                 ->orderBy('id', 'desc') // Deterministic tie-breaker
+                                 ->cursorPaginate($perPage);
+        } else {
+            $attendances = $query->orderBy('attendance_date', 'desc')
+                                 ->simplePaginate($perPage); 
+        }
 
         return response()->json([
             'success' => true,
@@ -175,7 +185,7 @@ class AttendanceReportController extends Controller
     }
 
     /**
-     * Daily report for school
+     * Daily report for school (Cached)
      *
      * Policy: viewReports - Can user view reports?
      */
@@ -186,11 +196,18 @@ class AttendanceReportController extends Controller
 
         $user = $request->user();
         $date = $request->input('date', now()->toDateString());
+        
+        // CACHE: Cache report for 60 seconds (High Traffic Optimization)
+        // Key format: report_{school_id}_{date}
+        $cacheKey = "report_{$user->school_id}_{$date}";
 
-        $report = $this->attendanceRepo->dailyReport(
-            $user->school_id,
-            \Carbon\Carbon::parse($date)
-        );
+        $report = \Illuminate\Support\Facades\Cache::remember($cacheKey, 60, function() use ($user, $date) {
+            // Use Repository for optimized aggregation (Index Scan Only)
+            return $this->attendanceRepo->dailyReport(
+                $user->school_id,
+                \Carbon\Carbon::parse($date)
+            );
+        });
 
         return response()->json([
             'success' => true,

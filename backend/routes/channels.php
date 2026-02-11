@@ -1,70 +1,173 @@
 <?php
 
+use App\Broadcasting\ChannelAuthorization;
 use Illuminate\Support\Facades\Broadcast;
 
 /*
 |--------------------------------------------------------------------------
-| Broadcast Channels
+| Broadcast Channels (SECURITY HARDENED)
 |--------------------------------------------------------------------------
 |
-| Here you may register all of the event broadcasting channels that your
-| application supports. The given channel authorization callbacks are
-| used to check if an authenticated user can listen to the channel.
+| All broadcast channels now implement:
+| - Multi-tenant isolation (school_id validation)
+| - Ownership chain validation
+| - Timing attack prevention
+| - Unauthorized access logging
+| - N+1 query prevention
+|
+| Authorization logic is centralized in App\Broadcasting\ChannelAuthorization
 |
 */
 
-// Attendance Session Channel - untuk real-time updates saat QR scanning
+/**
+ * Attendance Session Channel
+ * 
+ * Real-time updates during QR code scanning sessions.
+ * 
+ * Authorization:
+ * - Session must exist and belong to user's school
+ * - User must be teacher/admin from same school
+ * - Super admin can access any school
+ * 
+ * Security:
+ * - Validates school_id to prevent cross-school access
+ * - Logs unauthorized attempts
+ */
 Broadcast::channel('attendance.session.{sessionId}', function ($user, $sessionId) {
-    // Hanya teacher yang membuat session atau admin yang bisa listen
-    return $user->hasRole(['teacher', 'homeroom_teacher', 'school_admin', 'admin']);
+    return ChannelAuthorization::authorizeAttendanceSession($user, $sessionId);
 });
 
-// Student Attendance Channel - untuk notifikasi ke student
+/**
+ * Student Channel
+ * 
+ * Personal notifications for students.
+ * 
+ * Authorization:
+ * - Student themselves
+ * - Parent of the student
+ * - Teacher/admin from same school
+ * 
+ * Security:
+ * - Validates parent-student relationship
+ * - Validates school_id for teachers/admins
+ */
 Broadcast::channel('student.{studentId}', function ($user, $studentId) {
-    // Hanya student yang bersangkutan atau parent/teacher yang bisa listen
-    return $user->id == $studentId ||
-           $user->hasRole(['parent', 'teacher', 'homeroom_teacher', 'school_admin', 'admin']);
+    return ChannelAuthorization::authorizeStudentChannel($user, $studentId);
 });
 
-// Parent Notification Channel
+/**
+ * Parent Channel
+ * 
+ * Personal notifications for parents.
+ * 
+ * Authorization:
+ * - Parent themselves only
+ * - No cross-parent access
+ * 
+ * Security:
+ * - Strict ownership validation
+ * - Role verification
+ */
 Broadcast::channel('parent.{parentId}', function ($user, $parentId) {
-    // Hanya parent yang bersangkutan
-    return $user->id == $parentId && $user->hasRole('parent');
+    return ChannelAuthorization::authorizeParentChannel($user, $parentId);
 });
 
-// Teacher Dashboard Channel - untuk real-time updates di dashboard guru
+/**
+ * Teacher Channel
+ * 
+ * Real-time updates for teacher dashboard.
+ * 
+ * Authorization:
+ * - Teacher themselves
+ * - Admin from same school
+ * 
+ * Security:
+ * - Validates school_id for admins
+ * - Prevents cross-school teacher monitoring
+ */
 Broadcast::channel('teacher.{teacherId}', function ($user, $teacherId) {
-    // Hanya teacher yang bersangkutan atau admin
-    return $user->id == $teacherId || $user->hasRole(['school_admin', 'admin']);
+    return ChannelAuthorization::authorizeTeacherChannel($user, $teacherId);
 });
 
-// School-wide Channel - untuk pengumuman sekolah
+/**
+ * School-wide Channel
+ * 
+ * Announcements and updates for entire school.
+ * 
+ * Authorization:
+ * - User must belong to the school
+ * 
+ * Security:
+ * - Strict school_id validation
+ * - Prevents cross-school listening
+ */
 Broadcast::channel('school.{schoolId}', function ($user, $schoolId) {
-    // Semua user yang terkait dengan sekolah tersebut
-    return $user->school_id == $schoolId;
+    return ChannelAuthorization::authorizeSchoolChannel($user, $schoolId);
 });
 
-// Admin Security Alerts Channel
+/**
+ * Admin Security Alerts Channel
+ * 
+ * Security events and alerts for administrators.
+ * 
+ * Authorization:
+ * - Admin from same school
+ * - Super admin can access any school
+ * 
+ * Security:
+ * - Role-based access control
+ * - School_id validation
+ */
 Broadcast::channel('admin.security.{schoolId}', function ($user, $schoolId) {
-    // Hanya admin sekolah yang bersangkutan
-    return $user->hasRole(['school_admin', 'admin', 'super_admin']) &&
-           ($user->school_id == $schoolId || $user->hasRole('super_admin'));
+    return ChannelAuthorization::authorizeAdminSecurityChannel($user, $schoolId);
 });
 
-// System Health Channel - untuk monitoring sistem
+/**
+ * System Health Channel
+ * 
+ * System monitoring and health metrics.
+ * 
+ * Authorization:
+ * - Super admin only
+ * - Regular admin (limited access)
+ * 
+ * Security:
+ * - High-privilege channel
+ * - Strict role validation
+ */
 Broadcast::channel('system.health', function ($user) {
-    // Hanya super admin dan admin yang bisa monitor sistem
-    return $user->hasRole(['super_admin', 'admin']);
+    return ChannelAuthorization::authorizeSystemHealthChannel($user);
 });
 
-// Class-specific Channel - untuk update per kelas
+/**
+ * Class Channel
+ * 
+ * Updates for specific class (attendance, assignments, etc).
+ * 
+ * Authorization:
+ * - Teacher/admin from same school
+ * - Class must exist and belong to user's school
+ * 
+ * Security:
+ * - Validates class existence
+ * - Validates school_id
+ */
 Broadcast::channel('class.{classId}', function ($user, $classId) {
-    // Teacher, homeroom teacher, atau admin yang mengajar/mengelola kelas tersebut
-    return $user->hasRole(['teacher', 'homeroom_teacher', 'school_admin', 'admin']);
+    return ChannelAuthorization::authorizeClassChannel($user, $classId);
 });
 
-// Private User Channel - untuk notifikasi personal
+/**
+ * Private User Channel
+ * 
+ * Personal notifications for individual users.
+ * 
+ * Authorization:
+ * - User themselves only
+ * 
+ * Security:
+ * - Strict ownership validation
+ * - No delegation allowed
+ */
 Broadcast::channel('user.{userId}', function ($user, $userId) {
-    // Hanya user yang bersangkutan
-    return (int) $user->id === (int) $userId;
+    return ChannelAuthorization::authorizeUserChannel($user, $userId);
 });

@@ -4,57 +4,89 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Exceptions\AttendanceException;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\AttendanceScanRequest;
-use App\Http\Requests\ManualAttendanceRequest;
-use App\Services\AttendanceCheckInService;
-use App\Traits\ValidatesSchoolOwnership;
+use App\Http\Requests\Attendance\DailyReportRequest;
+use App\Http\Requests\Attendance\ManualAttendanceRequest;
+use App\Http\Requests\Attendance\ScanAttendanceRequest;
+use App\Services\AttendanceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
+/**
+ * Attendance Controller (Refactored)
+ * 
+ * CLEAN ARCHITECTURE PRINCIPLES:
+ * 1. Controller only handles HTTP layer
+ * 2. Validation via FormRequest
+ * 3. Business logic in Service layer
+ * 4. All queries are school-scoped
+ * 5. Transactions handled in Service
+ * 6. No mass assignment
+ * 
+ * @version 3.0.0
+ */
 class AttendanceController extends Controller
 {
-    use \App\Traits\UsesCacheTags, ValidatesSchoolOwnership;
-
     public function __construct(
-        private AttendanceCheckInService $checkInService
+        private AttendanceService $attendanceService,
+        private \App\Services\AttendanceCheckInService $checkInService
     ) {}
 
     /**
      * Scan QR Code for attendance (Student only)
-     *
-     * CLEAN ARCHITECTURE:
+     * 
      * Controller responsibilities:
-     * 1. Validate request
-     * 2. Call service
-     * 3. Return JSON response
-     *
-     * All business logic is in AttendanceCheckInService
+     * 1. Validate request via FormRequest
+     * 2. Authorize via Policy
+     * 3. Call service
+     * 4. Return JSON response
+     * 
+     * @param ScanAttendanceRequest $request
+     * @return JsonResponse
      */
-    public function scan(AttendanceScanRequest $request): JsonResponse
+    public function scan(ScanAttendanceRequest $request): JsonResponse
     {
+        // Authorization check via Policy
+        Gate::authorize('create', \App\Models\Attendance::class);
+
         try {
-            // 1. Get authenticated user
+            // Get authenticated student
             $student = $request->user();
 
-            // 2. Prepare scan data (simple mapping only)
-            $deviceInfo = $request->input('device_info', []);
+            // Get validated data with defaults
+            $data = $request->validatedWithDefaults();
+
+            // Log security context if present
+            if (!empty($data['security_context'])) {
+                $this->logSecurityContext($student, $data);
+            }
+
+            // Prepare scan data for service
             $scanData = [
-                'qr_token' => $request->input('token'),
-                'lat' => $request->input('latitude'),
-                'lng' => $request->input('longitude'),
-                'accuracy' => $request->input('accuracy'),
-                'device_id' => $deviceInfo['device_id'] ?? null,
-                'request_id' => $request->input('request_id')
-                    ?? $request->header('X-Request-ID')
-                    ?? (string) Str::uuid(),
+                'qr_token' => $data['qr_token'],
+                'lat' => $data['latitude'],
+                'lng' => $data['longitude'],
+                'accuracy' => $data['accuracy'],
+                'altitude' => $data['altitude'],
+                'speed' => $data['speed'],
+                'heading' => $data['heading'],
+                'is_mocked' => $data['is_mocked'],
+                'device_id' => $data['device_id'] ?? null,
             ];
 
-            // 3. Delegate to service (ALL business logic here)
-            $result = $this->checkInService->checkIn($student, $scanData);
+            // 5. Delegate to service (ALL business logic here)
+            // Service will:
+            // - Validate QR token
+            // - Check nonce (replay prevention)
+            // - Validate geofence (radius)
+            // - Validate speed (anti-spoofing)
+            // - Validate time window
+            // - Determine status (present/late)
+            // - Record attendance with SERVER timestamp
+            $result = $this->checkInService->checkIn($student, $scanData, $request);
 
-            // 4. Dispatch event (side effect after success)
+            // 6. Dispatch event (side effect after success)
             if ($result->isSuccessful() && $result->attendance) {
                 $result->attendance->load(['student', 'schedule.class']);
                 \App\Events\StudentAttended::dispatch($result->attendance, $student->school_id);
@@ -63,11 +95,12 @@ class AttendanceController extends Controller
                     'user_id' => $student->id,
                     'schedule_id' => $result->attendance->schedule_id,
                     'action' => 'scan_success',
+                    'status' => $result->attendance->status, // SERVER-DETERMINED
                     'timestamp' => now(),
                 ]);
             }
 
-            // 5. Return response (formatting only)
+            // 7. Return response (formatting only)
             return response()->json($result->toArray(), $result->getHttpStatusCode());
 
         } catch (AttendanceException $e) {
@@ -95,6 +128,30 @@ class AttendanceController extends Controller
     }
 
     /**
+     * Log security context from mobile client
+     *
+     * Logs security metadata for monitoring and analysis
+     */
+    private function logSecurityContext($student, array $data): void
+    {
+        $context = $data['security_context'] ?? [];
+        
+        // Only log if there are security concerns
+        if (!empty($context['violations']) || $context['risk_level'] !== 'low') {
+            Log::channel('attendance_security')->warning('Mobile security context', [
+                'user_id' => $student->id,
+                'is_secure' => $context['is_secure'] ?? true,
+                'risk_level' => $context['risk_level'] ?? 'unknown',
+                'violation_count' => $context['violation_count'] ?? 0,
+                'violations' => $context['violations'] ?? [],
+                'is_mocked' => $data['is_mocked'] ?? false,
+                'device_fingerprint' => $data['device_fingerprint'] ?? null,
+                'timestamp' => now()->toIso8601String(),
+            ]);
+        }
+    }
+
+    /**
      * Manual attendance input (Teacher/Admin only)
      *
      * Controller responsibilities:
@@ -106,6 +163,11 @@ class AttendanceController extends Controller
     public function manual(ManualAttendanceRequest $request)
     {
         $validated = $request->validated();
+        
+        // ZERO-TRUST: Policy Check
+        // Ensure user has permission for specific schedule
+        $schedule = \App\Models\Schedule::findOrFail($validated['schedule_id']);
+        \Illuminate\Support\Facades\Gate::authorize('manualEntry', [\App\Models\Attendance::class, $schedule]);
 
         // SECURITY: Validate student and schedule belong to same school
         $student = $this->validateSchoolOwnershipById(

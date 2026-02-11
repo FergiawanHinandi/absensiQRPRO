@@ -1,0 +1,234 @@
+# Artillery Load Test with Chaos Engineering
+# AbsensiQR Pro SaaS - 10,000 Concurrent Attendance Scan
+#
+# FEATURES:
+# - 5000 students scan dalam 5 detik
+# - 10 teachers generate QR bersamaan
+# - 100 webhooks bersamaan
+# - Redis restart simulation
+# - DB latency injection
+#
+# RUN:
+# artillery run tests/load/artillery-chaos-test.yml
+# artillery run --output report.json tests/load/artillery-chaos-test.yml
+# artillery report report.json
+
+config:
+  target: "http://localhost:8000"
+  phases:
+    # Phase 1: Warm-up (10s)
+    - duration: 10
+      arrivalRate: 10
+      name: "Warm-up"
+    
+    # Phase 2: Burst Load - 5000 students dalam 5 detik (1000 RPS)
+    - duration: 5
+      arrivalRate: 1000
+      name: "Student Scan Burst"
+    
+    # Phase 3: Sustained Load (30s)
+    - duration: 30
+      arrivalRate: 100
+      name: "Sustained Load"
+    
+    # Phase 4: Spike Test (10s)
+    - duration: 10
+      arrivalRate: 500
+      name: "Spike Test"
+    
+    # Phase 5: Cool Down (10s)
+    - duration: 10
+      arrivalRate: 10
+      name: "Cool Down"
+  
+  # Plugins
+  plugins:
+    expect: {}
+    metrics-by-endpoint: {}
+  
+  # Custom Metrics
+  ensure:
+    maxErrorRate: 1  # Max 1% error rate
+    p95: 1000        # 95th percentile < 1s
+    p99: 2000        # 99th percentile < 2s
+  
+  # Variables
+  variables:
+    schools:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+    
+  # Processor
+  processor: "./artillery-processor.js"
+
+# ============================================================================
+# SCENARIOS
+# ============================================================================
+
+scenarios:
+  # SCENARIO 1: Student Scan QR Code (70% of traffic)
+  - name: "Student Scan QR"
+    weight: 70
+    flow:
+      - function: "generateStudentData"
+      - function: "generateQRPayload"
+      - post:
+          url: "/api/v1/student/attendance/scan"
+          headers:
+            Content-Type: "application/json"
+            Authorization: "Bearer {{ studentToken }}"
+          json:
+            qr_payload: "{{ qrPayload }}"
+            latitude: "{{ latitude }}"
+            longitude: "{{ longitude }}"
+            gps_accuracy: "{{ gpsAccuracy }}"
+            device_id: "{{ deviceId }}"
+            is_mock_location: false
+          capture:
+            - json: "$.success"
+              as: "scanSuccess"
+            - json: "$.data.attendance_id"
+              as: "attendanceId"
+          expect:
+            - statusCode: [200, 201]
+            - contentType: json
+            - hasProperty: success
+          afterResponse: "validateScanResponse"
+  
+  # SCENARIO 2: Teacher Generate QR (15% of traffic)
+  - name: "Teacher Generate QR"
+    weight: 15
+    flow:
+      - function: "generateTeacherData"
+      - post:
+          url: "/api/v1/teacher/attendance/generate-qr"
+          headers:
+            Content-Type: "application/json"
+            Authorization: "Bearer {{ teacherToken }}"
+          json:
+            schedule_id: "{{ scheduleId }}"
+            expiry_seconds: 60
+          capture:
+            - json: "$.data.qr_payload"
+              as: "generatedQR"
+          expect:
+            - statusCode: 200
+            - contentType: json
+          afterResponse: "validateQRGeneration"
+  
+  # SCENARIO 3: Webhook Payment (5% of traffic)
+  - name: "Webhook Payment"
+    weight: 5
+    flow:
+      - function: "generateWebhookData"
+      - post:
+          url: "/api/v1/webhook/payment"
+          headers:
+            Content-Type: "application/json"
+          json:
+            order_id: "{{ orderId }}"
+            transaction_id: "{{ transactionId }}"
+            transaction_status: "settlement"
+            payment_type: "bank_transfer"
+            gross_amount: "500000"
+            status_code: "200"
+            signature_key: "{{ signatureKey }}"
+          expect:
+            - statusCode: 200
+            - contentType: json
+          afterResponse: "validateWebhookIdempotency"
+  
+  # SCENARIO 4: Dashboard View (8% of traffic)
+  - name: "Dashboard View"
+    weight: 8
+    flow:
+      - function: "generateTeacherData"
+      - get:
+          url: "/api/v1/teacher/dashboard"
+          headers:
+            Authorization: "Bearer {{ teacherToken }}"
+          expect:
+            - statusCode: 200
+            - contentType: json
+          afterResponse: "validateDashboardPerformance"
+  
+  # SCENARIO 5: Report Export (2% of traffic)
+  - name: "Report Export"
+    weight: 2
+    flow:
+      - function: "generateTeacherData"
+      - post:
+          url: "/api/v1/admin/attendance/export"
+          headers:
+            Content-Type: "application/json"
+            Authorization: "Bearer {{ teacherToken }}"
+          json:
+            type: "monthly"
+            month: "2026-02"
+          expect:
+            - statusCode: [200, 202]
+            - contentType: json
+
+# ============================================================================
+# CHAOS ENGINEERING SCENARIOS
+# ============================================================================
+
+  # CHAOS 1: Redis Restart Simulation
+  - name: "Redis Restart Chaos"
+    weight: 0  # Triggered manually
+    flow:
+      - think: 15  # Wait 15s into test
+      - function: "simulateRedisRestart"
+      - think: 5   # Wait 5s for recovery
+      - function: "validateSystemRecovery"
+  
+  # CHAOS 2: Database Latency Injection
+  - name: "DB Latency Chaos"
+    weight: 0  # Triggered manually
+    flow:
+      - think: 20  # Wait 20s into test
+      - function: "injectDBLatency"  # Add 300ms latency
+      - think: 10  # Sustained latency for 10s
+      - function: "removeDBLatency"
+      - function: "validatePerformanceRecovery"
+  
+  # CHAOS 3: Concurrent QR Generation (10 teachers)
+  - name: "Concurrent QR Generation"
+    weight: 0  # Triggered manually
+    flow:
+      - loop:
+          - function: "generateTeacherData"
+          - post:
+              url: "/api/v1/teacher/attendance/generate-qr"
+              headers:
+                Content-Type: "application/json"
+                Authorization: "Bearer {{ teacherToken }}"
+              json:
+                schedule_id: "{{ scheduleId }}"
+                expiry_seconds: 60
+          count: 10  # 10 concurrent requests
+      - function: "validateNoDuplicateQR"
+  
+  # CHAOS 4: Webhook Burst (100 webhooks)
+  - name: "Webhook Burst"
+    weight: 0  # Triggered manually
+    flow:
+      - loop:
+          - function: "generateWebhookData"
+          - post:
+              url: "/api/v1/webhook/payment"
+              headers:
+                Content-Type: "application/json"
+              json:
+                order_id: "{{ orderId }}"
+                transaction_id: "{{ transactionId }}"
+                transaction_status: "settlement"
+                payment_type: "bank_transfer"
+                gross_amount: "500000"
+                status_code: "200"
+                signature_key: "{{ signatureKey }}"
+          count: 100  # 100 concurrent webhooks
+      - function: "validateNoDoubleSubscription"

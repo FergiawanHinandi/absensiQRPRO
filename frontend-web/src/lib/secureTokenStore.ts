@@ -44,7 +44,7 @@ const tokenStore = (() => {
          * @param expiresIn - Optional expiry time in seconds
          */
         setToken: (token: string, expiresIn?: number): void => {
-            console.log('[TOKEN_STORE] setToken called');
+            // SECURITY: No logging of token operations in production
             
             const expiry = expiresIn 
                 ? Date.now() + (expiresIn * 1000)
@@ -56,13 +56,12 @@ const tokenStore = (() => {
             try {
                 sessionStorage.setItem(TOKEN_KEY, token);
                 sessionStorage.setItem(TOKEN_EXPIRY_KEY, expiry.toString());
-                console.log('[TOKEN_STORE] Token saved to sessionStorage');
-                
-                // Verify it was saved
-                const verified = sessionStorage.getItem(TOKEN_KEY);
-                console.log('[TOKEN_STORE] Verification:', verified ? 'SUCCESS' : 'FAILED');
+                // SECURITY: Removed token logging - verify only in DEV if needed
             } catch (e) {
-                console.error('[TOKEN_STORE] Failed to save token:', e);
+                // Silent fail in production, or use error reporting service
+                if (import.meta.env.DEV) {
+                    console.error('[TOKEN_STORE] Storage error');
+                }
             }
         },
 

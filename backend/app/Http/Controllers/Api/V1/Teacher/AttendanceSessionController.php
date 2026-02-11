@@ -161,18 +161,27 @@ class AttendanceSessionController extends Controller
             'attendance_date' => today(),
         ]);
 
-        $attendance->school_id = $teacher->school_id; // Ensure school_id is set
-        $attendance->class_id = $schedule->class_id;  // Ensure class_id is set
-        $attendance->status = $status;
+        $attendance->school_id = $teacher->school_id;
+        $attendance->class_id = $schedule->class_id;
         $attendance->recorded_by = $teacher->id;
         $attendance->notes = $reason;
         $attendance->is_manual = true;
-        
-        if (in_array($status, ['present', 'late']) && !$attendance->check_in_time) {
-            $attendance->check_in_time = now();
-        }
 
-        $attendance->save();
+        // CRITICAL: Use state machine for status changes instead of direct assignment
+        // Status is guarded - use domain methods
+        if (in_array($status, ['present', 'late'])) {
+            // For new attendance or INIT state, perform check-in via state machine
+            if (!$attendance->exists || $attendance->state === 'INIT') {
+                $attendance->save(); // Save first to get ID
+                $attendance->checkIn($teacher, null, null, null);
+            }
+        } elseif ($status === 'absent') {
+            // For absent status, just save without state transition (INIT state defaults to absent)
+            $attendance->save();
+        } else {
+            // Other statuses like 'sick', 'permit' - save and let observer/defaults handle
+            $attendance->save();
+        }
 
         AuditLog::create([
             'user_id' => $teacher->id,
@@ -188,4 +197,66 @@ class AttendanceSessionController extends Controller
 
         return response()->success(null, 'Attendance recorded successfully');
     }
+
+    /**
+     * Bulk manual attendance for multiple students
+     * 
+     * POST /api/v1/teacher/attendance/session/{scheduleId}/bulk-manual
+     * 
+     * @param Request $request
+     * @param int $scheduleId
+     * @return JsonResponse
+     */
+    public function bulkManualAttendance(Request $request, $scheduleId)
+    {
+        // Validate request
+        $validated = $request->validate([
+            'students' => 'required|array|min:1',
+            'students.*.student_id' => 'required|integer|exists:users,id',
+            'students.*.status' => 'required|in:present,late,sick,permit,alpha',
+            'students.*.notes' => 'nullable|string|max:255',
+        ]);
+
+        $teacher = $request->user();
+
+        try {
+            // Inject AttendanceService
+            $attendanceService = app(\App\Services\AttendanceService::class);
+            
+            $result = $attendanceService->bulkManualAttendance(
+                $scheduleId,
+                $validated['students'],
+                $teacher
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Absensi manual berhasil disimpan',
+                'data' => [
+                    'created' => $result['created'],
+                    'updated' => $result['updated'],
+                    'total_processed' => $result['total_processed'],
+                    'errors' => $result['errors'],
+                ],
+            ]);
+
+        } catch (\App\Exceptions\AttendanceException $e) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Bulk manual attendance controller error', [
+                'schedule_id' => $scheduleId,
+                'teacher_id' => $teacher->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan saat menyimpan absensi',
+            ], 500);
+        }
+    }
 }
+
