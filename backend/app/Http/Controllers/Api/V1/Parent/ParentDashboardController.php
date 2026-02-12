@@ -12,24 +12,32 @@ class ParentDashboardController extends Controller
 
     /**
      * Get list of children associated with the logged-in parent
+     * OPTIMIZED: Added field selection to eager loading to prevent N+1
      */
     public function index(Request $request)
     {
         $user = $request->user();
 
-        // Get children with their profile and latest attendance
+        // OPTIMIZATION: Add field selection to reduce memory footprint
         $children = $user->children()
-            ->with(['profile', 'classStudent.class_model', 'attendances' => function ($query) {
-                $query->latest()->limit(1);
-            }])
+            ->with([
+                'profile:user_id,photo_url',
+                'classStudent:id,student_id,class_id,status',
+                'classStudent.class_model:id,name',
+                'attendances' => function ($query) {
+                    $query->select('id', 'student_id', 'attendance_date', 'status', 'check_in_time')
+                        ->latest()
+                        ->limit(1);
+                }
+            ])
             ->get()
             ->map(function ($child) {
                 return [
                     'id' => $child->id,
                     'name' => $child->name,
-                    'nis' => $child->username, // Assuming username is NIS
+                    'nis' => $child->username,
                     'photo_url' => $child->profile?->photo_url,
-                    'class_name' => $child->classStudent?->class_model?->name ?? '-', // Need to check ClassStudent relationship
+                    'class_name' => $child->classStudent?->class_model?->name ?? '-',
                     'latest_attendance' => $child->attendances->first(),
                     'relationship' => $child->pivot->relationship,
                 ];

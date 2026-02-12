@@ -226,7 +226,12 @@ class AttendanceController extends Controller
      */
     public function classAttendance($scheduleId)
     {
-        $schedule = \App\Models\Schedule::with('class.students')->findOrFail($scheduleId);
+        // OPTIMIZATION: Add field selection to eager loading
+        $schedule = \App\Models\Schedule::with([
+            'class.students:id,name,username',
+            'subject:id,name',
+            'teacher:id,name'
+        ])->findOrFail($scheduleId);
 
         // SECURITY: Validate schedule belongs to same school
         $this->validateSchoolOwnership($schedule, 'Jadwal tidak ditemukan atau bukan milik sekolah Anda.');
@@ -241,7 +246,12 @@ class AttendanceController extends Controller
         }
 
         // Get attendances for this schedule TODAY
-        $attendances = \App\Models\Attendance::with(['student', 'schedule.class', 'schedule.subject', 'schedule.teacher'])
+        $attendances = \App\Models\Attendance::with([
+            'student:id,name,username',
+            'schedule.class:id,name',
+            'schedule.subject:id,name',
+            'schedule.teacher:id,name'
+        ])
             ->where('schedule_id', $scheduleId)
             ->where('attendance_date', now()->toDateString())
             ->get()

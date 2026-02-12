@@ -109,6 +109,8 @@ class MidtransWebhookController extends Controller
                     $this->activateSubscription($subscription);
                 } else if ($transactionStatus == 'cancel' || $transactionStatus == 'deny' || $transactionStatus == 'expire') {
                     $subscription->update(['status' => 'inactive']);
+                    // CRITICAL: Clear subscription cache when deactivating
+                    \App\Http\Middleware\CheckActiveSubscription::clearCache($subscription->school_id);
                 } else if ($transactionStatus == 'pending') {
                     // Update status to pending
                 }

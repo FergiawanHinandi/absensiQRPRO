@@ -10,19 +10,25 @@ use Illuminate\Support\Facades\DB;
 /**
  * Dashboard Cache Service
  * 
- * Centralized caching for dashboard data
+ * Centralized caching for dashboard data with cache stampede protection
  * 
  * CACHE STRATEGY:
  * - TTL: 60 minutes for dashboard stats
  * - TTL: 5 minutes for real-time data
  * - Cache tags for easy invalidation
+ * - Cache lock pattern to prevent stampede
  * 
  * CACHE INVALIDATION:
  * - On new attendance record
  * - On attendance update/delete
  * - Manual flush via admin
  * 
- * @version 1.0.0
+ * CACHE STAMPEDE PROTECTION:
+ * - Uses CacheLockService to prevent concurrent regeneration
+ * - Only one process regenerates cache at a time
+ * - Other processes wait and retry with exponential backoff
+ * 
+ * @version 2.0.0
  */
 class DashboardCacheService
 {
@@ -34,7 +40,20 @@ class DashboardCacheService
     const CACHE_TTL_REPORTS = 1800;   // 30 minutes
 
     /**
-     * Get dashboard data for school (with caching)
+     * Cache lock service
+     */
+    protected CacheLockService $cacheLock;
+
+    /**
+     * Constructor
+     */
+    public function __construct(CacheLockService $cacheLock)
+    {
+        $this->cacheLock = $cacheLock;
+    }
+
+    /**
+     * Get dashboard data for school (with caching and stampede protection)
      * 
      * @param int $schoolId
      * @param string $date
@@ -45,13 +64,15 @@ class DashboardCacheService
         $date = $date ?? Carbon::today()->toDateString();
         $cacheKey = "dashboard_{$schoolId}_{$date}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_DASHBOARD, function () use ($schoolId, $date) {
-            return $this->fetchDashboardData($schoolId, $date);
-        });
+        return $this->cacheLock->remember(
+            $cacheKey,
+            self::CACHE_TTL_DASHBOARD,
+            fn() => $this->fetchDashboardData($schoolId, $date)
+        );
     }
 
     /**
-     * Get real-time attendance stats (shorter cache)
+     * Get real-time attendance stats (shorter cache with stampede protection)
      * 
      * @param int $schoolId
      * @return array
@@ -60,25 +81,29 @@ class DashboardCacheService
     {
         $cacheKey = "realtime_stats_{$schoolId}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_REALTIME, function () use ($schoolId) {
-            $today = Carbon::today()->toDateString();
-            
-            return Attendance::where('school_id', $schoolId)
-                ->whereDate('attendance_date', $today)
-                ->selectRaw("
-                    COUNT(DISTINCT student_id) as total_students,
-                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
-                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
-                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
-                    MAX(created_at) as last_updated
-                ")
-                ->first()
-                ->toArray();
-        });
+        return $this->cacheLock->remember(
+            $cacheKey,
+            self::CACHE_TTL_REALTIME,
+            function () use ($schoolId) {
+                $today = Carbon::today()->toDateString();
+                
+                return Attendance::where('school_id', $schoolId)
+                    ->whereDate('attendance_date', $today)
+                    ->selectRaw("
+                        COUNT(DISTINCT student_id) as total_students,
+                        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
+                        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
+                        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
+                        MAX(created_at) as last_updated
+                    ")
+                    ->first()
+                    ->toArray();
+            }
+        );
     }
 
     /**
-     * Get monthly summary (with caching)
+     * Get monthly summary (with caching and stampede protection)
      * 
      * @param int $schoolId
      * @param int $month
@@ -89,13 +114,15 @@ class DashboardCacheService
     {
         $cacheKey = "monthly_summary_{$schoolId}_{$month}_{$year}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_REPORTS, function () use ($schoolId, $month, $year) {
-            return $this->fetchMonthlySummary($schoolId, $month, $year);
-        });
+        return $this->cacheLock->remember(
+            $cacheKey,
+            self::CACHE_TTL_REPORTS,
+            fn() => $this->fetchMonthlySummary($schoolId, $month, $year)
+        );
     }
 
     /**
-     * Get class attendance summary (with caching)
+     * Get class attendance summary (with caching and stampede protection)
      * 
      * @param int $classId
      * @param string $date
@@ -105,21 +132,25 @@ class DashboardCacheService
     {
         $cacheKey = "class_summary_{$classId}_{$date}";
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_DASHBOARD, function () use ($classId, $date) {
-            return Attendance::where('class_id', $classId)
-                ->whereDate('attendance_date', $date)
-                ->selectRaw("
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
-                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
-                    SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
-                    ROUND(((SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) + 
-                            SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END))::numeric / 
-                            NULLIF(COUNT(*), 0)) * 100, 2) as attendance_rate
-                ")
-                ->first()
-                ->toArray();
-        });
+        return $this->cacheLock->remember(
+            $cacheKey,
+            self::CACHE_TTL_DASHBOARD,
+            function () use ($classId, $date) {
+                return Attendance::where('class_id', $classId)
+                    ->whereDate('attendance_date', $date)
+                    ->selectRaw("
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
+                        SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
+                        SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
+                        ROUND(((SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) + 
+                                SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END))::numeric / 
+                                NULLIF(COUNT(*), 0)) * 100, 2) as attendance_rate
+                    ")
+                    ->first()
+                    ->toArray();
+            }
+        );
     }
 
     /**

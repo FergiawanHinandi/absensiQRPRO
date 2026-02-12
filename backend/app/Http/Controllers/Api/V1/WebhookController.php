@@ -435,6 +435,9 @@ class WebhookController extends Controller
             'package_updated_at' => now(),
         ]);
 
+        // CRITICAL: Clear subscription cache after package update
+        \App\Http\Middleware\CheckActiveSubscription::clearCache($schoolId);
+
         Log::info('School package upgraded', [
             'school_id' => $schoolId,
             'package_id' => $packageId,

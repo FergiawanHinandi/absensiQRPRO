@@ -79,6 +79,7 @@ class StudentDashboardController extends Controller
 
     /**
      * Get student attendance history (last 30 days)
+     * OPTIMIZED: Converted from raw DB queries to Eloquent with eager loading
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -87,22 +88,15 @@ class StudentDashboardController extends Controller
         $student = Auth::user();
         $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-        $history = DB::table('attendance_logs')
-            ->leftJoin('schedules', 'attendance_logs.schedule_id', '=', 'schedules.id')
-            ->leftJoin('subjects', 'schedules.subject_id', '=', 'subjects.id')
-            ->leftJoin('users as teachers', 'schedules.teacher_id', '=', 'teachers.id')
-            ->where('attendance_logs.student_id', $student->id)
-            ->where('attendance_logs.created_at', '>=', $thirtyDaysAgo)
-            ->select(
-                'attendance_logs.status',
-                'attendance_logs.created_at',
-                'subjects.name as subject_name',
-                'subjects.code as subject_code',
-                'teachers.name as teacher_name',
-                'schedules.start_time',
-                'schedules.end_time'
-            )
-            ->orderBy('attendance_logs.created_at', 'desc')
+        // OPTIMIZATION: Use Eloquent with eager loading instead of raw joins
+        $history = \App\Models\AttendanceLog::with([
+            'schedule:id,subject_id,teacher_id,start_time,end_time',
+            'schedule.subject:id,name,code',
+            'schedule.teacher:id,name'
+        ])
+            ->where('student_id', $student->id)
+            ->where('created_at', '>=', $thirtyDaysAgo)
+            ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($record) {
                 return [
@@ -110,13 +104,13 @@ class StudentDashboardController extends Controller
                     'time' => Carbon::parse($record->created_at)->format('H:i'),
                     'status' => $record->status,
                     'subject' => [
-                        'name' => $record->subject_name,
-                        'code' => $record->subject_code,
+                        'name' => $record->schedule->subject->name ?? null,
+                        'code' => $record->schedule->subject->code ?? null,
                     ],
-                    'teacher' => $record->teacher_name,
+                    'teacher' => $record->schedule->teacher->name ?? null,
                     'schedule' => [
-                        'start_time' => $record->start_time,
-                        'end_time' => $record->end_time,
+                        'start_time' => $record->schedule->start_time ?? null,
+                        'end_time' => $record->schedule->end_time ?? null,
                     ],
                 ];
             });
@@ -136,6 +130,7 @@ class StudentDashboardController extends Controller
 
     /**
      * Get student's today schedule
+     * OPTIMIZED: Converted from raw DB queries to Eloquent with eager loading
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -144,25 +139,16 @@ class StudentDashboardController extends Controller
         $student = Auth::user();
         $today = Carbon::today();
 
-        $schedule = DB::table('schedules')
-            ->join('classes', 'schedules.class_id', '=', 'classes.id')
-            ->join('subjects', 'schedules.subject_id', '=', 'subjects.id')
-            ->join('users as teachers', 'schedules.teacher_id', '=', 'teachers.id')
-            ->join('users', 'users.class_id', '=', 'classes.id')
-            ->where('users.id', $student->id)
-            ->where('schedules.day_of_week', $today->dayOfWeek)
-            ->where('schedules.is_active', true)
-            ->select(
-                'schedules.id',
-                'schedules.start_time',
-                'schedules.end_time',
-                'schedules.room',
-                'subjects.name as subject_name',
-                'subjects.code as subject_code',
-                'teachers.name as teacher_name',
-                'classes.name as class_name'
-            )
-            ->orderBy('schedules.start_time')
+        // OPTIMIZATION: Use Eloquent with eager loading and whereHas for filtering
+        $schedule = \App\Models\Schedule::with([
+            'class:id,name',
+            'subject:id,name,code',
+            'teacher:id,name'
+        ])
+            ->whereHas('class.students', fn($q) => $q->where('users.id', $student->id))
+            ->where('day_of_week', $today->dayOfWeek)
+            ->where('is_active', true)
+            ->orderBy('start_time')
             ->get()
             ->map(function ($item) use ($today) {
                 $startTime = Carbon::parse($today->format('Y-m-d').' '.$item->start_time);
@@ -180,10 +166,10 @@ class StudentDashboardController extends Controller
                 return [
                     'id' => $item->id,
                     'subject' => [
-                        'name' => $item->subject_name,
-                        'code' => $item->subject_code,
+                        'name' => $item->subject->name ?? null,
+                        'code' => $item->subject->code ?? null,
                     ],
-                    'teacher' => $item->teacher_name,
+                    'teacher' => $item->teacher->name ?? null,
                     'time' => [
                         'start' => $item->start_time,
                         'end' => $item->end_time,
@@ -206,6 +192,7 @@ class StudentDashboardController extends Controller
 
     /**
      * Get student profile information
+     * OPTIMIZED: Converted from raw DB queries to Eloquent with eager loading
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -213,21 +200,13 @@ class StudentDashboardController extends Controller
     {
         $student = Auth::user();
 
-        $profile = DB::table('users')
-            ->leftJoin('classes', 'users.class_id', '=', 'classes.id')
-            ->leftJoin('grades', 'classes.grade_id', '=', 'grades.id')
-            ->leftJoin('schools', 'users.school_id', '=', 'schools.id')
-            ->where('users.id', $student->id)
-            ->select(
-                'users.name',
-                'users.username',
-                'users.email',
-                'users.phone',
-                'users.photo_url',
-                'classes.name as class_name',
-                'grades.name as grade_name',
-                'schools.name as school_name'
-            )
+        // OPTIMIZATION: Use Eloquent with eager loading instead of raw joins
+        $profile = \App\Models\User::with([
+            'class:id,name,grade_id',
+            'class.grade:id,name',
+            'school:id,name'
+        ])
+            ->where('id', $student->id)
             ->first();
 
         if (! $profile) {
@@ -246,10 +225,10 @@ class StudentDashboardController extends Controller
                 'phone' => $profile->phone,
                 'photo_url' => $profile->photo_url,
                 'class' => [
-                    'name' => $profile->class_name,
-                    'grade' => $profile->grade_name,
+                    'name' => $profile->class->name ?? null,
+                    'grade' => $profile->class->grade->name ?? null,
                 ],
-                'school' => $profile->school_name,
+                'school' => $profile->school->name ?? null,
             ],
         ]);
     }

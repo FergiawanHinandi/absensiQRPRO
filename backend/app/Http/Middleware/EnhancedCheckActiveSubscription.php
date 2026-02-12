@@ -31,9 +31,9 @@ use Symfony\Component\HttpFoundation\Response;
 class EnhancedCheckActiveSubscription
 {
     /**
-     * Cache TTL in seconds (5 minutes)
+     * Cache TTL in seconds (1 minute)
      */
-    private const CACHE_TTL = 300;
+    private const CACHE_TTL = 60;
 
     /**
      * Grace period in days (set to 0 to disable)

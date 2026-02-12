@@ -346,10 +346,14 @@ class SecureAttendanceController extends Controller
     {
         $user = $request->user();
         
-        // STEP 1: Find schedule with tenant isolation
+        // STEP 1: Find schedule with tenant isolation and optimized eager loading
         $schedule = Schedule::where('id', $scheduleId)
             ->where('school_id', $user->school_id)
-            ->with(['class.students', 'subject', 'teacher:id,name'])
+            ->with([
+                'class.students:id,name,username',
+                'subject:id,name',
+                'teacher:id,name'
+            ])
             ->first();
         
         if (!$schedule) {

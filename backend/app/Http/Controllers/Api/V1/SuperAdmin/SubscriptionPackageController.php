@@ -3,78 +3,79 @@
 namespace App\Http\Controllers\Api\V1\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\SubscriptionPackage;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class SubscriptionPackageController extends Controller
 {
-    public function index()
+    public function index(): JsonResponse
     {
-        $packages = DB::table('subscription_packages')
-            ->orderBy('price', 'asc')
-            ->get()
-            ->map(function ($pkg) {
-                $pkg->features = json_decode($pkg->features, true);
-                $pkg->is_popular = (bool) $pkg->is_popular;
-                $pkg->is_active = (bool) $pkg->is_active;
-
-                return $pkg;
-            });
+        $packages = SubscriptionPackage::orderBy('price', 'asc')->get();
 
         return response()->json(['success' => true, 'data' => $packages]);
     }
 
-    public function store(Request $request)
+    public function show(int $id): JsonResponse
+    {
+        $package = SubscriptionPackage::findOrFail($id);
+
+        return response()->json(['success' => true, 'data' => $package]);
+    }
+
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string',
-            'price' => 'required|numeric',
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
             'billing_cycle' => 'required|in:monthly,yearly',
             'features' => 'required|array',
-            'is_popular' => 'boolean',
-            'is_active' => 'boolean',
+            'is_popular' => 'sometimes|boolean',
+            'is_active' => 'sometimes|boolean',
         ]);
 
-        $id = DB::table('subscription_packages')->insertGetId([
-            'name' => $validated['name'],
-            'price' => $validated['price'],
-            'billing_cycle' => $validated['billing_cycle'],
-            'features' => json_encode($validated['features']),
+        $package = SubscriptionPackage::create(array_merge($validated, [
             'is_popular' => $validated['is_popular'] ?? false,
             'is_active' => $validated['is_active'] ?? true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        ]));
 
-        return response()->json(['success' => true, 'message' => 'Package created', 'data' => ['id' => $id]]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Package created.',
+            'data' => $package,
+        ], 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, int $id): JsonResponse
     {
+        $package = SubscriptionPackage::findOrFail($id);
+
         $validated = $request->validate([
-            'name' => 'string',
-            'price' => 'numeric',
-            'billing_cycle' => 'in:monthly,yearly',
-            'features' => 'array',
-            'is_popular' => 'boolean',
-            'is_active' => 'boolean',
+            'name' => 'sometimes|string|max:255',
+            'price' => 'sometimes|numeric|min:0',
+            'billing_cycle' => 'sometimes|in:monthly,yearly',
+            'features' => 'sometimes|array',
+            'is_popular' => 'sometimes|boolean',
+            'is_active' => 'sometimes|boolean',
         ]);
 
-        $updateData = $validated;
-        if (isset($validated['features'])) {
-            $updateData['features'] = json_encode($validated['features']);
-        }
-        $updateData['updated_at'] = now();
+        $package->update($validated);
 
-        DB::table('subscription_packages')->where('id', $id)->update($updateData);
-
-        return response()->json(['success' => true, 'message' => 'Package updated']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Package updated.',
+            'data' => $package->fresh(),
+        ]);
     }
 
-    public function destroy($id)
+    public function destroy(int $id): JsonResponse
     {
-        DB::table('subscription_packages')->where('id', $id)->delete();
+        $package = SubscriptionPackage::findOrFail($id);
+        $package->delete();
 
-        return response()->json(['success' => true, 'message' => 'Package deleted']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Package deleted.',
+        ]);
     }
 }

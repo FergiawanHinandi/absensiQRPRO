@@ -69,6 +69,7 @@ Route::prefix('super-admin')
         Route::prefix('billing')->group(function () {
             Route::get('/packages', [SubscriptionPackageController::class, 'index']);
             Route::post('/packages', [SubscriptionPackageController::class, 'store']);
+            Route::get('/packages/{id}', [SubscriptionPackageController::class, 'show']);
             Route::put('/packages/{id}', [SubscriptionPackageController::class, 'update']);
             Route::delete('/packages/{id}', [SubscriptionPackageController::class, 'destroy']);
             
@@ -113,8 +114,13 @@ Route::prefix('super-admin')
             Route::post('/export/trigger', [GlobalReportController::class, 'triggerExport']);
         });
         
-        // Announcements (store available; index/update/delete need controller implementation)
+        // Announcements — Full CRUD
         Route::prefix('announcements')->group(function () {
+            Route::get('/', [AnnouncementController::class, 'index']);
             Route::post('/', [AnnouncementController::class, 'store']);
+            Route::get('/{id}', [AnnouncementController::class, 'show']);
+            Route::put('/{id}', [AnnouncementController::class, 'update']);
+            Route::delete('/{id}', [AnnouncementController::class, 'destroy']);
+            Route::patch('/{id}/toggle', [AnnouncementController::class, 'toggleActive']);
         });
     });

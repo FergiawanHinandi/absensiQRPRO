@@ -48,6 +48,7 @@ class StudentController extends Controller
 
     /**
      * Get Students
+     * OPTIMIZED: Added field selection to eager loading
      */
     public function index(Request $request)
     {
@@ -57,9 +58,10 @@ class StudentController extends Controller
         $search = $request->input('search');
         $classId = $request->input('class_id');
 
+        // OPTIMIZATION: Add field selection to reduce memory usage
         $query = User::where('school_id', $schoolId)
             ->where('role_type', 'student')
-            ->with(['studentClass']);
+            ->with(['studentClass:id,student_id,class_id,status']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {

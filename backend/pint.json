@@ -1,0 +1,17 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "declare_strict_types": true,
+        "no_unused_imports": true,
+        "strict_comparison": true,
+        "no_empty_comment": true,
+        "no_superfluous_phpdoc_tags": true,
+        "phpdoc_align": true,
+        "phpdoc_separation": true,
+        "phpdoc_trim": true,
+        "return_type_declaration": true,
+        "method_argument_space": {
+            "on_multiline": "ensure_fully_multiline"
+        }
+    }
+}

@@ -7,7 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Attendance\BulkManualAttendanceRequest;
 use App\Http\Requests\Attendance\ManualAttendanceRequest;
 use App\Models\Attendance;
-use App\Models\ClassRoom;
+use App\Models\Classroom;
 use App\Models\Schedule;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;

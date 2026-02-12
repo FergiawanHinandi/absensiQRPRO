@@ -147,6 +147,9 @@ class PaymentController extends Controller
             'max_teachers' => $features['max_teachers'] ?? $school->max_teachers,
             'max_classes' => $features['max_classes'] ?? $school->max_classes,
         ]);
+
+        // CRITICAL: Clear subscription cache after package update
+        \App\Http\Middleware\CheckActiveSubscription::clearCache($school->id);
     }
 
     /**

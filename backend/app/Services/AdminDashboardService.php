@@ -8,13 +8,26 @@ use Illuminate\Support\Facades\DB;
 
 final class AdminDashboardService
 {
+    /**
+     * Cache lock service
+     */
+    protected CacheLockService $cacheLock;
+
+    /**
+     * Constructor
+     */
+    public function __construct(CacheLockService $cacheLock)
+    {
+        $this->cacheLock = $cacheLock;
+    }
+
     public function getClassAttendanceSummary(User $user, ?string $date = null): array
     {
         $schoolId = $user->school_id;
         $targetDate = $date ? Carbon::parse($date)->toDateString() : Carbon::today()->toDateString();
         $cacheKey = "dashboard_stats_class_{$schoolId}_{$targetDate}";
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($schoolId, $targetDate) {
+        return $this->cacheLock->remember($cacheKey, 300, function () use ($schoolId, $targetDate) {
             $classes = DB::table('classes')
                 ->where('classes.school_id', $schoolId)
                 ->where('classes.is_active', true)
@@ -101,7 +114,7 @@ final class AdminDashboardService
         $dayInt = $targetDate->dayOfWeek;
         $cacheKey = "dashboard_stats_teacher_{$schoolId}_{$dateString}";
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($schoolId, $dateString, $dayInt) {
+        return $this->cacheLock->remember($cacheKey, 300, function () use ($schoolId, $dateString, $dayInt) {
             $teacherSchedules = DB::table('schedules')
                 ->join('users', 'schedules.teacher_id', '=', 'users.id')
                 ->where('schedules.school_id', $schoolId)
@@ -160,7 +173,7 @@ final class AdminDashboardService
         $targetDate = $date ? Carbon::parse($date)->toDateString() : Carbon::today()->toDateString();
         $cacheKey = "dashboard_stats_late_{$schoolId}_{$targetDate}";
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($schoolId, $targetDate) {
+        return $this->cacheLock->remember($cacheKey, 300, function () use ($schoolId, $targetDate) {
             $lateStudents = DB::table('attendances')
                 ->join('users', 'attendances.student_id', '=', 'users.id')
                 ->join('schedules', 'attendances.schedule_id', '=', 'schedules.id')
@@ -238,7 +251,7 @@ final class AdminDashboardService
         $targetDate = $date ? Carbon::parse($date)->toDateString() : Carbon::today()->toDateString();
         $cacheKey = "dashboard_stats_anomalies_{$schoolId}_{$targetDate}";
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($schoolId, $targetDate) {
+        return $this->cacheLock->remember($cacheKey, 300, function () use ($schoolId, $targetDate) {
             $manualOverrides = DB::table('attendances')
                 ->join('users as students', 'attendances.student_id', '=', 'students.id')
                 ->leftJoin('users as recorders', 'attendances.recorded_by', '=', 'recorders.id')

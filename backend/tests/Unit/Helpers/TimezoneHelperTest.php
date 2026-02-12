@@ -229,4 +229,197 @@ class TimezoneHelperTest extends TestCase
         
         Carbon::setTestNow(); // Reset
     }
+
+    /**
+     * Test 13: whereDate() queries use timezone-aware dates
+     * 
+     * This test verifies that when using whereDate() with attendance_date,
+     * the date comparison respects the timezone, not just UTC.
+     * 
+     * Scenario: A school in Tokyo (UTC+9) creates an attendance at 23:30 Tokyo time.
+     * In UTC, this would be 14:30 on the previous day. The whereDate() query
+     * should find the attendance when querying with Tokyo timezone date.
+     */
+    public function test_where_date_queries_use_timezone_aware_dates(): void
+    {
+        // Create a school with Tokyo timezone
+        $school = School::factory()->create([
+            'timezone' => 'Asia/Tokyo', // UTC+9
+        ]);
+        
+        // Create a student for this school
+        $student = \App\Models\Student::factory()->create([
+            'school_id' => $school->id,
+        ]);
+        
+        // Create a schedule
+        $schedule = \App\Models\Schedule::factory()->create([
+            'school_id' => $school->id,
+        ]);
+        
+        // Freeze time at 2026-02-09 23:30 Tokyo time (14:30 UTC)
+        // This is important: 23:30 Tokyo is still Feb 9, but 14:30 UTC is Feb 9
+        Carbon::setTestNow(Carbon::parse('2026-02-09 14:30:00', 'UTC'));
+        
+        // Create an attendance record using TimezoneHelper for date
+        $attendanceDate = TimezoneHelper::today($school); // Should be "2026-02-09"
+        
+        $attendance = \App\Models\Attendance::create([
+            'school_id' => $school->id,
+            'student_id' => $student->id,
+            'schedule_id' => $schedule->id,
+            'attendance_date' => $attendanceDate,
+            'attendance_type' => 'in',
+            'session_type' => 'morning',
+            'check_in_time' => TimezoneHelper::schoolNow($school),
+        ]);
+        
+        // Test 1: Query using whereDate with TimezoneHelper::today()
+        $query1 = \App\Models\Attendance::where('school_id', $school->id)
+            ->whereDate('attendance_date', TimezoneHelper::today($school))
+            ->count();
+        
+        $this->assertEquals(1, $query1, 'Query with TimezoneHelper::today() should find the attendance');
+        
+        // Test 2: Query using whereDate with Carbon::today() (should also work since we're using Tokyo timezone)
+        $query2 = \App\Models\Attendance::where('school_id', $school->id)
+            ->whereDate('attendance_date', Carbon::today('Asia/Tokyo')->toDateString())
+            ->count();
+        
+        $this->assertEquals(1, $query2, 'Query with Carbon::today() in Tokyo timezone should find the attendance');
+        
+        // Test 3: Query using whereDate with UTC date (should NOT find it if we use wrong timezone)
+        // 23:30 Tokyo = 14:30 UTC, both are Feb 9, so this should still find it
+        $query3 = \App\Models\Attendance::where('school_id', $school->id)
+            ->whereDate('attendance_date', Carbon::today('UTC')->toDateString())
+            ->count();
+        
+        $this->assertEquals(1, $query3, 'Query with UTC date should also find it since both dates are Feb 9');
+        
+        // Test 4: Edge case - test with a time that crosses date boundary
+        // Set time to 00:30 Tokyo time (15:30 UTC previous day)
+        // 00:30 Tokyo Feb 10 = 15:30 UTC Feb 9
+        Carbon::setTestNow(Carbon::parse('2026-02-09 15:30:00', 'UTC'));
+        
+        $attendanceDate2 = TimezoneHelper::today($school); // Should be "2026-02-10"
+        
+        $attendance2 = \App\Models\Attendance::create([
+            'school_id' => $school->id,
+            'student_id' => $student->id,
+            'schedule_id' => $schedule->id,
+            'attendance_date' => $attendanceDate2,
+            'attendance_type' => 'in',
+            'session_type' => 'morning',
+            'check_in_time' => TimezoneHelper::schoolNow($school),
+        ]);
+        
+        // Query with Tokyo date (Feb 10)
+        $query4 = \App\Models\Attendance::where('school_id', $school->id)
+            ->whereDate('attendance_date', TimezoneHelper::today($school))
+            ->count();
+        
+        $this->assertEquals(1, $query4, 'Query with Tokyo date (Feb 10) should find the new attendance');
+        
+        // Query with UTC date (Feb 9) should NOT find the new attendance
+        $query5 = \App\Models\Attendance::where('school_id', $school->id)
+            ->whereDate('attendance_date', Carbon::today('UTC')->toDateString())
+            ->count();
+        
+        $this->assertEquals(0, $query5, 'Query with UTC date (Feb 9) should NOT find attendance dated Feb 10 Tokyo time');
+        
+        Carbon::setTestNow(); // Reset
+    }
+    
+    /**
+     * Test 14: whereDate() with different timezones produces correct results
+     * 
+     * Tests that the same physical time produces different dates in different timezones
+     * and whereDate() queries respect this.
+     */
+    public function test_where_date_with_different_timezones_produces_correct_results(): void
+    {
+        // Create two schools with different timezones
+        $schoolTokyo = School::factory()->create([
+            'timezone' => 'Asia/Tokyo', // UTC+9
+        ]);
+        
+        $schoolJakarta = School::factory()->create([
+            'timezone' => 'Asia/Jakarta', // UTC+7
+        ]);
+        
+        // Create students for each school
+        $studentTokyo = \App\Models\Student::factory()->create([
+            'school_id' => $schoolTokyo->id,
+        ]);
+        
+        $studentJakarta = \App\Models\Student::factory()->create([
+            'school_id' => $schoolJakarta->id,
+        ]);
+        
+        // Create schedules
+        $scheduleTokyo = \App\Models\Schedule::factory()->create([
+            'school_id' => $schoolTokyo->id,
+        ]);
+        
+        $scheduleJakarta = \App\Models\Schedule::factory()->create([
+            'school_id' => $schoolJakarta->id,
+        ]);
+        
+        // Set time to a boundary case: 2026-02-09 23:30 UTC
+        // This is:
+        // - 2026-02-10 08:30 Tokyo time (UTC+9)
+        // - 2026-02-10 06:30 Jakarta time (UTC+7)
+        Carbon::setTestNow(Carbon::parse('2026-02-09 23:30:00', 'UTC'));
+        
+        // Create attendance for Tokyo school (date should be Feb 10)
+        $attendanceTokyo = \App\Models\Attendance::create([
+            'school_id' => $schoolTokyo->id,
+            'student_id' => $studentTokyo->id,
+            'schedule_id' => $scheduleTokyo->id,
+            'attendance_date' => TimezoneHelper::today($schoolTokyo), // Feb 10
+            'attendance_type' => 'in',
+            'session_type' => 'morning',
+            'check_in_time' => TimezoneHelper::schoolNow($schoolTokyo),
+        ]);
+        
+        // Create attendance for Jakarta school (date should also be Feb 10)
+        $attendanceJakarta = \App\Models\Attendance::create([
+            'school_id' => $schoolJakarta->id,
+            'student_id' => $studentJakarta->id,
+            'schedule_id' => $scheduleJakarta->id,
+            'attendance_date' => TimezoneHelper::today($schoolJakarta), // Feb 10
+            'attendance_type' => 'in',
+            'session_type' => 'morning',
+            'check_in_time' => TimezoneHelper::schoolNow($schoolJakarta),
+        ]);
+        
+        // Test Tokyo school query
+        $tokyoCount = \App\Models\Attendance::where('school_id', $schoolTokyo->id)
+            ->whereDate('attendance_date', TimezoneHelper::today($schoolTokyo))
+            ->count();
+        
+        $this->assertEquals(1, $tokyoCount, 'Tokyo school should have 1 attendance for Feb 10');
+        
+        // Test Jakarta school query
+        $jakartaCount = \App\Models\Attendance::where('school_id', $schoolJakarta->id)
+            ->whereDate('attendance_date', TimezoneHelper::today($schoolJakarta))
+            ->count();
+        
+        $this->assertEquals(1, $jakartaCount, 'Jakarta school should have 1 attendance for Feb 10');
+        
+        // Test that querying with wrong date doesn't find records
+        $wrongDateTokyo = \App\Models\Attendance::where('school_id', $schoolTokyo->id)
+            ->whereDate('attendance_date', '2026-02-09') // Wrong date (should be Feb 10)
+            ->count();
+        
+        $this->assertEquals(0, $wrongDateTokyo, 'Tokyo school should have 0 attendances for Feb 9');
+        
+        $wrongDateJakarta = \App\Models\Attendance::where('school_id', $schoolJakarta->id)
+            ->whereDate('attendance_date', '2026-02-09') // Wrong date (should be Feb 10)
+            ->count();
+        
+        $this->assertEquals(0, $wrongDateJakarta, 'Jakarta school should have 0 attendances for Feb 9');
+        
+        Carbon::setTestNow(); // Reset
+    }
 }

@@ -73,7 +73,7 @@ class AttendanceDailySummary extends Model
     
     public function classroom(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Classroom::class, 'class_id');
+        return $this->belongsTo(\App\Models\ClassModel::class, 'class_id');
     }
     
     // ─────────────────────────────────────────────────────────────────────

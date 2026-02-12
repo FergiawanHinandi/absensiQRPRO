@@ -330,16 +330,29 @@ class AttendanceReportController extends Controller
         $startDate = $request->input('start_date', now()->startOfMonth()->toDateString());
         $endDate = $request->input('end_date', now()->toDateString());
 
+        // OPTIMIZATION: Use cursor() for memory-efficient iteration on large datasets
         $data = Attendance::where('school_id', $user->school_id)
             ->whereBetween('attendance_date', [$startDate, $endDate])
             ->with(['student:id,name,username', 'schedule:id,subject_id', 'schedule.subject:id,name'])
-            ->get();
+            ->cursor()
+            ->map(function ($attendance) {
+                return [
+                    'id' => $attendance->id,
+                    'student_name' => $attendance->student->name ?? null,
+                    'student_username' => $attendance->student->username ?? null,
+                    'subject_name' => $attendance->schedule->subject->name ?? null,
+                    'attendance_date' => $attendance->attendance_date,
+                    'status' => $attendance->status,
+                    'check_in_time' => $attendance->check_in_time,
+                ];
+            })
+            ->toArray();
 
         return response()->json([
             'success' => true,
             'data' => $data,
             'meta' => [
-                'total' => $data->count(),
+                'total' => count($data),
                 'start_date' => $startDate,
                 'end_date' => $endDate,
             ],

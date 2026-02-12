@@ -59,10 +59,10 @@ class CheckActiveSubscription
 
         // 3. Check subscription status (with cache)
         // Cache key format: school_sub_{school_id}
-        // TTL: 300 seconds (5 minutes)
+        // TTL: 60 seconds (1 minute)
         $cacheKey = "school_sub_{$school->id}";
         
-        $subscriptionStatus = Cache::remember($cacheKey, 300, function () use ($school) {
+        $subscriptionStatus = Cache::remember($cacheKey, 60, function () use ($school) {
             // Query: is_active = true AND expires_at >= now()
             $subscription = $school->subscriptions()
                 ->where('is_active', true)
@@ -86,7 +86,46 @@ class CheckActiveSubscription
             ];
         });
 
-        // 4. If no active subscription, deny access with 402 Payment Required
+        // 4. CRITICAL: Validate expires_at after cache hit to prevent stale cache issue
+        if ($subscriptionStatus['active'] && isset($subscriptionStatus['expires_at'])) {
+            $expiresAt = \Carbon\Carbon::parse($subscriptionStatus['expires_at']);
+            
+            if (now()->greaterThan($expiresAt)) {
+                // Cache has stale data, clear it and deny access
+                self::clearCache($school->id);
+                
+                Log::channel('audit')->warning('Subscription expired (detected via cache validation)', [
+                    'school_id' => $school->id,
+                    'school_name' => $school->name,
+                    'user_id' => $user->id,
+                    'username' => $user->username,
+                    'role' => $user->role_type,
+                    'cached_expires_at' => $subscriptionStatus['expires_at'],
+                    'current_time' => now()->toIso8601String(),
+                    'ip' => $request->ip(),
+                    'endpoint' => $request->path(),
+                    'method' => $request->method(),
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'error' => 'SUBSCRIPTION_EXPIRED',
+                    'message' => 'Langganan sekolah Anda telah berakhir. Silakan perpanjang langganan untuk melanjutkan.',
+                    'data' => [
+                        'school_name' => $school->name,
+                        'contact_admin' => true,
+                        'expired_at' => $expiresAt->toDateString(),
+                    ],
+                    'contact' => [
+                        'email' => 'support@absensi.com',
+                        'phone' => '+62 812-3456-7890',
+                        'whatsapp' => 'https://wa.me/6281234567890',
+                    ],
+                ], 402); // 402 Payment Required
+            }
+        }
+        
+        // 5. If no active subscription, deny access with 402 Payment Required
         if (!$subscriptionStatus['active']) {
             // Log the blocked attempt
             Log::channel('audit')->warning('Blocked API access due to inactive subscription', [
@@ -117,7 +156,7 @@ class CheckActiveSubscription
             ], 402); // 402 Payment Required
         }
 
-        // 5. Subscription is active, allow request
+        // 6. Subscription is active, allow request
         return $next($request);
     }
 

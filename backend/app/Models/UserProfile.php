@@ -22,7 +22,10 @@ class UserProfile extends Model
     ];
 
     protected $casts = [
-        'birth_date' => 'date',
+        'birth_date' => 'encrypted:date',
+        'nisn' => 'encrypted',
+        'phone' => 'encrypted',
+        'address' => 'encrypted',
     ];
 
     public function user()

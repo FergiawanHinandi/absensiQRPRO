@@ -22,7 +22,8 @@ return new class extends Migration
             $table->text('error_message')->nullable();
             $table->json('metadata')->nullable();
             $table->json('metrics')->nullable();
-            $table->foreignId('school_id')->nullable()->constrained()->onDelete('set null');
+            $table->unsignedBigInteger('school_id')->nullable();
+            $table->foreign('school_id')->references('id')->on('schools')->onDelete('set null');
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
 

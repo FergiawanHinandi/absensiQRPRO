@@ -49,7 +49,8 @@ return new class extends Migration
 
         // 5. Security events monitoring (Security dashboard)
         // Query: WHERE school_id = ? AND created_at >= ? ORDER BY created_at DESC
-        if (!$this->indexExists('security_events', 'idx_security_events_monitoring')) {
+        // Only create if table exists (table created in later migration)
+        if (Schema::hasTable('security_events') && !$this->indexExists('security_events', 'idx_security_events_monitoring')) {
             DB::statement('CREATE INDEX idx_security_events_monitoring ON security_events (school_id, created_at DESC, severity, event_type)');
         }
 
@@ -61,7 +62,8 @@ return new class extends Migration
 
         // 7. Security critical events with severity filter
         // Query: WHERE school_id = ? AND severity IN ('high', 'critical') ORDER BY created_at DESC
-        if (!$this->indexExists('security_events', 'idx_security_events_critical')) {
+        // Only create if table exists (table created in later migration)
+        if (Schema::hasTable('security_events') && !$this->indexExists('security_events', 'idx_security_events_critical')) {
             DB::statement('CREATE INDEX idx_security_events_critical ON security_events (school_id, severity, created_at DESC, user_id)');
         }
 
@@ -105,9 +107,12 @@ return new class extends Migration
         ];
 
         foreach ($indexes as $table => $tableIndexes) {
-            foreach ($tableIndexes as $index) {
-                if ($this->indexExists($table, $index)) {
-                    DB::statement("DROP INDEX {$index}");
+            // Only drop indexes if table exists
+            if (Schema::hasTable($table)) {
+                foreach ($tableIndexes as $index) {
+                    if ($this->indexExists($table, $index)) {
+                        DB::statement("DROP INDEX {$index}");
+                    }
                 }
             }
         }

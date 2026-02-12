@@ -1,120 +1,196 @@
-# SaaS Hardening - Task List
+# Implementation Plan: SaaS Hardening 30-Day Roadmap
 
-## WEEK 1: DATA INTEGRITY & TENANT SAFETY
+## Overview
 
-### Day 1: Timezone Consistency
-- [x] 1.1 Audit all date() and time() usage
-- [x] 1.2 Create TimezoneHelper utility class
-- [x] 1.3 Replace date() with TimezoneHelper::now()
-- [x] 1.4 Add timezone to school settings
-- [x] 1.5 Write timezone tests (10 tests)
+This implementation plan addresses critical production issues in AbsensiQR Pro through a risk-first approach. The plan is organized into 4 weekly sprints focusing on: (1) Data Integrity & Tenant Safety, (2) Concurrency & Webhook Hardening, (3) Performance Optimization, and (4) Observability & Resilience. All changes are backward compatible with rollback plans for each deployment.
 
-### Day 2: Unique Attendance Constraint
-- [x] 2.1 Query existing duplicates
-- [x] 2.2 Create cleanup script
-- [x] 2.3 Create migration with unique constraint
-- [x] 2.4 Update to firstOrCreate()
-- [x] 2.5 Write duplicate tests (8 tests)
+## Tasks
 
-### Day 3: Queue Job Tenant Context
-- [x] 3.1 Audit all queue jobs
-- [x] 3.2 Create TenantAwareJob base class
-- [x] 3.3 Update ExportAttendanceReport
-- [x] 3.4 Update all dispatchers
-- [x] 3.5 Write tenant tests (12 tests)
+### WEEK 1: DATA INTEGRITY & TENANT SAFETY
 
-### Day 4: State Machine Enforcement
-- [x] 4.1 Block direct status modification
-- [x] 4.2 Update seeders/factories
-- [x] 4.3 Add audit logging
-- [x] 4.4 Write state tests (15 tests)
+- [x] 1. Day 1: Timezone Consistency Audit & Fix
+  - [x] 1.1 Audit all files for date(), time(), strtotime() usage
+    - Search codebase for raw PHP date functions
+    - Identify patterns in controllers, services, and reports
+    - Document all occurrences for replacement
+    - _Requirements: Week 1 Day 1, Acceptance Criteria 1_
+  
+  - [x] 1.2 Create TimezoneHelper utility class
+    - Implement TimezoneHelper::now() with timezone parameter
+    - Implement TimezoneHelper::schoolNow() for school-specific timezone
+    - Implement TimezoneHelper::parse() for date parsing
+    - Place in app/Helpers/TimezoneHelper.php
+    - _Requirements: Week 1 Day 1, Acceptance Criteria 2_
+  
+  - [x] 1.3 Replace all raw date functions with TimezoneHelper
+    - Update app/Services/SecureAttendanceService.php
+    - Update app/Http/Controllers/Api/V1/Teacher/QRGeneratorController.php
+    - Update app/Http/Controllers/Api/V1/Admin/AttendanceReportController.php
+    - Update app/Jobs/ExportAttendanceReport.php
+    - Replace date() with TimezoneHelper::now()->toDateString()
+    - Replace Carbon::now() with TimezoneHelper::schoolNow($school)
+    - _Requirements: Week 1 Day 1, Acceptance Criteria 1, 3_
+  
+  - [x] 1.4 Add timezone field to school settings
+    - Add timezone column to schools table if not exists
+    - Update School model with timezone attribute
+    - Set default timezone in config/app.php
+    - _Requirements: Week 1 Day 1, Acceptance Criteria 4_
+  
+  - [-] 1.5 Write timezone consistency tests
+    - Test TimezoneHelper::now() returns correct timezone
+    - Test TimezoneHelper::schoolNow() uses school timezone
+    - Test whereDate() queries use timezone-aware dates
+    - Test timezone fallback to config default
+    - Target: 10 tests in tests/Unit/TimezoneHelperTest.php
+    - _Requirements: Week 1 Day 1, Acceptance Criteria 5_
 
-### Day 5: DB::table() Elimination
-- [x] 5.1 Search DB::table() usage
-- [x] 5.2 Replace with Eloquent
-- [x] 5.3 Add PHPStan rule
-- [x] 5.4 Write scope tests (6 tests)
+- [x] 2. Day 2: Unique Attendance Constraint
+  - [x] 2.1 Identify and analyze existing duplicate records
+    - Run SQL query to find duplicates by (student_id, schedule_id, attendance_date, school_id)
+    - Document duplicate count and patterns
+    - Determine cleanup strategy (keep oldest, soft delete rest)
+    - _Requirements: Week 1 Day 2, Acceptance Criteria 2_
+  
+  - [x] 2.2 Create cleanup script for existing duplicates
+    - Write migration to identify duplicates
+    - Keep oldest record per unique combination
+    - Soft delete or hard delete duplicates based on data integrity
+    - Log cleanup actions for audit trail
+    - _Requirements: Week 1 Day 2, Acceptance Criteria 2_
+  
+  - [x] 2.3 Create migration with unique constraint
+    - Create migration: add_unique_attendance_constraint
+    - Add unique index on (student_id, schedule_id, attendance_date, school_id)
+    - Name constraint: unique_attendance_per_day
+    - Include rollback method to drop constraint
+    - _Requirements: Week 1 Day 2, Acceptance Criteria 1_
+  
+  - [x] 2.4 Update all attendance creation code to use firstOrCreate
+    - Update SecureAttendanceService to use firstOrCreate
+    - Update QR scan attendance creation
+    - Update manual attendance entry
+    - Add constraint violation error handling
+    - Return user-friendly error messages
+    - _Requirements: Week 1 Day 2, Acceptance Criteria 3, 5_
+  
+  - [x]* 2.5 Write duplicate prevention tests
+    - Test unique constraint prevents duplicates at database level
+    - Test firstOrCreate returns existing record
+    - Test constraint violation handling
+    - Test error message clarity
+    - Target: 8 tests in tests/Feature/AttendanceDuplicateTest.php
+    - _Requirements: Week 1 Day 2, Acceptance Criteria 4_
 
-## WEEK 2: CONCURRENCY & WEBHOOK
+- [x] 3. Day 3: Queue Job Tenant Context Fix
+  - [x] 3.1 Audit all queue jobs for tenant context
+    - Find all jobs implementing ShouldQueue
+    - Check each job for school_id usage
+    - Identify jobs using DB::table() or bypassing scopes
+    - Document jobs needing updates
+    - _Requirements: Week 1 Day 3, Acceptance Criteria 2_
+  
+  - [x] 3.2 Create TenantAwareJob base class
+    - Create abstract class in app/Jobs/TenantAwareJob.php
+    - Add protected $schoolId property
+    - Add constructor requiring school_id
+    - Add forSchool() helper method for queries
+    - Include SerializesModels trait
+    - _Requirements: Week 1 Day 3, Acceptance Criteria 1_
+  
+  - [x] 3.3 Update ExportAttendanceReport job
+    - Extend TenantAwareJob base class
+    - Pass school_id to constructor
+    - Force school_id filter in all queries
+    - Update handle() method to use $this->schoolId
+    - _Requirements: Week 1 Day 3, Acceptance Criteria 1, 2_
+  
+  - [x] 3.4 Update all job dispatchers to pass school_id
+    - Update controllers dispatching ExportAttendanceReport
+    - Update SendAttendanceNotification dispatchers
+    - Update GenerateMonthlyReport dispatchers
+    - Ensure all dispatchers pass user's school_id
+    - _Requirements: Week 1 Day 3, Acceptance Criteria 1_
+  
+  - [x]* 3.5 Write tenant isolation tests for queue jobs
+    - Test jobs maintain school_id context
+    - Test jobs filter queries by school_id
+    - Test cross-tenant access is prevented
+    - Test audit log for scope bypass attempts
+    - Target: 12 tests in tests/Feature/QueueTenantIsolationTest.php
+    - _Requirements: Week 1 Day 3, Acceptance Criteria 4, 5_
 
-### Day 6: Deadlock Retry
-- [x] 6.1 Create DeadlockRetryMiddleware
-- [x] 6.2 Add exponential backoff
-- [x] 6.3 Write deadlock tests (8 tests)
+- [x] 4. Day 4: State Machine Enforcement
+  - [x] 4.1 Block direct status modification in Attendance model
+    - Add setStatusAttribute() method that throws exception
+    - Add setStateAttribute() with internal flag check
+    - Throw StateViolationException with helpful message
+    - Document state machine methods in exception
+    - _Requirements: Week 1 Day 4, Acceptance Criteria 1_
+  
+  - [x] 4.2 Update all seeders and factories to use state machine
+    - Update database/seeders/AttendanceSeeder.php
+    - Update database/factories/AttendanceFactory.php
+    - Replace direct status assignment with checkIn(), checkOut()
+    - Update all test files creating attendance records
+    - _Requirements: Week 1 Day 4, Acceptance Criteria 2_
+  
+  - [x] 4.3 Add state transition audit logging
+    - Log all state transitions in activity log
+    - Include previous state, new state, actor, timestamp
+    - Use spatie/laravel-activitylog for tracking
+    - _Requirements: Week 1 Day 4, Acceptance Criteria 3_
+  
+  - [x]* 4.4 Write state machine enforcement tests
+    - Test direct status modification throws exception
+    - Test state transitions through methods work
+    - Test invalid transitions are rejected
+    - Test audit log records transitions
+    - Target: 15 tests in tests/Feature/AttendanceStateMachineTest.php
+    - _Requirements: Week 1 Day 4, Acceptance Criteria 4, 5_
 
-### Day 7: Redis Health Guard
-- [x] 7.1 Configure failover cache
-- [x] 7.2 Create health check endpoint
-- [x] 7.3 Write Redis tests (10 tests)
+- [x] 5. Day 5: DB::table() Audit & Elimination
+  - [x] 5.1 Search all files for DB::table() patterns
+    - Use grep to find all DB::table() usage
+    - Exclude migrations directory
+    - Document each occurrence with context
+    - Categorize as: needs replacement, legitimate raw query, migration
+    - _Requirements: Week 1 Day 5, Acceptance Criteria 1, 2_
+  
+  - [x] 5.2 Replace DB::table() with Eloquent queries
+    - Replace DB::table('attendances') with Attendance::query()
+    - Replace DB::table('schedules') with Schedule::query()
+    - Ensure all queries respect global scopes
+    - Document any legitimate raw query usage with justification
+    - _Requirements: Week 1 Day 5, Acceptance Criteria 1, 2, 3_
+  
+  - [x] 5.3 Add PHPStan rule to prevent DB::table() usage
+    - Create or update phpstan.neon configuration
+    - Add rule to flag DB::table() calls
+    - Exclude migrations directory from rule
+    - Update coding standards documentation
+    - _Requirements: Week 1 Day 5, Acceptance Criteria 4_
+  
+  - [x]* 5.4 Write scope bypass detection tests
+    - Test Eloquent queries respect global scopes
+    - Test tenant isolation is maintained
+    - Test no cross-tenant data access
+    - Target: 6 tests in tests/Feature/ScopeBypassTest.php
+    - _Requirements: Week 1 Day 5, Acceptance Criteria 5_
 
-### Day 8: Webhook Idempotency
-- [x] 8.1 Increase lock timeout to 300s
-- [x] 8.2 Add markAsProcessing()
-- [x] 8.3 Write webhook tests (12 tests)
+- [ ] 6. Week 1 Checkpoint: Verify data integrity fixes
+  - Ensure all Week 1 tests pass
+  - Verify timezone consistency across application
+  - Confirm no duplicate attendance possible
+  - Validate tenant isolation in queue jobs
+  - Check state machine enforcement
+  - Ask user if questions arise before proceeding to Week 2
 
-### Day 9: Cache Stampede
-- [-] 9.1 Implement cache lock pattern
-- [ ] 9.2 Write stampede tests (6 tests)
+### WEEK 2: CONCURRENCY & WEBHOOK HARDENING
 
-### Day 10: Subscription Cache Fix
-- [ ] 10.1 Reduce TTL to 60s
-- [ ] 10.2 Add expires_at validation
-- [ ] 10.3 Write cache tests (8 tests)
-
-## WEEK 3: PERFORMANCE
-
-### Day 11: Database Indexes
-- [ ] 11.1 Run slow query analysis
-- [ ] 11.2 Create index migration
-- [ ] 11.3 Write index tests (8 tests)
-
-### Day 12: N+1 Elimination
-- [ ] 12.1 Audit controllers
-- [ ] 12.2 Add eager loading
-- [ ] 12.3 Write query tests (12 tests)
-
-### Day 13: Summary Table
-- [ ] 13.1 Create summary table
-- [ ] 13.2 Add observer
-- [ ] 13.3 Write summary tests (10 tests)
-
-### Day 14: Export Chunking
-- [ ] 14.1 Use cursor() in exports
-- [ ] 14.2 Write chunking tests (6 tests)
-
-### Day 15: Query Profiling
-- [ ] 15.1 Enable query logging
-- [ ] 15.2 Optimize top 10 queries
-- [ ] 15.3 Write performance tests (8 tests)
-
-## WEEK 4: OBSERVABILITY
-
-### Day 16-17: Health Checks
-- [ ] 16.1 Create HealthCheckController
-- [ ] 16.2 Implement all endpoints
-- [ ] 16.3 Write health tests (15 tests)
-
-### Day 18: Queue Monitoring
-- [ ] 18.1 Create QueueMonitorCommand
-- [ ] 18.2 Configure alerts
-- [ ] 18.3 Write monitor tests (8 tests)
-
-### Day 19: Redis Monitoring
-- [ ] 19.1 Create RedisMonitorCommand
-- [ ] 19.2 Write Redis tests (6 tests)
-
-### Day 20: Disk Monitoring
-- [ ] 20.1 Create DiskMonitorCommand
-- [ ] 20.2 Write disk tests (5 tests)
-
-### Day 21-22: Backup Testing
-- [ ] 21.1 Configure backups
-- [ ] 21.2 Test restore
-- [ ] 21.3 Write backup tests (8 tests)
-
-### Day 23: Chaos Testing
-- [ ] 23.1 Test failure scenarios
-- [ ] 23.2 Document runbooks
-
-**Total**: 181 tasks, 200+ tests, 130 hours
-
+- [x] 7. Day 6: Deadlock Detection & Retry
+  - [x] 7.1 Create DeadlockRetryMiddleware
+    - Create middleware in app/Http/Middleware/DeadlockRetryMiddleware.php
+    - Implement retry logic with max 3 attempts
+    - Add exponential backoff (100ms, 200ms, 400ms)
+    - Catch Dea

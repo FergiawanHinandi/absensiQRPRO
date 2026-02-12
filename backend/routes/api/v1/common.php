@@ -3,8 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\HealthController;
 use App\Http\Controllers\Api\V1\MonitoringController;
-// use App\Http\Controllers\Api\V1\RegionController; // TODO: Create controller if needed
-// use App\Http\Controllers\Api\V1\CallbackController; // TODO: Create controller if needed
+use App\Http\Controllers\Api\V1\RegionController;
 
 Route::get('/health', [HealthController::class, 'check']);
 
@@ -31,13 +30,12 @@ Route::prefix('monitoring')->middleware(['auth:sanctum', 'role:super_admin'])->g
 Route::get('/prometheus/metrics', [MonitoringController::class, 'prometheusMetrics'])
     ->middleware(['auth:sanctum', 'role:super_admin']);
 
-// TODO: Uncomment when RegionController is created
-// Route::prefix('region')->group(function () {
-//     Route::get('/provinces', [RegionController::class, 'provinces']);
-//     Route::get('/regencies/{provinceId}', [RegionController::class, 'regencies']);
-//     Route::get('/districts/{regencyId}', [RegionController::class, 'districts']);
-//     Route::get('/villages/{districtId}', [RegionController::class, 'villages']);
-// });
+// Region lookup (Indonesian administrative regions)
+Route::prefix('region')->group(function () {
+    Route::get('/provinces', [RegionController::class, 'provinces']);
+    Route::get('/regencies/{provinceId}', [RegionController::class, 'regencies']);
+    Route::get('/districts/{regencyId}', [RegionController::class, 'districts']);
+    Route::get('/villages/{districtId}', [RegionController::class, 'villages']);
+});
 
-// TODO: Uncomment when CallbackController is created
-// Route::post('/callback/xendit', [CallbackController::class, 'xendit']);
+// Xendit payment callback handled by WebhookController (see webhook routes)
