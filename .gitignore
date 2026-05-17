@@ -72,5 +72,19 @@ coverage/
 
 # ---- Misc ----
 *.key
+*.pem
 test-login.json
 test_login.json
+
+# ---- Secrets / Tokens (NEVER COMMIT) ----
+tokens.json
+**/tokens.json
+*.token
+*.secret
+backend/tokens.local.json
+
+# Environment Variables
+.env
+.env.*
+backend/.env
+
