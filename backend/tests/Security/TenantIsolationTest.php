@@ -43,17 +43,17 @@ class TenantIsolationTest extends TestCase
         // Create users for each school
         $this->userSchoolA = User::factory()->create([
             'school_id' => $this->schoolA->id,
-            'role' => 'teacher',
+            'role_type' => 'teacher',
         ]);
 
         $this->userSchoolB = User::factory()->create([
             'school_id' => $this->schoolB->id,
-            'role' => 'teacher',
+            'role_type' => 'teacher',
         ]);
 
         $this->superAdmin = User::factory()->create([
             'school_id' => null,
-            'role' => 'super_admin',
+            'role_type' => 'super_admin',
         ]);
     }
 
@@ -224,7 +224,7 @@ class TenantIsolationTest extends TestCase
 
         $userStudentA = User::factory()->create([
             'school_id' => $this->schoolA->id,
-            'role' => 'student',
+            'role_type' => 'student',
         ]);
 
         // Act: Student from School A tries to view School B student

@@ -27,6 +27,26 @@ readonly class RequestCorrectionCommand implements Command
         return 'RequestCorrectionCommand';
     }
 
+    /**
+     * Validate the command data
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function validate(): void
+    {
+        if ($this->attendanceId <= 0) {
+            throw new \InvalidArgumentException('Invalid attendance ID');
+        }
+
+        if ($this->requesterId <= 0) {
+            throw new \InvalidArgumentException('Invalid requester ID');
+        }
+
+        if (trim($this->reason) === '') {
+            throw new \InvalidArgumentException('Correction reason must not be empty');
+        }
+    }
+
     public function getPayload(): array
     {
         return [

@@ -43,7 +43,7 @@ class QueryPerformanceTest extends TestCase
 
         $this->user = User::factory()->create([
             'school_id' => $this->school->id,
-            'role' => 'teacher',
+            'role_type' => 'teacher',
         ]);
 
         // Initialize profiling service

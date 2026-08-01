@@ -27,6 +27,8 @@ class Payment extends Model
         'due_date',
         'paid_at',
         'invoice_number',
+        'transaction_id',
+        'description',
         'notes',
         'features',
         'metadata',

@@ -23,13 +23,13 @@ class ClassModel extends Model
         'name',
         'grade_level',
         'homeroom_teacher_id',
-        'capacity',
+        'max_students',
         'is_active',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'capacity' => 'integer',
+        'max_students' => 'integer',
     ];
 
     // Relationships

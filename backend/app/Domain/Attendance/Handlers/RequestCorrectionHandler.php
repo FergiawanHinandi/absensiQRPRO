@@ -47,7 +47,9 @@ class RequestCorrectionHandler implements CommandHandler
             $model->save();
 
             // Dispatch events
-            $aggregate->releaseEvents();
+            foreach ($aggregate->releasePendingEvents() as $event) {
+                event($event);
+            }
 
             return $model;
         });

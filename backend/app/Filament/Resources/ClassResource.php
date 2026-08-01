@@ -66,7 +66,7 @@ class ClassResource extends Resource
                             ->searchable()
                             ->preload()
                             ->nullable(),
-                        Forms\Components\TextInput::make('capacity')
+                        Forms\Components\TextInput::make('max_students')
                             ->label('Kapasitas')
                             ->numeric()
                             ->default(40),

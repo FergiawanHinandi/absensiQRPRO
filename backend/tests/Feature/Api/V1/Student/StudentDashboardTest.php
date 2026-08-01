@@ -40,7 +40,7 @@ class StudentDashboardTest extends TestCase
             'school_id' => $this->school->id,
             'name' => 'X-A',
             'grade_level' => '10',
-            'capacity' => 30,
+            'max_students' => 30,
             'is_active' => true,
         ]);
 
@@ -456,7 +456,7 @@ class StudentDashboardTest extends TestCase
             'school_id' => $this->school->id,
             'name' => 'X-B',
             'grade_level' => '10',
-            'capacity' => 30,
+            'max_students' => 30,
             'is_active' => true,
         ]);
 

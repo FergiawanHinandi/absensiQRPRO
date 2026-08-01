@@ -42,7 +42,7 @@ class DatabaseIndexTest extends TestCase
         $this->classroom = Classroom::factory()->create(['school_id' => $this->school->id]);
         $this->student = User::factory()->create([
             'school_id' => $this->school->id,
-            'role' => 'student',
+            'role_type' => 'student',
         ]);
         $this->schedule = Schedule::factory()->create([
             'school_id' => $this->school->id,
@@ -241,7 +241,7 @@ class DatabaseIndexTest extends TestCase
         // Create test attendance records
         $teacher = User::factory()->create([
             'school_id' => $this->school->id,
-            'role' => 'teacher',
+            'role_type' => 'teacher',
         ]);
 
         $attendance = Attendance::create([
@@ -274,7 +274,7 @@ class DatabaseIndexTest extends TestCase
         // Create test attendance records
         $teacher = User::factory()->create([
             'school_id' => $this->school->id,
-            'role' => 'teacher',
+            'role_type' => 'teacher',
         ]);
 
         $attendance = Attendance::create([
@@ -307,7 +307,7 @@ class DatabaseIndexTest extends TestCase
         // Create test attendance records
         $teacher = User::factory()->create([
             'school_id' => $this->school->id,
-            'role' => 'teacher',
+            'role_type' => 'teacher',
         ]);
 
         $attendance = Attendance::create([

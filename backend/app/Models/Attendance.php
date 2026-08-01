@@ -319,6 +319,41 @@ class Attendance extends Model
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // MANUAL EXCEPTION ENTRIES
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Record a manual exception entry (sick / permit / alpha / excused).
+     *
+     * Manual exceptions are NOT part of the state machine lifecycle
+     * (state remains INIT / absent); the legacy status is written directly
+     * with an audit trail. 'present' / 'late' must come from check-in.
+     *
+     * @param  string  $status  One of: sick, permit, alpha, excused
+     */
+    public function recordManualException(
+        string $status,
+        ?string $notes,
+        int $recordedBy
+    ): self {
+        $this->attributes['status'] = $status;
+        $this->attributes['is_manual'] = true;
+        $this->attributes['notes'] = $notes;
+        $this->attributes['recorded_by'] = $recordedBy;
+        $this->save();
+
+        \Illuminate\Support\Facades\Log::channel('audit')->info('manual_attendance_recorded', [
+            'attendance_id' => $this->id,
+            'student_id' => $this->student_id,
+            'schedule_id' => $this->schedule_id,
+            'status' => $status,
+            'recorded_by' => $recordedBy,
+        ]);
+
+        return $this;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // ACTIVITY LOG CONFIGURATION (Spatie)
     // ─────────────────────────────────────────────────────────────────────
 

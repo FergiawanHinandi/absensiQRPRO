@@ -31,7 +31,7 @@ class ManualAttendanceRequest extends FormRequest
             'student_id' => 'required|integer|exists:users,id',
             'schedule_id' => 'required|integer|exists:schedules,id',
             'attendance_date' => 'required|date_format:Y-m-d',
-            'status' => 'required|string|in:present,late,sick,permit,alpha',
+            'status' => 'required|string|in:sick,permit,alpha,excused',
             'notes' => 'nullable|string|max:500',
         ];
     }
@@ -49,7 +49,7 @@ class ManualAttendanceRequest extends FormRequest
             'attendance_date.required' => 'Tanggal absensi harus diisi.',
             'attendance_date.date_format' => 'Format tanggal harus YYYY-MM-DD.',
             'status.required' => 'Status absensi harus dipilih.',
-            'status.in' => 'Status absensi tidak valid.',
+            'status.in' => 'Status manual hanya boleh: sakit, izin, alpa, atau excused. Untuk hadir gunakan scan QR.',
             'notes.max' => 'Catatan maksimal 500 karakter.',
         ];
     }

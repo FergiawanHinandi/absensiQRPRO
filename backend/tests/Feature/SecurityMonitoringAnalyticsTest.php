@@ -35,13 +35,13 @@ class SecurityMonitoringAnalyticsTest extends TestCase
 
         // Create admin user for school 1
         $this->adminUser = User::factory()->create([
-            'role' => 'school_admin',
+            'role_type' => 'school_admin',
             'school_id' => $this->school1->id,
         ]);
 
         // Create non-admin user
         $this->nonAdminUser = User::factory()->create([
-            'role' => 'student',
+            'role_type' => 'student',
             'school_id' => $this->school1->id,
         ]);
 

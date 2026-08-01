@@ -50,18 +50,19 @@ class CheckInHandler implements CommandHandler
             $timeWindow = null;
             if ($schedule->start_time && $schedule->end_time) {
                 $timeWindow = new AttendanceTimeWindow(
-                    windowOpens: $schedule->start_time,
-                    windowCloses: $schedule->end_time,
-                    lateThreshold: $schedule->late_threshold ?? 15,
+                    scheduledStart: \Carbon\CarbonImmutable::parse($schedule->start_time),
+                    scheduledEnd: \Carbon\CarbonImmutable::parse($schedule->end_time),
+                    preWindowMinutes: (int) ($schedule->pre_window_minutes ?? 10),
+                    postWindowMinutes: (int) ($schedule->late_threshold ?? 15),
                 );
             }
 
             $geoFence = null;
             if ($schedule->school && $schedule->school->latitude && $schedule->school->longitude) {
                 $geoFence = new GeoFence(
-                    centerLat: (float) $schedule->school->latitude,
-                    centerLng: (float) $schedule->school->longitude,
-                    radiusMeters: (int) ($schedule->school->geofence_radius ?? 100),
+                    lat: (float) $schedule->school->latitude,
+                    lng: (float) $schedule->school->longitude,
+                    radiusMeters: (int) ($schedule->school->radius_meters ?? 100),
                 );
             }
 
@@ -102,7 +103,9 @@ class CheckInHandler implements CommandHandler
             $model->save();
 
             // Dispatch domain events
-            $aggregate->releaseEvents();
+            foreach ($aggregate->releasePendingEvents() as $event) {
+                event($event);
+            }
 
             return $model;
         });

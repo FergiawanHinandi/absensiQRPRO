@@ -216,7 +216,7 @@ class UpdateAttendanceSummaryListener implements ShouldQueue
      */
     private function updateSummary(
         int $schoolId,
-        int $classId,
+        ?int $classId,
         string $date,
         string $newStatus,
         ?string $oldStatus = null
@@ -268,6 +268,11 @@ class UpdateAttendanceSummaryListener implements ShouldQueue
         
         // Increment new status count
         $this->incrementStatus($summary, $newStatus);
+
+        // Track total students for new records
+        if ($oldStatus === null) {
+            $summary->increment('total_students');
+        }
         
         // Recalculate attendance rate
         $this->recalculateRate($summary);

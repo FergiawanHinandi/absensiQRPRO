@@ -43,7 +43,12 @@ class AttendanceAggregateTest extends TestCase
         parent::setUp();
 
         // 1. Setup Schools (Tenancy)
-        $this->schoolA = School::factory()->create(['name' => 'School A']);
+        $this->schoolA = School::factory()->create([
+            'name' => 'School A',
+            'latitude' => -6.2,
+            'longitude' => 106.816666,
+            'radius_meters' => 500,
+        ]);
         $this->schoolB = School::factory()->create(['name' => 'School B']);
 
         // 2. Setup Users (Isolation)
@@ -81,9 +86,9 @@ class AttendanceAggregateTest extends TestCase
             'class_id' => $classA->id,
             'subject_id' => $subjectA->id,
             'teacher_id' => $this->teacherA->id,
-            'date' => today(),
-            'start_time' => '08:00:00',
-            'end_time' => '10:00:00',
+            'day_of_week' => today()->dayOfWeek,
+            'start_time' => now()->subMinutes(30)->format('H:i:s'),
+            'end_time' => now()->addMinutes(30)->format('H:i:s'),
         ]);
     }
 
@@ -136,7 +141,7 @@ class AttendanceAggregateTest extends TestCase
         ]);
 
         $this->expectException(\App\Exceptions\StateViolationException::class);
-        $this->expectExceptionMessage('Cannot transition from INIT to CHECKED_OUT');
+        $this->expectExceptionMessage('Harus melakukan check-in terlebih dahulu sebelum check-out.');
 
         // Attempt invalid transition directly
         $attendance->checkOut($this->teacherA, -6.2, 106.8, 'device-123');
@@ -208,53 +213,44 @@ class AttendanceAggregateTest extends TestCase
     {
         $idempotencyKey = Str::uuid()->toString();
 
-        // Request 1: Original
-        $response1 = $this->actingAs($this->studentA)
-            ->withHeader('X-Idempotency-Key', $idempotencyKey)
-            ->postJson('/api/v1/attendance/scan', [
-                'qr_token' => 'valid-token-mock', // In real test, generate valid token
-                // ... needed fields ...
-                // For this test, verifying middleware logic is key, or we mock service
-            ]);
-        
-        // Note: Without full service mock, this might fail validation.
-        // We will simulate the middleware effect directly or use a known endpoint.
-        // Or better: Use the generic manual endpoint if available to student (no).
-        // Let's rely on the IdempotencyTest logic which uses a real endpoint.
-        
-        // To make this test self-contained without mocking complex QR logic:
-        // We simulate the Idempotency/Service behavior.
-        
-        // Actually, let's use the DB constraint logic which is the ultimate fallback for replay 
-        // if idempotency middleware fails (which is covered in Concurrent test).
-        
-        // Let's assume Middleware is working and test via HTTP to a simple endpoint if possible.
-        // Or trust the existing IdempotencyTest.php which is robust.
-        
-        // For "Test Suite" completeness, I will replicate the key logic from IdempotencyTest.
-        // Using Teacher Manual Check-in for simplicity
-        
-        $data = [
-            'student_id' => $this->studentA->id,
+        // Build a valid QR token for the schedule (same contract as IdempotencyTest)
+        $payload = [
+            'sid' => $this->scheduleA->id,
+            'sch' => $this->schoolA->id,
+            'iat' => now()->timestamp,
             'schedule_id' => $this->scheduleA->id,
-            'attendance_date' => today()->format('Y-m-d'),
-            'status' => 'present'
+            'nonce' => Str::random(16),
+        ];
+        $encoded = base64_encode(json_encode($payload));
+        $token = $encoded.'.'.hash_hmac('sha256', $encoded, config('qr.secret'));
+
+        $scanData = [
+            'qr_token' => $token,
+            'latitude' => -6.200000,
+            'longitude' => 106.816666,
+            'accuracy' => 10,
+            'device_fingerprint' => 'test-device-fingerprint',
+            'request_id' => (string) Str::uuid(),
         ];
 
         // 1. First Request
-        $response1 = $this->actingAs($this->teacherA)
-            ->withHeader('X-Idempotency-Key', $idempotencyKey)
-            ->postJson('/api/v1/attendance/manual', $data);
-            
-        // 2. Second Request (Replay)
-        $response2 = $this->actingAs($this->teacherA)
-            ->withHeader('X-Idempotency-Key', $idempotencyKey)
-            ->postJson('/api/v1/attendance/manual', $data);
+        \Laravel\Sanctum\Sanctum::actingAs($this->studentA, ['*']);
+        $response1 = $this->withHeader('X-Idempotency-Key', $idempotencyKey)
+            ->postJson('/api/v1/attendance/scan', $scanData);
+
+        // 2. Second Request (Replay) - with the same idempotency key
+        \Laravel\Sanctum\Sanctum::actingAs($this->studentA, ['*']);
+        $response2 = $this->withHeader('X-Idempotency-Key', $idempotencyKey)
+            ->postJson('/api/v1/attendance/scan', $scanData);
 
         // Assertions
         $response1->assertStatus(201); // Created
-        $response2->assertStatus(409); // Conflict (Replay detected)
-        
+        $response2->assertStatus(201); // Cached response (idempotent replay)
+        $this->assertEquals(
+            $response1->json('data.attendance.id'),
+            $response2->json('data.attendance.id')
+        );
+
         // Verify DB count is 1
         $this->assertEquals(1, Attendance::where('student_id', $this->studentA->id)->count());
     }

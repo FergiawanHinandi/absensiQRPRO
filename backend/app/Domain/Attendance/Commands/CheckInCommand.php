@@ -47,6 +47,30 @@ readonly class CheckInCommand implements Command
     }
 
     /**
+     * Validate the command data
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function validate(): void
+    {
+        if ($this->studentId <= 0) {
+            throw new \InvalidArgumentException('Invalid student ID');
+        }
+
+        if ($this->scheduleId <= 0) {
+            throw new \InvalidArgumentException('Invalid schedule ID');
+        }
+
+        if ($this->schoolId <= 0) {
+            throw new \InvalidArgumentException('Invalid school ID');
+        }
+
+        if (! \Illuminate\Support\Carbon::parse($this->attendanceDate)->isToday()) {
+            throw new \InvalidArgumentException('Attendance date must be today');
+        }
+    }
+
+    /**
      * Get command payload for auditing
      */
     public function getPayload(): array

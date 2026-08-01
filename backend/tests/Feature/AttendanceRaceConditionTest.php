@@ -21,7 +21,7 @@ class AttendanceRaceConditionTest extends TestCase
         $school = \App\Models\School::create(['name' => 'Test School', 'address' => 'Test Address']);
         
         $student = User::factory()->create([
-            'role' => 'student', 
+            'role_type' => 'student', 
             'school_id' => $school->id,
             'password' => Hash::make('password')
         ]);

@@ -590,7 +590,7 @@ class DisasterRecoveryPropertyTest extends TestCase
                 'name' => "Test User {$seed}_{$i}",
                 'email' => "user{$seed}_{$i}@test.com",
                 'password' => bcrypt('password'),
-                'role' => 'student',
+                'role_type' => 'student',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

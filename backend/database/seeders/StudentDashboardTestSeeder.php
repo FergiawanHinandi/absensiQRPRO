@@ -103,7 +103,7 @@ class StudentDashboardTestSeeder extends Seeder
                 'grade_id' => $gradeId,
                 'school_id' => $schoolId,
                 'homeroom_teacher_id' => $teacherId,
-                'capacity' => 36,
+                'max_students' => 36,
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),

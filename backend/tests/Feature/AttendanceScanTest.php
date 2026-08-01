@@ -3,12 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\Attendance;
-use App\Models\QrCode;
 use App\Models\Schedule;
 use App\Models\School;
+use App\Models\TeacherDevice;
 use App\Models\User;
-use App\Services\QrService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class AttendanceScanTest extends TestCase
@@ -23,16 +24,14 @@ class AttendanceScanTest extends TestCase
 
     private Schedule $schedule;
 
-    private QrService $qrService;
+    private string $teacherDeviceId;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->qrService = app(QrService::class);
-
         // Create school
-        $this->school = School::create([
+        $this->school = School::factory()->create([
             'name' => 'SMP Test',
             'npsn' => '12345678',
             'school_level' => 'SMP',
@@ -44,37 +43,89 @@ class AttendanceScanTest extends TestCase
         ]);
 
         // Create teacher
-        $this->teacher = User::create([
+        $this->teacher = User::factory()->create([
             'school_id' => $this->school->id,
             'username' => 'teacher1',
             'name' => 'Teacher Test',
             'email' => 'teacher@test.com',
-            'password' => bcrypt('password'),
             'role_type' => 'teacher',
             'is_active' => true,
         ]);
 
         // Create student
-        $this->student = User::create([
+        $this->student = User::factory()->create([
             'school_id' => $this->school->id,
             'username' => 'student1',
             'name' => 'Student Test',
             'email' => 'student@test.com',
-            'password' => bcrypt('password'),
             'role_type' => 'student',
             'is_active' => true,
         ]);
 
-        // Create schedule
-        $this->schedule = Schedule::create([
+        // Create schedule (active today, window covers "now")
+        $this->schedule = Schedule::factory()->create([
             'school_id' => $this->school->id,
-            'academic_year_id' => 1, // Default academic year
             'teacher_id' => $this->teacher->id,
             'day_of_week' => now()->dayOfWeek,
-            'start_time' => '07:00:00',
-            'end_time' => '08:30:00',
+            'start_time' => now()->subMinutes(5)->format('H:i:s'),
+            'end_time' => now()->addMinutes(50)->format('H:i:s'),
             'room' => 'Room 1',
         ]);
+
+        // Register approved device for the teacher (CheckTeacherDevice middleware)
+        $this->teacherDeviceId = 'device-'.Str::uuid();
+        TeacherDevice::factory()->create([
+            'teacher_id' => $this->teacher->id,
+            'school_id' => $this->school->id,
+            'device_id' => $this->teacherDeviceId,
+            'is_approved' => true,
+        ]);
+    }
+
+    private function manualRequest(array $overrides = [])
+    {
+        Sanctum::actingAs($this->teacher, ['*']);
+
+        return $this->withHeader('X-Device-ID', $this->teacherDeviceId)
+            ->withHeader('X-Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/attendance/manual', array_merge([
+                'schedule_id' => $this->schedule->id,
+                'student_id' => $this->student->id,
+                'attendance_date' => today()->toDateString(),
+                'status' => 'present',
+                'notes' => 'Test note',
+            ], $overrides));
+    }
+
+    private function generateQrToken(Schedule $schedule): string
+    {
+        $payload = [
+            'sid' => $this->student->id,
+            'sch' => $this->school->id,
+            'iat' => now()->timestamp,
+            'schedule_id' => $schedule->id,
+            'nonce' => Str::random(16),
+        ];
+
+        $encoded = base64_encode(json_encode($payload));
+        $signature = hash_hmac('sha256', $encoded, config('qr.secret'));
+
+        return $encoded.'.'.$signature;
+    }
+
+    private function scanRequest(string $token, ?User $user = null)
+    {
+        Sanctum::actingAs($user ?? $this->student, ['*']);
+
+        return $this->withHeader('X-Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/attendance/scan', [
+                'qr_token' => $token,
+                'latitude' => -6.200000,
+                'longitude' => 106.816666,
+                'accuracy' => 10,
+                'device_fingerprint' => 'test-device-fingerprint',
+                'request_id' => (string) Str::uuid(),
+            ]);
     }
 
     /**
@@ -83,49 +134,23 @@ class AttendanceScanTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_valid_qr_code_success()
     {
-        // Create active QR code
-        $qrCode = QrCode::create([
-            'school_id' => $this->school->id,
-            'schedule_id' => $this->schedule->id,
-            'qr_type' => 'in',
-            'valid_from' => now(),
-            'valid_until' => now()->addMinutes(10),
-            'max_scans' => 30,
-            'scan_count' => 0,
-            'is_active' => true,
-        ]);
+        $token = $this->generateQrToken($this->schedule);
 
-        // Generate valid token
-        $token = $this->qrService->generate([
-            'schedule_id' => $this->schedule->id,
-            'qr_id' => $qrCode->id,
-            'type' => 'in',
-        ]);
-
-        // Scan QR
-        $response = $this->actingAs($this->student, 'sanctum')
-            ->postJson('/api/v1/attendance/scan', [
-                'token' => $token,
-                'latitude' => -6.200000, // Within radius
-                'longitude' => 106.816666,
-                'accuracy' => 10,
-            ]);
+        $response = $this->scanRequest($token);
 
         $response->assertStatus(201)
             ->assertJson([
-                'message' => 'Absensi berhasil',
+                'success' => true,
+                'message' => 'Absensi berhasil dicatat.',
             ]);
 
         // Verify attendance created
         $this->assertDatabaseHas('attendances', [
             'student_id' => $this->student->id,
             'schedule_id' => $this->schedule->id,
-            'attendance_type' => 'in',
+            'attendance_type' => 'qr_scan',
             'is_manual' => false,
         ]);
-
-        // Verify scan count incremented
-        $this->assertEquals(1, $qrCode->fresh()->scan_count);
     }
 
     /**
@@ -134,45 +159,26 @@ class AttendanceScanTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_duplicate_qr_code_rejected()
     {
-        // Create QR code
-        $qrCode = QrCode::create([
-            'school_id' => $this->school->id,
-            'schedule_id' => $this->schedule->id,
-            'qr_type' => 'in',
-            'valid_from' => now(),
-            'valid_until' => now()->addMinutes(10),
-            'is_active' => true,
-        ]);
-
-        $token = $this->qrService->generate([
-            'schedule_id' => $this->schedule->id,
-            'qr_id' => $qrCode->id,
-            'type' => 'in',
-        ]);
-
         // Create existing attendance (already scanned)
-        Attendance::create([
+        Attendance::factory()->create([
             'school_id' => $this->school->id,
             'schedule_id' => $this->schedule->id,
             'student_id' => $this->student->id,
             'attendance_date' => today(),
-            'attendance_type' => 'in',
-            'status' => 'present',
+            'attendance_type' => 'qr_scan',
             'check_in_time' => now(),
             'is_manual' => false,
         ]);
 
-        // Try to scan again
-        $response = $this->actingAs($this->student, 'sanctum')
-            ->postJson('/api/v1/attendance/scan', [
-                'token' => $token,
-                'latitude' => -6.200000,
-                'longitude' => 106.816666,
-            ]);
+        $token = $this->generateQrToken($this->schedule);
 
-        $response->assertStatus(422)
-            ->assertJsonFragment([
-                'message' => 'Already scanned for this schedule',
+        // Try to scan again (new idempotency key = new attempt)
+        $response = $this->scanRequest($token);
+
+        $response->assertStatus(400)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Absensi sudah dicatat sebelumnya.',
             ]);
     }
 
@@ -182,25 +188,14 @@ class AttendanceScanTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_expired_qr_code_rejected()
     {
-        // Create expired QR code
-        $qrCode = QrCode::create([
-            'school_id' => $this->school->id,
-            'schedule_id' => $this->schedule->id,
-            'qr_type' => 'in',
-            'valid_from' => now()->subMinutes(20),
-            'valid_until' => now()->subMinutes(10), // Expired
-            'is_active' => true,
-        ]);
-
         // Generate token with expired timestamp
         $expiredPayload = [
-            'sid' => $this->schedule->id,
-            'qid' => $qrCode->id,
-            'typ' => 'in',
+            'sid' => $this->student->id,
+            'sch' => $this->school->id,
             'iat' => now()->subMinutes(20)->timestamp,
             'exp' => now()->subMinutes(10)->timestamp, // Expired
-            'nonce' => 'test123',
-            'v' => 1,
+            'schedule_id' => $this->schedule->id,
+            'nonce' => Str::random(16),
         ];
 
         $encoded = base64_encode(json_encode($expiredPayload));
@@ -208,16 +203,12 @@ class AttendanceScanTest extends TestCase
         $expiredToken = $encoded.'.'.$signature;
 
         // Try to scan expired QR
-        $response = $this->actingAs($this->student, 'sanctum')
-            ->postJson('/api/v1/attendance/scan', [
-                'token' => $expiredToken,
-                'latitude' => -6.200000,
-                'longitude' => 106.816666,
-            ]);
+        $response = $this->scanRequest($expiredToken);
 
         $response->assertStatus(400)
             ->assertJson([
-                'message' => 'QR code sudah kadaluarsa',
+                'success' => false,
+                'message' => 'QR Code tidak valid atau sudah kadaluarsa.',
             ]);
     }
 
@@ -227,32 +218,25 @@ class AttendanceScanTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_outside_school_area_rejected()
     {
-        $qrCode = QrCode::create([
-            'school_id' => $this->school->id,
-            'schedule_id' => $this->schedule->id,
-            'qr_type' => 'in',
-            'valid_from' => now(),
-            'valid_until' => now()->addMinutes(10),
-            'is_active' => true,
-        ]);
-
-        $token = $this->qrService->generate([
-            'schedule_id' => $this->schedule->id,
-            'qr_id' => $qrCode->id,
-            'type' => 'in',
-        ]);
+        $token = $this->generateQrToken($this->schedule);
 
         // Scan from far away location (> 100m radius)
-        $response = $this->actingAs($this->student, 'sanctum')
+        Sanctum::actingAs($this->student, ['*']);
+
+        $response = $this->withHeader('X-Idempotency-Key', (string) Str::uuid())
             ->postJson('/api/v1/attendance/scan', [
-                'token' => $token,
+                'qr_token' => $token,
                 'latitude' => -6.300000, // ~11km away
                 'longitude' => 106.900000,
+                'accuracy' => 10,
+                'device_fingerprint' => 'test-device-fingerprint',
+                'request_id' => (string) Str::uuid(),
             ]);
 
-        $response->assertStatus(422)
-            ->assertJsonFragment([
-                'message' => 'Location out of range',
+        $response->assertStatus(400)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Lokasi di luar radius yang diizinkan.',
             ]);
 
         // Verify NO attendance created
@@ -264,19 +248,13 @@ class AttendanceScanTest extends TestCase
 
     /**
      * TEST 5: Manual Attendance with "present" Status Rejected
+     * Present/late must come from QR scan; manual is only for exceptions.
      */
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_manual_attendance_present_status_rejected()
     {
         // Try to create manual attendance with "present" status
-        $response = $this->actingAs($this->teacher, 'sanctum')
-            ->postJson('/api/v1/attendance/manual', [
-                'schedule_id' => $this->schedule->id,
-                'student_id' => $this->student->id,
-                'attendance_date' => today()->toDateString(),
-                'status' => 'present', // NOT ALLOWED
-                'notes' => 'Test note',
-            ]);
+        $response = $this->manualRequest();
 
         $response->assertStatus(422)
             ->assertJsonFragment([
@@ -297,17 +275,11 @@ class AttendanceScanTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_manual_attendance_sick_status_success()
     {
-        $response = $this->actingAs($this->teacher, 'sanctum')
-            ->postJson('/api/v1/attendance/manual', [
-                'schedule_id' => $this->schedule->id,
-                'student_id' => $this->student->id,
-                'attendance_date' => today()->toDateString(),
-                'status' => 'sick', // ALLOWED
-                'notes' => 'Demam tinggi',
-            ]);
+        $response = $this->manualRequest(['status' => 'sick', 'notes' => 'Demam tinggi']);
 
         $response->assertStatus(201)
             ->assertJson([
+                'success' => true,
                 'message' => 'Absensi manual berhasil disimpan',
             ]);
 
@@ -324,12 +296,11 @@ class AttendanceScanTest extends TestCase
      * EDGE CASE 1: Scan Before School Hours
      */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function test_scan_before_school_hours_marked_as_absent()
+    public function test_scan_before_school_hours_rejected()
     {
         // Create schedule for later today (e.g., 14:00-15:30)
-        $futureSchedule = Schedule::create([
+        $futureSchedule = Schedule::factory()->create([
             'school_id' => $this->school->id,
-            'academic_year_id' => 1,
             'teacher_id' => $this->teacher->id,
             'day_of_week' => now()->dayOfWeek,
             'start_time' => '14:00:00',
@@ -337,36 +308,20 @@ class AttendanceScanTest extends TestCase
             'room' => 'Room 2',
         ]);
 
-        $qrCode = QrCode::create([
-            'school_id' => $this->school->id,
-            'schedule_id' => $futureSchedule->id,
-            'qr_type' => 'in',
-            'valid_from' => now(),
-            'valid_until' => now()->addMinutes(10),
-            'is_active' => true,
-        ]);
-
-        $token = $this->qrService->generate([
-            'schedule_id' => $futureSchedule->id,
-            'qr_id' => $qrCode->id,
-            'type' => 'in',
-        ]);
-
         // Mock current time to be way before schedule (e.g., 06:00 AM)
         $this->travel(-8)->hours();
 
-        // Attempt scan before school hours
-        $response = $this->actingAs($this->student, 'sanctum')
-            ->postJson('/api/v1/attendance/scan', [
-                'token' => $token,
-                'latitude' => -6.200000,
-                'longitude' => 106.816666,
-                'accuracy' => 10,
-            ]);
+        $token = $this->generateQrToken($futureSchedule);
 
-        // Should either reject or mark differently based on business logic
-        // Assuming rejection for scans outside valid time window
-        $response->assertStatus(400);
+        // Attempt scan before school hours
+        $response = $this->scanRequest($token);
+
+        // Rejected because scan is outside the valid time window
+        $response->assertStatus(400)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Absensi belum dibuka. Silakan scan mulai pukul 13:45.',
+            ]);
     }
 
     /**
@@ -375,49 +330,28 @@ class AttendanceScanTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_slightly_late_marked_as_late()
     {
-        // Create schedule with grace period settings
-        $schedule = Schedule::create([
+        // Create schedule that started 20 mins ago
+        $schedule = Schedule::factory()->create([
             'school_id' => $this->school->id,
-            'academic_year_id' => 1,
             'teacher_id' => $this->teacher->id,
             'day_of_week' => now()->dayOfWeek,
-            'start_time' => now()->subMinutes(20)->format('H:i:s'), // Started 20 mins ago
+            'start_time' => now()->subMinutes(20)->format('H:i:s'),
             'end_time' => now()->addHour()->format('H:i:s'),
             'room' => 'Room 3',
         ]);
 
-        $qrCode = QrCode::create([
-            'school_id' => $this->school->id,
-            'schedule_id' => $schedule->id,
-            'qr_type' => 'in',
-            'valid_from' => now()->subMinutes(25),
-            'valid_until' => now()->addMinutes(10),
-            'is_active' => true,
-        ]);
-
-        $token = $this->qrService->generate([
-            'schedule_id' => $schedule->id,
-            'qr_id' => $qrCode->id,
-            'type' => 'in',
-        ]);
+        $token = $this->generateQrToken($schedule);
 
         // Scan 20 minutes after start time (late)
-        $response = $this->actingAs($this->student, 'sanctum')
-            ->postJson('/api/v1/attendance/scan', [
-                'token' => $token,
-                'latitude' => -6.200000,
-                'longitude' => 106.816666,
-                'accuracy' => 10,
-            ]);
+        $response = $this->scanRequest($token);
 
         $response->assertStatus(201);
 
-        // Verify attendance marked as 'late' based on grace period
+        // Verify attendance recorded with server-determined status
         $attendance = Attendance::where('student_id', $this->student->id)
             ->where('schedule_id', $schedule->id)
             ->first();
 
-        // Status should be 'late' if scan is after grace period
         $this->assertNotNull($attendance);
         $this->assertContains($attendance->status, ['present', 'late']);
     }
@@ -428,29 +362,10 @@ class AttendanceScanTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function test_multiple_scans_only_first_valid_counted()
     {
-        $qrCode = QrCode::create([
-            'school_id' => $this->school->id,
-            'schedule_id' => $this->schedule->id,
-            'qr_type' => 'in',
-            'valid_from' => now(),
-            'valid_until' => now()->addMinutes(10),
-            'is_active' => true,
-        ]);
-
-        $token = $this->qrService->generate([
-            'schedule_id' => $this->schedule->id,
-            'qr_id' => $qrCode->id,
-            'type' => 'in',
-        ]);
+        $token = $this->generateQrToken($this->schedule);
 
         // First scan - should succeed
-        $response1 = $this->actingAs($this->student, 'sanctum')
-            ->postJson('/api/v1/attendance/scan', [
-                'token' => $token,
-                'latitude' => -6.200000,
-                'longitude' => 106.816666,
-                'accuracy' => 10,
-            ]);
+        $response1 = $this->scanRequest($token);
 
         $response1->assertStatus(201);
 
@@ -462,19 +377,10 @@ class AttendanceScanTest extends TestCase
         $this->assertNotNull($firstAttendance);
         $firstCheckInTime = $firstAttendance->check_in_time;
 
-        // Wait a moment
-        sleep(1);
+        // Second scan (new idempotency key) - should be rejected (duplicate)
+        $response2 = $this->scanRequest($token);
 
-        // Second scan - should be rejected (duplicate)
-        $response2 = $this->actingAs($this->student, 'sanctum')
-            ->postJson('/api/v1/attendance/scan', [
-                'token' => $token,
-                'latitude' => -6.200000,
-                'longitude' => 106.816666,
-                'accuracy' => 10,
-            ]);
-
-        $response2->assertStatus(422);
+        $response2->assertStatus(400);
 
         // Verify only ONE attendance record exists
         $attendanceCount = Attendance::where('student_id', $this->student->id)

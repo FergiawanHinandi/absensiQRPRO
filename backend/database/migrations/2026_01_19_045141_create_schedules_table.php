@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('class_id')->constrained('classes')->onDelete('cascade');
             $table->foreignId('subject_id')->nullable()->constrained('subjects')->onDelete('set null');
             $table->foreignId('teacher_id')->constrained('users')->onDelete('cascade');
-            $table->enum('day_of_week', ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+            $table->unsignedTinyInteger('day_of_week')->comment('0=Sunday, 6=Saturday');
             $table->time('start_time');
             $table->time('end_time');
             $table->string('room', 100)->nullable();

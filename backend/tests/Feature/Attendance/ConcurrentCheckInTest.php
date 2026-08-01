@@ -59,7 +59,7 @@ class ConcurrentCheckInTest extends TestCase
         // Create schedule for today
         $this->schedule = Schedule::factory()->create([
             'school_id' => $this->school->id,
-            'date' => today(),
+            'day_of_week' => today()->dayOfWeek,
             'start_time' => '08:00:00',
             'end_time' => '10:00:00',
         ]);
@@ -77,6 +77,7 @@ class ConcurrentCheckInTest extends TestCase
     {
         // Prepare check-in data
         $checkInData = [
+            'school_id' => $this->school->id,
             'student_id' => $this->student->id,
             'schedule_id' => $this->schedule->id,
             'attendance_date' => today()->format('Y-m-d'),
@@ -135,8 +136,8 @@ class ConcurrentCheckInTest extends TestCase
                     DB::rollBack();
                     
                     // Check if it's a duplicate entry error
-                    if (str_contains($e->getMessage(), 'Duplicate entry') || 
-                        str_contains($e->getMessage(), 'unique constraint')) {
+                    if (str_contains(strtolower($e->getMessage()), 'duplicate entry') || 
+                        str_contains(strtolower($e->getMessage()), 'unique constraint')) {
                         $conflictCount++;
                         $results[] = ['status' => 409, 'message' => 'Duplicate entry'];
                     } else {
@@ -252,7 +253,7 @@ class ConcurrentCheckInTest extends TestCase
 
         // Second check-in: FAIL
         $this->expectException(\App\Exceptions\StateViolationException::class);
-        $this->expectExceptionMessage('Cannot transition from CHECKED_IN to CHECKED_IN');
+        $this->expectExceptionMessage('Sudah melakukan check-in sebelumnya.');
 
         $attendance->checkIn($this->teacher, -6.200000, 106.816666, 'device-001');
     }

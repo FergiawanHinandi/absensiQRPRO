@@ -92,7 +92,7 @@ class AttendanceRateLimitMiddleware
         // Add rate limit headers to response
         $response = $next($request);
 
-        return $this->addRateLimitHeaders($response, $keys[0], $maxAttempts, $decayMinutes);
+        return $this->addRateLimitHeaders($response, $keys['user'], $maxAttempts, $decayMinutes);
     }
 
     /**
@@ -178,7 +178,7 @@ class AttendanceRateLimitMiddleware
         int $decayMinutes
     ): Response {
         $remaining = RateLimiter::remaining($key, $maxAttempts);
-        $resetAt = RateLimiter::availableAt($key);
+        $resetAt = now()->addMinutes($decayMinutes)->getTimestamp();
 
         return $response
             ->header('X-RateLimit-Limit', $maxAttempts)

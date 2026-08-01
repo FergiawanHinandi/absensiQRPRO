@@ -51,12 +51,12 @@ class ChangeAttendanceStatusTest extends TestCase
         // Create users
         $this->principal = User::factory()->create([
             'school_id' => $this->school->id,
-            'role' => 'principal',
+            'role_type' => 'principal',
         ]);
         
         $this->teacher = User::factory()->create([
             'school_id' => $this->school->id,
-            'role' => 'teacher',
+            'role_type' => 'teacher',
         ]);
         
         // Create attendance record
@@ -182,7 +182,7 @@ class ChangeAttendanceStatusTest extends TestCase
         $otherSchool = School::factory()->create();
         $otherUser = User::factory()->create([
             'school_id' => $otherSchool->id,
-            'role' => 'principal',
+            'role_type' => 'principal',
         ]);
         
         $this->expectException(\Exception::class);

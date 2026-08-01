@@ -18,6 +18,9 @@ class RolePermissionSeeder extends Seeder
 
         // Create permissions
         $permissions = [
+            // System monitoring permissions
+            'system:monitor',
+
             // Attendance permissions
             'attendance.scan',
             'attendance.manual_input',
@@ -62,17 +65,30 @@ class RolePermissionSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::create(['name' => $permission, 'guard_name' => 'sanctum']);
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'sanctum']);
         }
 
         // Create roles and assign permissions
 
         // Super Admin - All permissions
-        $superAdmin = Role::create(['name' => 'super_admin', 'guard_name' => 'sanctum']);
+        $superAdmin = Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'sanctum']);
         $superAdmin->givePermissionTo(Permission::all());
 
+        // Admin - System monitoring & full school management
+        $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'sanctum']);
+        $admin->givePermissionTo([
+            'system:monitor',
+            'attendance.view_all',
+            'attendance.export',
+            'students.view',
+            'classes.view',
+            'users.view',
+            'reports.generate',
+            'reports.export',
+        ]);
+
         // School Admin - Manage school
-        $schoolAdmin = Role::create(['name' => 'school_admin', 'guard_name' => 'sanctum']);
+        $schoolAdmin = Role::firstOrCreate(['name' => 'school_admin', 'guard_name' => 'sanctum']);
         $schoolAdmin->givePermissionTo([
             'attendance.scan',
             'attendance.manual_input',
@@ -104,7 +120,7 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // Principal - View & approve reports
-        $principal = Role::create(['name' => 'principal', 'guard_name' => 'sanctum']);
+        $principal = Role::firstOrCreate(['name' => 'principal', 'guard_name' => 'sanctum']);
         $principal->givePermissionTo([
             'attendance.view_all',
             'attendance.approve',
@@ -117,7 +133,7 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // Vice Principal
-        $vicePrincipal = Role::create(['name' => 'vice_principal', 'guard_name' => 'sanctum']);
+        $vicePrincipal = Role::firstOrCreate(['name' => 'vice_principal', 'guard_name' => 'sanctum']);
         $vicePrincipal->givePermissionTo([
             'attendance.view_all',
             'reports.view_all',
@@ -126,7 +142,7 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // Teacher - Scan QR & manual input
-        $teacher = Role::create(['name' => 'teacher', 'guard_name' => 'sanctum']);
+        $teacher = Role::firstOrCreate(['name' => 'teacher', 'guard_name' => 'sanctum']);
         $teacher->givePermissionTo([
             'attendance.scan',
             'attendance.manual_input',
@@ -137,7 +153,7 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // Homeroom Teacher - Manage class
-        $homeroomTeacher = Role::create(['name' => 'homeroom_teacher', 'guard_name' => 'sanctum']);
+        $homeroomTeacher = Role::firstOrCreate(['name' => 'homeroom_teacher', 'guard_name' => 'sanctum']);
         $homeroomTeacher->givePermissionTo([
             'attendance.scan',
             'attendance.manual_input',
@@ -151,7 +167,7 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // Staff TU - Admin tasks
-        $staff = Role::create(['name' => 'staff', 'guard_name' => 'sanctum']);
+        $staff = Role::firstOrCreate(['name' => 'staff', 'guard_name' => 'sanctum']);
         $staff->givePermissionTo([
             'students.create',
             'students.update',
@@ -163,13 +179,13 @@ class RolePermissionSeeder extends Seeder
         ]);
 
         // Student - View own attendance
-        $student = Role::create(['name' => 'student', 'guard_name' => 'sanctum']);
+        $student = Role::firstOrCreate(['name' => 'student', 'guard_name' => 'sanctum']);
         $student->givePermissionTo([
             'attendance.view_own',
         ]);
 
         // Parent - View child attendance (future)
-        $parent = Role::create(['name' => 'parent', 'guard_name' => 'sanctum']);
+        $parent = Role::firstOrCreate(['name' => 'parent', 'guard_name' => 'sanctum']);
         $parent->givePermissionTo([
             'attendance.view_own',
         ]);

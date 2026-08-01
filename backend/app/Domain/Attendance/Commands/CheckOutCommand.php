@@ -31,6 +31,18 @@ readonly class CheckOutCommand implements Command
         return 'CheckOutCommand';
     }
 
+    /**
+     * Validate the command data
+     *
+     * @throws \InvalidArgumentException
+     */
+    public function validate(): void
+    {
+        if ($this->attendanceId <= 0) {
+            throw new \InvalidArgumentException('Invalid attendance ID');
+        }
+    }
+
     public function getPayload(): array
     {
         return [

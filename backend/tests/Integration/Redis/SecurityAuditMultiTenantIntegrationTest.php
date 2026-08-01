@@ -278,7 +278,7 @@ class SecurityAuditMultiTenantIntegrationTest extends TestCase
         // Simulate admin configuration change
         $adminUser = User::factory()->create([
             'school_id' => $this->school1->id,
-            'role' => 'admin',
+            'role_type' => 'admin',
         ]);
 
         $this->actingAs($adminUser);

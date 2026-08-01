@@ -240,20 +240,18 @@ final class AttendanceCheckInService
                 ->first();
 
             if ($existing) {
-                // If exists, update instead of create
-                $existing->update([
-                    'status' => $data['status'],
-                    'notes' => $data['notes'] ?? null,
-                    'is_manual' => true,
-                    'attendance_type' => 'manual',
-                    'recorded_by' => $recordedBy,
-                ]);
+                // If exists, update the manual exception entry
+                $existing->recordManualException(
+                    status: $data['status'],
+                    notes: $data['notes'] ?? null,
+                    recordedBy: $recordedBy
+                );
 
                 return $existing;
             }
 
-            // Create new attendance record (using firstOrCreate)
-            return Attendance::firstOrCreate(
+            // Create new attendance record, then record the manual exception
+            $attendance = Attendance::firstOrCreate(
                 [
                     'student_id' => $data['student_id'],
                     'schedule_id' => $data['schedule_id'],
@@ -261,13 +259,16 @@ final class AttendanceCheckInService
                     'school_id' => $data['school_id'],
                 ],
                 [
-                    'status' => $data['status'],
-                    'notes' => $data['notes'] ?? null,
                     'is_manual' => true,
                     'attendance_type' => 'manual',
-                    'recorded_by' => $recordedBy,
                     'check_in_time' => now()->timezone(School::find($data['school_id'])?->timezone ?? config('app.timezone')),
                 ]
+            );
+
+            return $attendance->recordManualException(
+                status: $data['status'],
+                notes: $data['notes'] ?? null,
+                recordedBy: $recordedBy
             );
         });
     }
@@ -447,9 +448,11 @@ final class AttendanceCheckInService
         $serverNow = now()->timestamp;
 
         // Get timestamp from various possible field names
-        $qrTimestamp = $payload['generated_at']
-            ?? $payload['exp'] - $this->getQrExpirySeconds()
-            ?? null;
+        $qrTimestamp = $payload['generated_at'] ?? null;
+
+        if ($qrTimestamp === null && isset($payload['exp'])) {
+            $qrTimestamp = $payload['exp'] - $this->getQrExpirySeconds();
+        }
 
         $expTimestamp = $payload['exp'] ?? null;
 
@@ -609,15 +612,17 @@ final class AttendanceCheckInService
      */
     private function validateDevice(User $student, ?string $deviceId, ?Request $request = null): void
     {
+        $registeredDeviceId = $student->device_id ?? null;
+
         // If student has registered device and incoming device doesn't match
-        if ($student->device_id && $deviceId && $student->device_id !== $deviceId) {
+        if ($registeredDeviceId && $deviceId && $registeredDeviceId !== $deviceId) {
             if ($request) {
                 $this->logger->securityAnomaly(
                     $request,
                     'device_mismatch',
                     'Student attempt with different device (potential joki)',
                     [
-                        'registered_device' => substr($student->device_id, 0, 8).'...',
+                        'registered_device' => substr($registeredDeviceId, 0, 8).'...',
                         'incoming_device' => substr($deviceId, 0, 8).'...',
                         'severity' => 'high',
                     ]
@@ -748,8 +753,7 @@ final class AttendanceCheckInService
                 // The unique constraint on (student_id, schedule_id, attendance_date)
                 // plus our gap lock guarantees no duplicate can be inserted
                 $attendanceType = $request ? 'qr_scan' : 'manual';
-                $recordedBy = $request ? null : auth()->id();
-                
+
                 try {
                     $attendance = Attendance::firstOrCreate(
                         [
@@ -759,21 +763,22 @@ final class AttendanceCheckInService
                             'school_id' => $student->school_id,
                         ],
                         [
-                            'status' => $status,
-                            'check_in_time' => $serverNow,
-                            'lat_in' => $data['lat'] ?? null,
-                            'lng_in' => $data['lng'] ?? null,
-                            'device_id_in' => $data['device_id'] ?? null,
                             'is_manual' => false,
                             'attendance_type' => $attendanceType,
-                            'recorded_by' => $recordedBy,
                             'request_id' => $requestId,
-                            'nonce' => $nonce,
-                            'client_scanned_at' => isset($data['scanned_at'])
-                                ? Carbon::parse($data['scanned_at'])->toDateTimeString()
-                                : null,
                         ]
                     );
+
+                    // Apply check-in via state machine (state/status are protected
+                    // from mass assignment; legacy status is synced automatically)
+                    if ($attendance->wasRecentlyCreated) {
+                        $attendance->checkIn(
+                            $student,
+                            $data['lat'] ?? null,
+                            $data['lng'] ?? null,
+                            $data['device_id'] ?? null
+                        );
+                    }
                 } catch (\Illuminate\Database\QueryException $e) {
                     // Handle race condition edge case: unique constraint violation
                     // This can happen if gap lock wasn't acquired (e.g., MyISAM table)

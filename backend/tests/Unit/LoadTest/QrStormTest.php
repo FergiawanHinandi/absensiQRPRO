@@ -37,7 +37,7 @@ class QrStormTest extends TestCase
         // Pre-create 1000 students to avoid overhead during test
         $students = User::factory()->count(100)->state([
             'school_id' => $school->id,
-            'role' => 'student'
+            'role_type' => 'student'
         ])->create();
 
         $startTime = microtime(true);

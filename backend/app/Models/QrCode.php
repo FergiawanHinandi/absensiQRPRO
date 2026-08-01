@@ -15,6 +15,7 @@ class QrCode extends Model
         'schedule_id',
         'qr_type',
         'token',
+        'generated_by',
         'valid_from',
         'valid_until',
         'max_scans',

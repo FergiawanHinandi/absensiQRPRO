@@ -7,12 +7,11 @@ namespace App\Domain\Shared;
 use Carbon\CarbonImmutable;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 
 abstract class DomainEvent
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable, InteractsWithSockets;
 
     public readonly string $eventId;
     public readonly string $occurredAt;

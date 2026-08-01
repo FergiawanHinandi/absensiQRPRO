@@ -76,6 +76,14 @@ class School extends Model
     }
 
     /**
+     * Get all subscriptions for the school (historical + current).
+     */
+    public function subscriptions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Subscription::class);
+    }
+
+    /**
      * Get the subscription for the school.
      */
     public function subscription(): \Illuminate\Database\Eloquent\Relations\HasOne

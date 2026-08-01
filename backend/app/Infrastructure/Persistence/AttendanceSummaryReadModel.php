@@ -108,7 +108,7 @@ class AttendanceSummaryReadModel
                 SUM(absent_count) as absent_count,
                 SUM(excused_count) as excused_count,
                 CASE WHEN SUM(total_students) > 0
-                    THEN ROUND((SUM(present_count) + SUM(late_count))::numeric / SUM(total_students) * 100, 2)
+                    THEN ROUND((SUM(present_count) + SUM(late_count)) * 100.0 / SUM(total_students), 2)
                     ELSE 0
                 END as attendance_rate
             ')
@@ -140,7 +140,7 @@ class AttendanceSummaryReadModel
             ->update([
                 'attendance_rate' => DB::raw('
                     CASE WHEN total_students > 0
-                        THEN ROUND((present_count + late_count)::numeric / total_students * 100, 2)
+                        THEN ROUND((present_count + late_count) * 100.0 / total_students, 2)
                         ELSE 0
                     END
                 '),
