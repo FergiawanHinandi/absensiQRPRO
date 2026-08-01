@@ -32,6 +32,7 @@ interface DashboardStats {
     total_teachers: number;
     attendance_today: number;
     revenue_this_month: number;
+    package_distribution?: { name: string; value: number; color: string }[];
 }
 
 interface RecentSchool {
@@ -57,6 +58,7 @@ export const SuperAdminDashboard: React.FC = () => {
     const [recentSchools, setRecentSchools] = useState<RecentSchool[]>([]);
     const [attendanceChart, setAttendanceChart] = useState<{ date: string; day: string; count: number }[]>([]);
     const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
+    const [packageData, setPackageData] = useState<{ name: string; value: number; color: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
 
@@ -67,12 +69,6 @@ export const SuperAdminDashboard: React.FC = () => {
     const handlePeriodChange = (newPeriod: 'today' | 'week' | 'month') => {
         setPeriod(newPeriod);
     };
-
-    const packageData = [
-        { name: 'Basic', value: 30, color: '#3B82F6' },
-        { name: 'Pro', value: 45, color: '#8B5CF6' },
-        { name: 'Premium', value: 25, color: '#F59E0B' },
-    ];
 
     useEffect(() => {
         fetchDashboardData();
@@ -89,9 +85,16 @@ export const SuperAdminDashboard: React.FC = () => {
                 setRecentSchools(data.recent_schools || []);
                 setAttendanceChart(data.attendance_chart || []);
                 setRecentActivities(data.recent_activities || []);
+                setPackageData(data.package_distribution || [
+                    { name: 'Basic', value: 0, color: '#3B82F6' },
+                    { name: 'Pro', value: 0, color: '#8B5CF6' },
+                    { name: 'Premium', value: 0, color: '#F59E0B' },
+                ]);
             }
         } catch (error) {
-            console.error('Failed to fetch dashboard data:', error);
+            if (import.meta.env.DEV) {
+                console.error('Failed to fetch dashboard data:', error);
+            }
         } finally {
             setLoading(false);
         }

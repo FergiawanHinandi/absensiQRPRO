@@ -6,7 +6,7 @@ use App\Http\Controllers\RollbackController;
 // Rollback API Routes
 Route::prefix('rollback')->middleware([
     'auth:sanctum', 
-    'admin', 
+    'role:super_admin', 
     'validate.multi.tenant.restore'
 ])->group(function () {
     

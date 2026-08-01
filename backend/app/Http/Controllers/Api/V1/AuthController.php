@@ -8,6 +8,7 @@ use App\Models\RefreshToken;
 use App\Models\User;
 use App\Services\AdminAuditService;
 use App\Services\Auth\LoginRateLimiter;
+use App\Services\Security\AccountLockoutService;
 use App\Services\TokenHardeningService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
@@ -22,14 +23,18 @@ class AuthController extends Controller
 
     protected AdminAuditService $auditService;
 
+    protected AccountLockoutService $accountLockout;
+
     public function __construct(
         LoginRateLimiter $rateLimiter,
         TokenHardeningService $tokenService,
-        AdminAuditService $auditService
+        AdminAuditService $auditService,
+        AccountLockoutService $accountLockout
     ) {
         $this->rateLimiter = $rateLimiter;
         $this->tokenService = $tokenService;
         $this->auditService = $auditService;
+        $this->accountLockout = $accountLockout;
     }
 
     /**
@@ -72,7 +77,10 @@ class AuthController extends Controller
         // allowing attackers to distinguish existing users (get "account locked")
         // from non-existing users (get "invalid credentials").
         if (! $user || ! $passwordValid) {
-            // CRITICAL: Record failed attempt
+            // CRITICAL: Record failed attempt in both lockout systems
+            // AccountLockoutService (Cache-based progressive tiers)
+            $this->accountLockout->recordFailedAttempt($request->username, $user?->id);
+
             if ($user) {
                 $this->rateLimiter->recordFailedAttempt($user);
 
@@ -114,6 +122,21 @@ class AuthController extends Controller
         // CRITICAL: Check if account is locked (only AFTER credentials verified)
         // Lockout message only shown when correct password is provided,
         // preventing attackers from using lockout responses for user enumeration
+
+        // AccountLockoutService — Cache-based progressive lockout check
+        $lockoutStatus = $this->accountLockout->isLockedOut($request->username);
+        if ($lockoutStatus['locked']) {
+            $this->enforceMinimumResponseTime($startTime, $minResponseTimeNs);
+
+            throw ValidationException::withMessages([
+                'email' => [
+                    'Akun Anda telah dikunci karena terlalu banyak percobaan login yang gagal. '
+                        . "Silakan coba lagi dalam {$lockoutStatus['remaining_minutes']} menit.",
+                ],
+            ]);
+        }
+
+        // LoginRateLimiter — DB-based persistent lockout check (legacy)
         if ($this->rateLimiter->isAccountLocked($user)) {
             $this->enforceMinimumResponseTime($startTime, $minResponseTimeNs);
 
@@ -150,6 +173,7 @@ class AuthController extends Controller
         // CRITICAL: Clear failed attempts on successful login
         $this->rateLimiter->clear($request, $request->username);
         $this->rateLimiter->clearAccountAttempts($user);
+        $this->accountLockout->clearFailedAttempts($request->username);
 
         // Revoke all previous tokens (single device policy for non-mobile)
         // Mobile apps can have multiple sessions, web should be single session

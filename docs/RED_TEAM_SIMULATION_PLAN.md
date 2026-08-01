@@ -23,7 +23,7 @@
 
 ## 1. Executive Summary
 
-This plan defines a structured Red Team engagement against the AbsensiQRPro multi-tenant SaaS attendance system. The system uses Laravel 12 (backend), React 19 (frontend-web), and React Native (mobile). Critical assets include attendance records, tenant data isolation, subscription billing, and QR-based authentication tokens.
+This plan defines a structured Red Team engagement against the AbsensiQRPro multi-tenant SaaS attendance system. The system uses Laravel 11 (backend), React 19 (frontend-web), and React Native (mobile). Critical assets include attendance records, tenant data isolation, subscription billing, and QR-based authentication tokens.
 
 ### Architecture Overview (Attack Surface)
 
@@ -34,7 +34,7 @@ Mobile App (React Native)
     |-- Offline Queue (encrypted)
     |
     v
-API Gateway (Laravel 12 + Sanctum)
+API Gateway (Laravel 11 + Sanctum)
     |-- SecurityHeaders Middleware (CSP, HSTS, X-Frame-Options)
     |-- AttendanceRateLimitMiddleware (10 scan/min)
     |-- IdempotencyMiddleware (X-Idempotency-Key UUID v4)

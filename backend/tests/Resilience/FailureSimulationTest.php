@@ -18,21 +18,18 @@ use Tests\TestCase;
 
 /**
  * Resilience Test: Failure Simulation
- * 
  * Tests system behavior under failure conditions:
  * - Redis down
  * - Database slow
  * - Queue stopped
  * - Network timeout
- * 
  * Expected:
  * - Attendance fails secure (no corruption)
  * - Graceful degradation
  * - Eventual consistency maintained
- * 
- * @group resilience
- * @group failure-simulation
  */
+#[\PHPUnit\Framework\Attributes\Group('resilience')]
+#[\PHPUnit\Framework\Attributes\Group('failure-simulation')]
 class FailureSimulationTest extends TestCase
 {
     use RefreshDatabase;
@@ -50,9 +47,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-001: Redis down: Cache fallback to DB
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_falls_back_to_database_when_redis_is_down(): void
     {
         // Arrange: Simulate Redis failure
@@ -84,9 +80,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-002: Redis down: Session handling
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_session_when_redis_is_down(): void
     {
         // Arrange: Use file-based sessions as fallback
@@ -101,9 +96,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-003: Database slow: Query timeout handling
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_database_query_timeout(): void
     {
         // Arrange: Set short timeout
@@ -120,10 +114,9 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-004: Database slow: Connection pool exhaustion
-     * 
-     * @test
-     * @group slow
      */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('slow')]
     public function it_handles_connection_pool_exhaustion(): void
     {
         // Arrange: Create many concurrent connections
@@ -147,9 +140,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-005: Queue stopped: Job retry mechanism
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_retries_failed_jobs(): void
     {
         // Arrange
@@ -172,9 +164,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-006: Queue stopped: Eventual consistency delay
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_maintains_eventual_consistency_despite_queue_delay(): void
     {
         // Arrange
@@ -207,9 +198,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-007: Event listener failure: No data corruption
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_data_corruption_on_event_listener_failure(): void
     {
         // Arrange
@@ -244,9 +234,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-008: Projector failure: Read model rebuild
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rebuilds_read_model_after_projector_failure(): void
     {
         // Arrange: Create attendance records
@@ -274,9 +263,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-009: Network timeout: Graceful degradation
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_network_timeout_gracefully(): void
     {
         // Arrange: Set short timeout
@@ -298,9 +286,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-010: Disk full: Error handling
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_disk_full_error(): void
     {
         // Arrange: Mock disk full scenario
@@ -314,9 +301,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-011: Transaction rollback on failure
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rolls_back_transaction_on_failure(): void
     {
         // Arrange
@@ -346,9 +332,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-012: Partial failure in bulk operation
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_partial_failure_in_bulk_operation(): void
     {
         // Arrange
@@ -377,9 +362,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-013: Cache corruption recovery
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_recovers_from_cache_corruption(): void
     {
         // Arrange: Put corrupted data in cache
@@ -405,9 +389,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-014: Database connection retry
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_retries_database_connection_on_failure(): void
     {
         // Arrange: Simulate transient connection failure
@@ -432,9 +415,8 @@ class FailureSimulationTest extends TestCase
 
     /**
      * FS-015: Graceful shutdown on critical error
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_shuts_down_gracefully_on_critical_error(): void
     {
         // Arrange

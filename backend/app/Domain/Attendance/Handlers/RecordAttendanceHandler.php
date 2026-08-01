@@ -217,6 +217,13 @@ class RecordAttendanceHandler implements CommandHandler
             ]
         );
         
+        // Check if attendance already existed (constraint violation handling)
+        if (!$attendance->wasRecentlyCreated) {
+            throw new \App\Exceptions\AttendanceException(
+                'Attendance record already exists for this student, schedule, and date.'
+            );
+        }
+        
         return $attendance;
     }
 }

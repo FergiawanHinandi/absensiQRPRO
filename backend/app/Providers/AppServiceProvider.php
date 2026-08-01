@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
@@ -28,9 +30,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register custom failover cache driver
+        $this->registerFailoverCacheDriver();
+
         // CRITICAL: Security checks - prevent production incidents
         $this->enforceProductionSecurity();
         $this->checkDefaultSecrets();
+
+        // CFG-03 FIX: Warn jika production tapi APP_URL masih localhost
+        $this->checkProductionUrl();
 
         // Use custom PersonalAccessToken model with security fields
         \Laravel\Sanctum\Sanctum::usePersonalAccessTokenModel(\App\Models\PersonalAccessToken::class);
@@ -42,9 +50,12 @@ class AppServiceProvider extends ServiceProvider
         // Register model observers
         \App\Models\School::observe(\App\Observers\SchoolObserver::class);
         \App\Models\User::observe(\App\Observers\UserObserver::class);
-        
+
         // ✅ OPTIMIZATION: Auto-invalidate cache when attendance changes
         \App\Models\Attendance::observe(\App\Observers\AttendanceObserver::class);
+
+        // ✅ REVENUE PROTECTION: Auto-invalidate subscription cache on updates
+        \App\Models\Subscription::observe(\App\Observers\SubscriptionObserver::class);
 
         // Enforce strict mode in development to prevent N+1 and attribute errors
         \Illuminate\Database\Eloquent\Model::preventLazyLoading(! $this->app->isProduction());
@@ -70,17 +81,17 @@ class AppServiceProvider extends ServiceProvider
         // SLOW QUERY LISTENER - Enhanced Monitoring
         // ============================================================
         // Logs queries taking longer than 500ms for performance optimization
-        // 
+        //
         // FEATURES:
         // - SQL query with bindings
         // - Execution time in milliseconds
         // - Request context (URL, method, user)
         // - Stack trace for debugging
         // - Query type detection (SELECT, INSERT, UPDATE, DELETE)
-        // 
+        //
         \Illuminate\Support\Facades\DB::listen(function ($query) {
             $threshold = config('database.slow_query_threshold', 500); // Default 500ms
-            
+
             if ($query->time > $threshold) {
                 // Detect query type
                 $sql = strtoupper(trim($query->sql));
@@ -94,7 +105,7 @@ class AppServiceProvider extends ServiceProvider
                 } elseif (str_starts_with($sql, 'DELETE')) {
                     $queryType = 'DELETE';
                 }
-                
+
                 // Get user context if available
                 $user = request()->user();
                 $userContext = $user ? [
@@ -102,14 +113,14 @@ class AppServiceProvider extends ServiceProvider
                     'user_role' => $user->role ?? 'unknown',
                     'school_id' => $user->school_id ?? null,
                 ] : null;
-                
+
                 // Get stack trace (limited to avoid log bloat)
                 $trace = collect(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 10))
                     ->filter(function ($item) {
                         // Filter out framework internals
-                        return isset($item['file']) && 
-                               !str_contains($item['file'], 'vendor/laravel') &&
-                               !str_contains($item['file'], 'vendor/illuminate');
+                        return isset($item['file']) &&
+                               ! str_contains($item['file'], 'vendor/laravel') &&
+                               ! str_contains($item['file'], 'vendor/illuminate');
                     })
                     ->map(function ($item) {
                         return [
@@ -121,7 +132,7 @@ class AppServiceProvider extends ServiceProvider
                     ->take(5)
                     ->values()
                     ->toArray();
-                
+
                 Log::warning('Slow Query Detected', [
                     'query_type' => $queryType,
                     'sql' => $query->sql,
@@ -138,7 +149,7 @@ class AppServiceProvider extends ServiceProvider
                     'stack_trace' => $trace,
                     'timestamp' => now()->toIso8601String(),
                 ]);
-                
+
                 // CRITICAL: If query is extremely slow (>2000ms), log as error
                 if ($query->time > 2000) {
                     Log::error('CRITICAL: Extremely Slow Query', [
@@ -161,7 +172,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Login rate limiting - prevent brute force attacks
         RateLimiter::for('login', function (Request $request) {
-            $key = strtolower($request->input('username')) . '|' . $request->ip();
+            $key = strtolower($request->input('username')).'|'.$request->ip();
+
             return Limit::perMinute(5)->by($key)->response(function () {
                 return response()->json([
                     'success' => false,
@@ -176,7 +188,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('scan', function (Request $request) {
-            $key = (($request->user()?->id) ?? 'guest') . '|' . $request->ip();
+            $key = (($request->user()?->id) ?? 'guest').'|'.$request->ip();
 
             return Limit::perMinute(30)->by($key);
         });
@@ -186,7 +198,19 @@ class AppServiceProvider extends ServiceProvider
             // $job is the Job instance (e.g. GenerateReportExport)
             $schoolId = $job->reportExport->school_id ?? 'global';
 
-            return Limit::perHour(10)->by('school:' . $schoolId);
+            return Limit::perHour(10)->by('school:'.$schoolId);
+        });
+
+        // Export rate limit (heavy operations)
+        RateLimiter::for('export', function (Request $request) {
+            return Limit::perHour(10)->by($request->user()?->id ?? $request->ip());
+        });
+
+        // School-scoped rate limit
+        RateLimiter::for('school', function (Request $request) {
+            $schoolId = $request->user()?->school_id ?? 0;
+
+            return Limit::perMinute(100)->by('school:'.$schoolId);
         });
 
         // Sentry Error Tracking Initialization
@@ -204,29 +228,29 @@ class AppServiceProvider extends ServiceProvider
 
     /**
      * CRITICAL: Validate environment variables at boot time
-     * 
+     *
      * In production: Fails fast with exception if critical vars missing
      * In other envs: Logs warnings for missing/invalid vars
      */
     private function validateCriticalEnvVars(): void
     {
         $isProduction = $this->app->environment('production');
-        
+
         // CRITICAL: These variables MUST exist in production
         $criticalVars = [
             'APP_KEY' => [
                 'required' => true,
-                'validate' => fn($v) => !empty($v) && strlen($v) >= 32,
+                'validate' => fn ($v) => ! empty($v) && strlen($v) >= 32,
                 'message' => 'APP_KEY must be at least 32 characters',
             ],
             'QR_SECRET_KEY' => [
                 'required' => true,
-                'validate' => fn($v) => !empty($v) && strlen($v) >= 32,
+                'validate' => fn ($v) => ! empty($v) && strlen($v) >= 32,
                 'message' => 'QR_SECRET_KEY must be at least 32 characters (HMAC security)',
             ],
             'DB_CONNECTION' => [
                 'required' => true,
-                'validate' => fn($v) => in_array($v, ['mysql', 'pgsql', 'sqlite']),
+                'validate' => fn ($v) => in_array($v, ['mysql', 'pgsql', 'sqlite']),
                 'message' => 'DB_CONNECTION must be a valid driver',
             ],
         ];
@@ -234,7 +258,7 @@ class AppServiceProvider extends ServiceProvider
         // Production-only strict requirements
         $productionVars = [
             'APP_DEBUG' => [
-                'validate' => fn($v) => $v === 'false' || $v === false || $v === '0',
+                'validate' => fn ($v) => $v === 'false' || $v === false || $v === '0',
                 'message' => 'APP_DEBUG must be false in production',
             ],
         ];
@@ -245,13 +269,14 @@ class AppServiceProvider extends ServiceProvider
         // Validate critical vars
         foreach ($criticalVars as $var => $config) {
             $value = env($var);
-            
+
             if ($config['required'] && empty($value)) {
                 $errors[] = "Missing critical ENV: {$var} - {$config['message']}";
+
                 continue;
             }
 
-            if (!empty($value) && isset($config['validate']) && !$config['validate']($value)) {
+            if (! empty($value) && isset($config['validate']) && ! $config['validate']($value)) {
                 $errors[] = "Invalid ENV: {$var} - {$config['message']}";
             }
         }
@@ -260,24 +285,24 @@ class AppServiceProvider extends ServiceProvider
         if ($isProduction) {
             foreach ($productionVars as $var => $config) {
                 $value = env($var);
-                
-                if (!$config['validate']($value)) {
+
+                if (! $config['validate']($value)) {
                     $errors[] = "Production requirement failed: {$var} - {$config['message']}";
                 }
             }
         }
 
         // In production, fail fast if critical errors
-        if ($isProduction && !empty($errors)) {
+        if ($isProduction && ! empty($errors)) {
             $errorList = implode("\n- ", $errors);
             throw new \RuntimeException(
-                "CRITICAL: Application cannot start due to environment errors:\n- {$errorList}\n\n" .
-                "Fix these issues before deploying to production."
+                "CRITICAL: Application cannot start due to environment errors:\n- {$errorList}\n\n".
+                'Fix these issues before deploying to production.'
             );
         }
 
         // In non-production, log warnings
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             foreach ($errors as $error) {
                 Log::warning("Environment validation: {$error}", [
                     'environment' => config('app.env'),
@@ -285,6 +310,25 @@ class AppServiceProvider extends ServiceProvider
                 ]);
             }
         }
+    }
+
+    /**
+     * Register custom failover cache driver
+     *
+     * Provides automatic failover between Redis -> Database -> Array
+     */
+    private function registerFailoverCacheDriver(): void
+    {
+        \Illuminate\Support\Facades\Cache::extend('failover', function ($app, $config) {
+            $stores = array_map(
+                fn ($storeName) => \Illuminate\Support\Facades\Cache::store($storeName),
+                $config['stores']
+            );
+
+            return \Illuminate\Support\Facades\Cache::repository(
+                new \App\Cache\FailoverStore($stores)
+            );
+        });
     }
 
     /**
@@ -300,15 +344,15 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production') && config('app.debug') === true) {
             // ABORT APPLICATION BOOT - This is a critical security violation
             throw new \RuntimeException(
-                "CRITICAL SECURITY ERROR: APP_DEBUG=true in production environment!\n\n" .
-                    "This exposes sensitive data including:\n" .
-                    "- Database credentials in stack traces\n" .
-                    "- API keys in exception dumps\n" .
-                    "- Full file paths and source code\n\n" .
-                    "IMMEDIATE ACTION REQUIRED:\n" .
-                    "1. Set APP_DEBUG=false in production .env\n" .
-                    "2. Run: php artisan config:cache\n" .
-                    "3. Verify with: php artisan tinker -> config('app.debug')\n\n" .
+                "CRITICAL SECURITY ERROR: APP_DEBUG=true in production environment!\n\n".
+                    "This exposes sensitive data including:\n".
+                    "- Database credentials in stack traces\n".
+                    "- API keys in exception dumps\n".
+                    "- Full file paths and source code\n\n".
+                    "IMMEDIATE ACTION REQUIRED:\n".
+                    "1. Set APP_DEBUG=false in production .env\n".
+                    "2. Run: php artisan config:cache\n".
+                    "3. Verify with: php artisan tinker -> config('app.debug')\n\n".
                     'Application boot ABORTED for security.'
             );
         }
@@ -349,12 +393,42 @@ class AppServiceProvider extends ServiceProvider
 
         // Check for default database password
         $dbPassword = config('database.connections.pgsql.password');
-        if (empty($dbPassword) || in_array($dbPassword, ['password', 'secret', 'admin', '123456'])) {
+        // CFG-01 FIX: Tambah 'admin123' dan variasi lainnya ke daftar password lemah
+        $weakPasswords = ['password', 'secret', 'admin', '123456', 'admin123', 'password123', 'root', 'admin1234', '12345678', 'pass'];
+        if (empty($dbPassword) || in_array($dbPassword, $weakPasswords)) {
             Log::channel('security')->critical('Weak or default database password detected!', [
                 'environment' => config('app.env'),
                 'action_required' => 'Use strong database password',
                 'security_impact' => 'Database vulnerable to unauthorized access',
             ]);
+        }
+    }
+
+    /**
+     * CFG-03 FIX: Warn jika APP_ENV=production tapi APP_URL masih menggunakan localhost
+     *
+     * Akibat APP_URL=localhost di production:
+     * - URL file (laporan PDF, export) akan mengarah ke localhost
+     * - Email links akan salah
+     * - QR code URLs tidak bisa diakses dari luar
+     */
+    private function checkProductionUrl(): void
+    {
+        if ($this->app->environment('production')) {
+            $appUrl = config('app.url', '');
+
+            if (str_contains($appUrl, 'localhost') || str_contains($appUrl, '127.0.0.1')) {
+                Log::channel('security')->warning('APP_URL mengandung localhost di environment production!', [
+                    'app_url' => $appUrl,
+                    'environment' => config('app.env'),
+                    'action_required' => 'Ganti APP_URL di .env dengan domain production yang sesungguhnya',
+                    'impact' => [
+                        'file_urls' => 'URL file (PDF, export, foto) akan mengarah ke localhost',
+                        'email_links' => 'Link di email akan salah',
+                        'qr_codes' => 'URL QR code tidak dapat diakses dari luar server',
+                    ],
+                ]);
+            }
         }
     }
 }

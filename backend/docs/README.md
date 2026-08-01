@@ -1,7 +1,7 @@
 # 📚 Dokumentasi Lengkap - Sistem Absensi QR Code
 
 > **Project:** AbsensiQRPro - Sistem Absensi QR Code untuk SD/SMP/SMA/SMK  
-> **Stack:** Laravel 12 (API) + Mobile App (Flutter/React Native)  
+> **Stack:** Laravel 11 (API) + Mobile App (Flutter/React Native)  
 > **Last Updated:** 2026-01-19
 
 ---
@@ -90,7 +90,7 @@ Roadmap development lengkap:
 - Deployment checklist
 
 **Phases:**
-1. Backend Setup (Laravel 12)
+1. Backend Setup (Laravel 11)
 2. Database Migrations
 3. Core Models & Repositories
 4. Core Services (QR, Attendance, Location)
@@ -196,7 +196,7 @@ php artisan tinker
 
 ```
 absensiQRPro/
-├── backend/                    # Laravel 12 API
+├── backend/                    # Laravel 11 API
 │   ├── app/
 │   │   ├── Http/
 │   │   │   ├── Controllers/   # API Controllers
@@ -224,7 +224,7 @@ absensiQRPro/
 ## 🎯 Development Roadmap
 
 ### ✅ Phase 1: Backend Setup (COMPLETED)
-- [x] Laravel 12 installed
+- [x] Laravel 11 installed
 - [x] Dependencies: Sanctum, Spatie Permission, QR, Redis
 - [x] Environment configured
 
@@ -305,8 +305,8 @@ absensiQRPro/
 ## 📞 Support & References
 
 ### Official Documentation
-- [Laravel 12 Docs](https://laravel.com/docs/12.x)
-- [Laravel Sanctum](https://laravel.com/docs/12.x/sanctum)
+- [Laravel 11 Docs](https://laravel.com/docs/11.x)
+- [Laravel Sanctum](https://laravel.com/docs/11.x/sanctum)
 - [Spatie Permission](https://spatie.be/docs/laravel-permission)
 - [Flutter](https://flutter.dev) / [React Native](https://reactnative.dev)
 

@@ -12,18 +12,15 @@ use Tests\TestCase;
 
 /**
  * TenantIsolationTest
- *
  * Tests tenant isolation and scope bypass security.
- *
  * CRITICAL SECURITY TESTS:
  * - Tenant isolation enforcement
  * - Unauthorized bypass prevention
  * - Audit logging verification
  * - Super admin bypass authorization
- *
- * @group security
- * @group tenant
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('tenant')]
 class TenantIsolationTest extends TestCase
 {
     use RefreshDatabase;
@@ -71,7 +68,7 @@ class TenantIsolationTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_only_see_own_school_attendance()
     {
         $this->actingAs($this->adminSchool1);
@@ -83,7 +80,7 @@ class TenantIsolationTest extends TestCase
         $this->assertNotContains($this->attendanceSchool2->id, $attendances->pluck('id'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_cannot_access_other_school_attendance_by_id()
     {
         $this->actingAs($this->adminSchool1);
@@ -93,7 +90,7 @@ class TenantIsolationTest extends TestCase
         $this->assertNull($attendance);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_see_all_schools_with_allTenants()
     {
         $this->actingAs($this->superAdmin);
@@ -105,7 +102,7 @@ class TenantIsolationTest extends TestCase
         $this->assertContains($this->attendanceSchool2->id, $attendances->pluck('id'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_cannot_use_allTenants()
     {
         $this->actingAs($this->adminSchool1);
@@ -115,7 +112,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(0, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthorized_allTenants_attempt_is_logged()
     {
         Log::shouldReceive('channel')
@@ -141,7 +138,7 @@ class TenantIsolationTest extends TestCase
         Attendance::allTenants();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function authorized_allTenants_is_logged()
     {
         Log::shouldReceive('channel')
@@ -167,7 +164,7 @@ class TenantIsolationTest extends TestCase
         Attendance::allTenants('Testing authorized bypass');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_query_all_tenants()
     {
         $this->actingAs($this->superAdmin);
@@ -178,7 +175,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(2, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_cannot_query_all_tenants()
     {
         $this->actingAs($this->adminSchool1);
@@ -189,7 +186,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(0, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_find_any_tenant()
     {
         $this->actingAs($this->superAdmin);
@@ -200,7 +197,7 @@ class TenantIsolationTest extends TestCase
         $this->assertEquals($this->attendanceSchool2->id, $attendance->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_cannot_find_any_tenant()
     {
         $this->actingAs($this->adminSchool1);
@@ -210,7 +207,7 @@ class TenantIsolationTest extends TestCase
         $this->assertNull($attendance);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guest_cannot_bypass_tenant_scope()
     {
         // Not authenticated
@@ -225,7 +222,7 @@ class TenantIsolationTest extends TestCase
         $this->assertNull($attendance);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function audit_service_correctly_identifies_authorization()
     {
         $auditService = app(TenantScopeBypassAuditService::class);
@@ -243,7 +240,7 @@ class TenantIsolationTest extends TestCase
         $this->assertFalse($auditService->isAuthorized());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function bypass_with_reason_is_logged_with_reason()
     {
         $reason = 'Testing cross-school report generation';
@@ -273,7 +270,7 @@ class TenantIsolationTest extends TestCase
         Attendance::allTenants($reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tenant_scope_applies_to_create_operations()
     {
         $this->actingAs($this->adminSchool1);
@@ -285,7 +282,7 @@ class TenantIsolationTest extends TestCase
         $this->assertEquals($this->school1->id, $attendance->school_id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_create_does_not_auto_set_school_id()
     {
         $this->actingAs($this->superAdmin);
@@ -297,7 +294,7 @@ class TenantIsolationTest extends TestCase
         $this->assertEquals($this->school2->id, $attendance->school_id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tenant_scope_applies_to_update_operations()
     {
         $this->actingAs($this->adminSchool1);
@@ -314,7 +311,7 @@ class TenantIsolationTest extends TestCase
         $this->assertNotEquals('present', $this->attendanceSchool2->status);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tenant_scope_applies_to_delete_operations()
     {
         $this->actingAs($this->adminSchool1);
@@ -332,7 +329,7 @@ class TenantIsolationTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function multiple_bypass_calls_are_all_logged()
     {
         Log::shouldReceive('channel')->andReturnSelf();

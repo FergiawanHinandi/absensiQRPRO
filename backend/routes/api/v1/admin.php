@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Admin\SecurityDashboardController;
 use App\Http\Controllers\Api\V1\Admin\AdminSecurityAlertController;
 use App\Http\Controllers\Api\V1\Admin\AttendanceReportControllerOptimized;
 use App\Http\Controllers\Api\V1\Admin\AttendanceReportController;
+use App\Http\Controllers\Api\V1\ExportProgressController;
 use App\Http\Controllers\Api\V1\Admin\StudentCardController as AdminStudentCardController;
 use App\Http\Controllers\Api\V1\Admin\StudentCardProgressController;
 use App\Http\Controllers\Api\V1\Admin\StudentPhotoReviewController;
@@ -42,6 +43,11 @@ use App\Http\Controllers\Api\V1\NotificationController;
 */
 
 Route::middleware(['role:school_admin'])->prefix('admin')->group(function () {
+    // A3-H4 FIX: Tambahkan GET /admin/dashboard (index) yang diagregasi dari semua sub-endpoint.
+    // Sebelumnya tidak ada endpoint index, hanya ada sub-routes di bawah /dashboard/
+    Route::get('dashboard', [AdminDashboardController::class, 'index'])
+        ->middleware('ability:admin:view_dashboard');
+
     // Dashboard sub-routes (classAttendance, teacherAbsent, lateAlpha, anomalies)
     Route::prefix('dashboard')->middleware('ability:admin:view_dashboard')->group(function () {
         Route::get('/class-attendance', [AdminDashboardController::class, 'classAttendance']);
@@ -49,6 +55,7 @@ Route::middleware(['role:school_admin'])->prefix('admin')->group(function () {
         Route::get('/late-alpha', [AdminDashboardController::class, 'lateAlpha']);
         Route::get('/anomalies', [AdminDashboardController::class, 'anomalies']);
     });
+
     
     // School - view/update own school only
     Route::apiResource('school', SchoolController::class)->only(['show', 'update']);
@@ -70,6 +77,8 @@ Route::middleware(['role:school_admin'])->prefix('admin')->group(function () {
     Route::get('students/photos/pending', [StudentPhotoReviewController::class, 'pending']);
     Route::post('students/{studentId}/photos/approve', [StudentPhotoReviewController::class, 'approve']);
     Route::post('students/{studentId}/photos/reject', [StudentPhotoReviewController::class, 'reject']);
+    Route::post('students/{studentId}/photos/reupload', [StudentPhotoReviewController::class, 'reupload'])
+        ->middleware('upload.validate:photo');
     
     // Teachers CRUD with import
     Route::apiResource('teachers', TeacherController::class);
@@ -150,6 +159,15 @@ Route::middleware(['role:school_admin'])->prefix('admin')->group(function () {
         Route::get('/export/{jobId}/status', [AttendanceReportControllerOptimized::class, 'exportStatus']);
     });
     
+    // ✅ NEW: Export Progress Tracking (Week 3 Day 14)
+    Route::prefix('export-progress')->middleware('ability:report:view')->group(function () {
+        Route::get('/', [ExportProgressController::class, 'index']);
+        Route::get('/active', [ExportProgressController::class, 'active']);
+        Route::get('/{id}', [ExportProgressController::class, 'show']);
+        Route::delete('/{id}', [ExportProgressController::class, 'destroy'])
+            ->middleware('ability:report:export');
+    });
+    
     // General Reports (index)
     Route::get('reports', [ReportController::class, 'index'])
         ->middleware('ability:report:view');
@@ -163,7 +181,12 @@ Route::middleware(['role:school_admin'])->prefix('admin')->group(function () {
         Route::post('/{studentId}/generate', [AdminStudentCardController::class, 'generate']);
         Route::post('/bulk-generate', [AdminStudentCardController::class, 'bulkGenerate']);
         Route::get('/{studentId}/status', [SchoolAdminStudentCardController::class, 'getCardStatus']);
+        Route::post('/{studentId}/deactivate', [SchoolAdminStudentCardController::class, 'deactivateCard']);
     });
+    
+    // Account Generator
+    Route::post('accounts/generate', [\App\Http\Controllers\Api\V1\SchoolAdmin\AccountGeneratorController::class, 'generateBulk']);
+    Route::post('accounts/{id}/reset-password', [\App\Http\Controllers\Api\V1\SchoolAdmin\AccountGeneratorController::class, 'resetPassword']);
     
     // Risk Overview
     Route::prefix('risk-overview')->group(function () {
@@ -200,4 +223,20 @@ Route::middleware(['role:school_admin'])->prefix('admin')->group(function () {
         Route::get('/teachers', [TeacherHeatmapController::class, 'teacherSummary']);
         Route::get('/anomalies', [TeacherHeatmapController::class, 'anomalies']);
     });
+});
+
+// Query Profiling Dashboard — PROTECTED: requires auth:sanctum + role
+Route::middleware(['auth:sanctum'])->prefix('query-profiling')->group(function () {
+    Route::get('/dashboard', [App\Http\Controllers\Api\V1\Admin\QueryProfilingController::class, 'dashboard'])
+        ->middleware('ability:admin:view_dashboard');
+    Route::get('/realtime', [App\Http\Controllers\Api\V1\Admin\QueryProfilingController::class, 'realtime'])
+        ->middleware('ability:admin:view_dashboard');
+    Route::get('/suggestions', [App\Http\Controllers\Api\V1\Admin\QueryProfilingController::class, 'suggestions'])
+        ->middleware('ability:admin:view_dashboard');
+    Route::get('/{id}', [App\Http\Controllers\Api\V1\Admin\QueryProfilingController::class, 'show'])
+        ->middleware('ability:admin:view_dashboard');
+    Route::get('/export', [App\Http\Controllers\Api\V1\Admin\QueryProfilingController::class, 'export'])
+        ->middleware('ability:admin:view_dashboard');
+    Route::delete('/clear', [App\Http\Controllers\Api\V1\Admin\QueryProfilingController::class, 'clear'])
+        ->middleware('ability:admin:manage_settings');
 });

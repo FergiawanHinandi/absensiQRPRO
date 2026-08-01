@@ -33,11 +33,3 @@ class Notification extends Model
         return $this->belongsTo(School::class);
     }
 }
-        'read_at' => 'datetime',
-    ];
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
-}

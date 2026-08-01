@@ -17,25 +17,42 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Writer\Csv;
 
-class ExportTeacherReport implements ShouldQueue
+/**
+ * Export Teacher Report Job
+ * 
+ * Generates attendance reports for teachers in various formats (XLSX, CSV, PDF).
+ * 
+ * TENANT SAFETY:
+ * - Extends TenantAwareJob to ensure school_id context
+ * - All queries are scoped to the school_id
+ * - Validates teacher belongs to the correct school
+ * 
+ * Usage:
+ *   ExportTeacherReport::dispatch($schoolId, $teacherId, $month, $format);
+ * 
+ * @version 2.0.0 - Updated to extend TenantAwareJob for tenant safety
+ */
+class ExportTeacherReport extends TenantAwareJob
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
     public $timeout = 300; // 5 minutes
     public $tries = 3;
 
     protected int $teacherId;
-    protected int $schoolId;
     protected string $month;
     protected string $format;
 
     /**
      * Create a new job instance.
+     *
+     * @param int $schoolId The school ID for tenant context (REQUIRED)
+     * @param int $teacherId The teacher ID
+     * @param string $month The month in Y-m format
+     * @param string $format The export format (xlsx, csv, pdf)
      */
-    public function __construct(int $teacherId, int $schoolId, string $month, string $format = 'xlsx')
+    public function __construct(int $schoolId, int $teacherId, string $month, string $format = 'xlsx')
     {
+        parent::__construct($schoolId);
         $this->teacherId = $teacherId;
-        $this->schoolId = $schoolId;
         $this->month = $month;
         $this->format = $format;
     }
@@ -46,13 +63,15 @@ class ExportTeacherReport implements ShouldQueue
     public function handle(): void
     {
         try {
-            $teacher = User::findOrFail($this->teacherId);
+            // ✅ TENANT SAFETY: Validate teacher belongs to this school
+            $teacher = User::where('school_id', $this->schoolId)
+                ->findOrFail($this->teacherId);
             
             // Parse month to get date range
             $startDate = Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
             $endDate = $startDate->copy()->endOfMonth();
 
-            // Fetch attendance data with optimized query
+            // ✅ TENANT SAFETY: Fetch attendance data with explicit school_id filter
             $attendances = Attendance::select([
                     'id',
                     'student_id',
@@ -73,7 +92,7 @@ class ExportTeacherReport implements ShouldQueue
                     $query->where('teacher_id', $this->teacherId)
                           ->where('school_id', $this->schoolId);
                 })
-                ->where('school_id', $this->schoolId)
+                ->where('school_id', $this->schoolId) // ✅ Explicit school_id filter
                 ->whereBetween('attendance_date', [$startDate->toDateString(), $endDate->toDateString()])
                 ->orderBy('attendance_date', 'desc')
                 ->get();
@@ -110,8 +129,7 @@ class ExportTeacherReport implements ShouldQueue
                 'timestamp' => now(),
             ]);
 
-            // TODO: Send notification to teacher with download link
-            // Notification::send($teacher, new ReportReadyNotification($filePath));
+            $teacher->notify(new \App\Notifications\ReportReadyNotification($filePath, $this->format, $this->month));
 
         } catch (\Exception $e) {
             Log::error('Export teacher report job failed', [
@@ -241,9 +259,24 @@ class ExportTeacherReport implements ShouldQueue
      */
     protected function generatePdf(User $teacher, $attendances, array $stats, Carbon $startDate, Carbon $endDate): string
     {
-        // For now, generate XLSX as fallback
-        // TODO: Implement PDF generation using TCPDF or DomPDF
-        return $this->generateXlsx($teacher, $attendances, $stats, $startDate, $endDate);
+        $fileName = 'laporan_guru_' . $teacher->id . '_' . $this->month . '.pdf';
+        $filePath = 'exports/teacher_reports/' . $fileName;
+
+        if (!Storage::exists('exports/teacher_reports')) {
+            Storage::makeDirectory('exports/teacher_reports');
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.teacher', [
+            'teacher' => $teacher,
+            'attendances' => $attendances,
+            'stats' => $stats,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+        ]);
+
+        Storage::put($filePath, $pdf->output());
+
+        return $filePath;
     }
 
     /**
@@ -257,7 +290,9 @@ class ExportTeacherReport implements ShouldQueue
             'error' => $exception->getMessage(),
         ]);
 
-        // TODO: Notify teacher about failure
-        // Notification::send(User::find($this->teacherId), new ReportFailedNotification());
+        $teacher = User::find($this->teacherId);
+        if ($teacher) {
+            $teacher->notify(new \App\Notifications\ReportFailedNotification($this->month));
+        }
     }
 }

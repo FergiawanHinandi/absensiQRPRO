@@ -20,7 +20,9 @@ export const PricingPage = () => {
             const data = await billingService.getPackages();
             setPackages(data);
         } catch (error) {
-            console.error(error);
+            if (import.meta.env.DEV) {
+                console.error(error);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -36,16 +38,13 @@ export const PricingPage = () => {
                 window.snap.pay(response.token, {
                     onSuccess: function (result: unknown) {
                         showToast.success("Pembayaran berhasil!");
-                        console.log(result);
                         window.location.reload();
                     },
                     onPending: function (result: unknown) {
                         showToast.loading("Menunggu pembayaran...");
-                        console.log(result);
                     },
                     onError: function (result: unknown) {
                         showToast.error("Pembayaran gagal!");
-                        console.log(result);
                     },
                     onClose: function () {
                         showToast.error('Anda menutup popup pembayaran tanpa menyelesaikan pembayaran');

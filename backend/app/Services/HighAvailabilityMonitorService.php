@@ -759,4 +759,53 @@ class HighAvailabilityMonitorService
             'message' => 'Redis Sentinel handles failover automatically. Check sentinel status.',
         ];
     }
+
+    /**
+     * Get failover history from cache/logs.
+     * Returns recent failover events for monitoring and reporting.
+     */
+    public function getFailoverHistory(int $limit = 50): array
+    {
+        try {
+            // Try to get from cache first
+            $history = cache()->get('ha_failover_history', []);
+            
+            // Limit the results
+            return array_slice($history, 0, $limit);
+        } catch (\Exception $e) {
+            Log::error('Failed to get failover history', ['error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    /**
+     * Record a failover event to history.
+     * Called internally when failover is executed.
+     */
+    private function recordFailoverEvent(string $component, string $action, array $result): void
+    {
+        try {
+            $event = [
+                'component' => $component,
+                'action' => $action,
+                'result' => $result,
+                'timestamp' => now()->toIso8601String(),
+                'duration' => $result['duration'] ?? null,
+            ];
+
+            // Get existing history
+            $history = cache()->get('ha_failover_history', []);
+            
+            // Add new event to the beginning
+            array_unshift($history, $event);
+            
+            // Keep only last 100 events
+            $history = array_slice($history, 0, 100);
+            
+            // Store back to cache (30 days retention)
+            cache()->put('ha_failover_history', $history, now()->addDays(30));
+        } catch (\Exception $e) {
+            Log::error('Failed to record failover event', ['error' => $e->getMessage()]);
+        }
+    }
 }

@@ -12,7 +12,7 @@ import {
 import { id } from 'date-fns/locale';
 import { teacherService, type TeacherSchedule } from '../../services/teacherService';
 import { ChevronLeft, ChevronRight, Calendar, Clock, MapPin, Users, AlertCircle } from 'lucide-react';
-import Loading from '../../components/common/Loading';
+import { Skeleton, SkeletonCard } from '../../components/ui/LoadingStates';
 
 const TeacherSchedulePage: React.FC = () => {
     // State: Current Week Focus (Defaults to Today)
@@ -84,7 +84,16 @@ const TeacherSchedulePage: React.FC = () => {
         return map[dayIndex];
     };
 
-    if (isLoading) return <Loading text="Memuat Jadwal Mengajar..." />;
+    if (isLoading) return (
+        <div className="space-y-6">
+            <Skeleton variant="rounded" width="100%" height={72} />
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {[1,2,3,4,5].map((i) => (
+                    <SkeletonCard key={i} className="h-80" />
+                ))}
+            </div>
+        </div>
+    );
 
     if (isError) {
         return (

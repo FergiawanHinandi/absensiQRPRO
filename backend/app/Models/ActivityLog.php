@@ -10,7 +10,22 @@ class ActivityLog extends Model
 {
     use HasFactory;
 
-    protected $guarded = ['id'];
+    /**
+     * SEC-02: Explicit fillable untuk mencegah mass assignment vulnerability.
+     * Hanya field yang aman untuk diisi via request yang dimasukkan.
+     *
+     * @see database/migrations/2026_02_07_220000_create_activity_logs_table.php
+     */
+    protected $fillable = [
+        'user_id',
+        'action',
+        'model_type',
+        'model_id',
+        'school_id',
+        'ip_address',
+        'user_agent',
+        'payload',
+    ];
 
     protected $casts = [
         'payload' => 'array',

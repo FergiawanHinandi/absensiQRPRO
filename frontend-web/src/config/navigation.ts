@@ -87,8 +87,8 @@ export const MENUS: Record<RoleType, MenuItem[]> = {
             children: [
                 { label: 'Role & Permission', path: '/super-admin/security/roles', icon: Lock },
                 { label: 'Audit Log', path: '/super-admin/security/audit', icon: FileText },
-                { label: 'Security Dashboard', path: '/admin/security-monitoring', icon: Shield },
-                { label: 'Teacher Heatmap', path: '/admin/teacher-heatmap', icon: Globe },
+                { label: 'Security Dashboard', path: '/super-admin/security-monitoring', icon: Shield },
+                { label: 'Teacher Heatmap', path: '/super-admin/teacher-heatmap', icon: Globe },
                 { label: 'Rate Limit', path: '/super-admin/security/rate-limit', icon: Activity },
             ]
         },
@@ -97,8 +97,8 @@ export const MENUS: Record<RoleType, MenuItem[]> = {
             path: '/super-admin/config',
             icon: Settings,
             children: [
-                { label: 'Tahun Ajaran', path: '/super-admin/config/academic-year', icon: Calendar },
-                { label: 'Template Jadwal', path: '/super-admin/config/schedule-template', icon: Calendar },
+                { label: 'Tahun Ajaran', path: '/super-admin/academic-year', icon: Calendar },
+                { label: 'Template Jadwal', path: '/super-admin/schedule-templates', icon: Calendar },
                 { label: 'Feature Flags', path: '/super-admin/config/features', icon: Settings },
             ]
         },
@@ -170,7 +170,7 @@ export const MENUS: Record<RoleType, MenuItem[]> = {
                 { label: 'Daftar Guru', path: '/admin/teachers', icon: Users },
                 { label: 'Guru Kelas', path: '/admin/teachers/homeroom', icon: User },
                 { label: 'Guru Mapel', path: '/admin/teachers/subject', icon: BookOpen },
-                { label: 'Assign Kelas & Mapel', path: '/admin/teachers/assignments', icon: ClipboardCheck },
+                // { label: 'Assign Kelas & Mapel', path: '/admin/teachers/assignments', icon: ClipboardCheck },
             ]
         },
         {
@@ -179,9 +179,9 @@ export const MENUS: Record<RoleType, MenuItem[]> = {
             icon: Users,
             children: [
                 { label: 'Daftar Siswa', path: '/admin/students', icon: Users },
-                { label: 'Penempatan Kelas', path: '/admin/students/placement', icon: School },
-                { label: 'Kartu Pelajar & QR', path: '/admin/students/cards', icon: CreditCard },
-                { label: 'Mutasi / Alumni', path: '/admin/students/mutation', icon: History },
+                // { label: 'Penempatan Kelas', path: '/admin/students/placement', icon: School },
+                { label: 'Kartu Pelajar & QR', path: '/admin/student-cards', icon: CreditCard },
+                // { label: 'Mutasi / Alumni', path: '/admin/students/mutation', icon: History },
             ]
         },
         {
@@ -192,8 +192,8 @@ export const MENUS: Record<RoleType, MenuItem[]> = {
                 { label: 'Daftar Kelas', path: '/admin/classes', icon: School },
                 { label: 'Wali Kelas', path: '/admin/classes/homeroom', icon: User },
                 { label: 'Daftar Mapel', path: '/admin/subjects', icon: BookOpen },
-                { label: 'Mapel ↔ Guru', path: '/admin/subjects/teacher-mapping', icon: ClipboardCheck },
-                { label: 'Mapel ↔ Kelas', path: '/admin/subjects/class-mapping', icon: ClipboardCheck },
+                // { label: 'Mapel ↔ Guru', path: '/admin/subjects/teacher-mapping', icon: ClipboardCheck },
+                // { label: 'Mapel ↔ Kelas', path: '/admin/subjects/class-mapping', icon: ClipboardCheck },
             ]
         },
         {
@@ -202,9 +202,9 @@ export const MENUS: Record<RoleType, MenuItem[]> = {
             icon: Calendar,
             children: [
                 { label: 'Jadwal Pelajaran', path: '/admin/schedules', icon: Calendar },
-                { label: 'Jam Masuk / Pulang', path: '/admin/schedules/timing', icon: Clock },
-                { label: 'Hari Libur', path: '/admin/schedules/holidays', icon: Calendar },
-                { label: 'Kalender Akademik', path: '/admin/schedules/academic-calendar', icon: Calendar },
+                // { label: 'Jam Masuk / Pulang', path: '/admin/schedules/timing', icon: Clock },
+                // { label: 'Hari Libur', path: '/admin/schedules/holidays', icon: Calendar },
+                // { label: 'Kalender Akademik', path: '/admin/schedules/academic-calendar', icon: Calendar },
             ]
         },
         {
@@ -226,8 +226,8 @@ export const MENUS: Record<RoleType, MenuItem[]> = {
             icon: Baby,
             children: [
                 { label: 'Akun Orang Tua', path: '/admin/parents', icon: Baby },
-                { label: 'Relasi Orang Tua ↔ Siswa', path: '/admin/parents/relations', icon: Users },
-                { label: 'Hak Akses Notifikasi', path: '/admin/parents/notifications', icon: Activity },
+                // { label: 'Relasi Orang Tua ↔ Siswa', path: '/admin/parents/relations', icon: Users },
+                // { label: 'Hak Akses Notifikasi', path: '/admin/parents/notifications', icon: Activity },
             ]
         },
         {

@@ -103,10 +103,11 @@ class TeacherDashboardController extends Controller
                 // Let's check table 'attendances' for today.
                 $todayStr = $currentDate->toDateString();
 
+                // ARCH-02 FIX: Kolom yang benar adalah attendance_date (bukan 'date')
                 $attendanceCounts = DB::table('attendances')
                     ->where('school_id', $user->school_id)
                     ->where('class_id', $homeroomClassId)
-                    ->where('date', $todayStr)
+                    ->where('attendance_date', $todayStr)
                     ->groupBy('status')
                     ->select('status', DB::raw('count(*) as total'))
                     ->pluck('total', 'status');
@@ -132,9 +133,31 @@ class TeacherDashboardController extends Controller
                     'attendance_percentage' => $attendancePercentage,
                 ];
 
-                // Mock At Risk (Requires deeper history analysis)
-                // We return empty for now or static placeholder until later
-                $atRiskStudents = [];
+                // ARCH-02 FIX: At-risk students diambil dari tabel risiko nyata,
+                // bukan placeholder statis kosong.
+                $atRiskStudentIds = DB::table('student_attendance_risk')
+                    ->whereIn('student_id', function ($query) use ($homeroomClassId) {
+                        $query->select('student_id')
+                            ->from('class_students')
+                            ->where('class_id', $homeroomClassId)
+                            ->where('status', 'active');
+                    })
+                    ->whereIn('risk_level', ['high', 'medium'])
+                    ->where('calculated_at', '>=', now()->subHours(24))
+                    ->pluck('student_id');
+
+                if ($atRiskStudentIds->isNotEmpty()) {
+                    $atRiskStudents = User::whereIn('id', $atRiskStudentIds)
+                        ->select('id', 'name')
+                        ->get()
+                        ->map(fn ($student) => [
+                            'student_id' => $student->id,
+                            'student_name' => $student->name,
+                        ])
+                        ->toArray();
+                } else {
+                    $atRiskStudents = [];
+                }
             }
 
             return [
@@ -207,10 +230,11 @@ class TeacherDashboardController extends Controller
                 ->count();
 
             // 3. Today's Attendance Stats
+            // ARCH-02 FIX: Kolom yang benar adalah attendance_date (bukan 'date')
             $attendanceCounts = DB::table('attendances')
                 ->where('school_id', $user->school_id)
                 ->where('class_id', $homeroomClassId)
-                ->where('date', $todayStr)
+                ->where('attendance_date', $todayStr)
                 ->groupBy('status')
                 ->select('status', DB::raw('count(*) as total'))
                 ->pluck('total', 'status');
@@ -233,14 +257,14 @@ class TeacherDashboardController extends Controller
             $trendData = DB::table('attendances')
                 ->where('school_id', $user->school_id)
                 ->where('class_id', $homeroomClassId)
-                ->whereBetween('date', [$startDate->toDateString(), $todayStr])
+                ->whereBetween('attendance_date', [$startDate->toDateString(), $todayStr])
                 ->whereIn('status', ['present', 'late']) // Count as present
-                ->groupBy('date')
-                ->select('date', DB::raw('count(*) as present_count'))
-                ->orderBy('date')
+                ->groupBy('attendance_date')
+                ->select('attendance_date', DB::raw('count(*) as present_count'))
+                ->orderBy('attendance_date')
                 ->get()
                 ->mapWithKeys(function ($item) {
-                    return [$item->date => $item->present_count];
+                    return [$item->attendance_date => $item->present_count];
                 });
 
             // Fill missing days with 0
@@ -649,6 +673,9 @@ class TeacherDashboardController extends Controller
             ->where('school_id', $user->school_id)
             ->where('role_type', 'student')
             ->firstOrFail();
+
+        // [SEC-01] IDOR Protection using Laravel Policy
+        \Illuminate\Support\Facades\Gate::authorize('view', $student);
 
         $riskData = $riskService->calculateStudentRisk($student);
 
@@ -1672,6 +1699,15 @@ class TeacherDashboardController extends Controller
             'success' => true,
             'data' => $monitoringData,
         ]);
+    }
+
+    /**
+     * Get students for a specific schedule (legacy route support)
+     * Delegates to getSessionStudents
+     */
+    public function getScheduleStudents(Request $request, $id)
+    {
+        return $this->getSessionStudents($request, $id);
     }
 
     /**

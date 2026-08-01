@@ -52,7 +52,7 @@ class CriticalEndpointsTest extends TestCase
     // REGRESSION: Authentication
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function login_endpoint_returns_200_with_valid_credentials()
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -70,7 +70,7 @@ class CriticalEndpointsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function login_response_structure_unchanged()
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -89,7 +89,7 @@ class CriticalEndpointsTest extends TestCase
         $this->assertIsString($data['token']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function logout_endpoint_returns_200()
     {
         Sanctum::actingAs($this->admin);
@@ -104,7 +104,7 @@ class CriticalEndpointsTest extends TestCase
     // REGRESSION: Attendance Scan
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function attendance_scan_endpoint_accessible()
     {
         Sanctum::actingAs($this->student);
@@ -119,7 +119,7 @@ class CriticalEndpointsTest extends TestCase
         $this->assertContains($response->status(), [200, 201, 422]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function attendance_scan_response_structure_consistent()
     {
         Sanctum::actingAs($this->student);
@@ -146,7 +146,7 @@ class CriticalEndpointsTest extends TestCase
     // REGRESSION: Attendance Reports
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function attendance_report_endpoint_returns_200()
     {
         // Create test attendance data
@@ -169,7 +169,7 @@ class CriticalEndpointsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function attendance_report_structure_unchanged()
     {
         Sanctum::actingAs($this->admin);
@@ -185,7 +185,7 @@ class CriticalEndpointsTest extends TestCase
         $this->assertArrayHasKey('success', $response->json());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function dashboard_report_endpoint_returns_200()
     {
         Sanctum::actingAs($this->admin);
@@ -203,7 +203,7 @@ class CriticalEndpointsTest extends TestCase
     // REGRESSION: Student Card Generation
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_card_generation_endpoint_accessible()
     {
         Sanctum::actingAs($this->admin);
@@ -219,7 +219,7 @@ class CriticalEndpointsTest extends TestCase
         $this->assertContains($response->status(), [200, 201, 202, 422]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_card_response_has_consistent_structure()
     {
         Sanctum::actingAs($this->admin);
@@ -236,7 +236,7 @@ class CriticalEndpointsTest extends TestCase
     // REGRESSION: Security Events
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_events_logging_endpoint_accessible()
     {
         Sanctum::actingAs($this->admin);
@@ -250,7 +250,7 @@ class CriticalEndpointsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_events_response_structure_consistent()
     {
         Sanctum::actingAs($this->admin);
@@ -264,7 +264,7 @@ class CriticalEndpointsTest extends TestCase
         $this->assertIsArray($data);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_summary_endpoint_returns_200()
     {
         Sanctum::actingAs($this->admin);
@@ -282,7 +282,7 @@ class CriticalEndpointsTest extends TestCase
     // REGRESSION: Core API Health
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function auth_me_endpoint_returns_200()
     {
         Sanctum::actingAs($this->admin);
@@ -301,7 +301,7 @@ class CriticalEndpointsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function notifications_endpoint_accessible()
     {
         Sanctum::actingAs($this->admin);
@@ -319,7 +319,7 @@ class CriticalEndpointsTest extends TestCase
     // REGRESSION: Error Handling
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthenticated_requests_return_401_not_500()
     {
         $response = $this->getJson('/api/v1/admin/dashboard');
@@ -327,7 +327,7 @@ class CriticalEndpointsTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function invalid_endpoints_return_404_not_500()
     {
         Sanctum::actingAs($this->admin);
@@ -337,7 +337,7 @@ class CriticalEndpointsTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validation_errors_return_422_not_500()
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -356,7 +356,7 @@ class CriticalEndpointsTest extends TestCase
     // REGRESSION: Response Format Consistency
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function all_successful_responses_have_success_key()
     {
         Sanctum::actingAs($this->admin);
@@ -378,7 +378,7 @@ class CriticalEndpointsTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function all_successful_responses_return_data_key()
     {
         Sanctum::actingAs($this->admin);

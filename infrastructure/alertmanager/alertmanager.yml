@@ -1,0 +1,80 @@
+# Alertmanager Configuration for AbsensiQRPro
+# ==============================================================================
+# Configure your notification receivers below to route alerts.
+# Supported receivers: slack, email, pagerduty, webhook, opsgenie, etc.
+# ==============================================================================
+
+global:
+  # The SMTP host for email notifications
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alerts@absensiqr.com'
+  # smtp_auth_username: 'your-email@gmail.com'
+  # smtp_auth_password: 'your-app-password'
+  resolve_timeout: 5m
+
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'severity', 'team']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Critical alerts: page on-call immediately
+    - match:
+        severity: critical
+      receiver: 'default'
+      repeat_interval: 10m
+
+    # Warning alerts: less frequent repeats
+    - match:
+        severity: warning
+      receiver: 'default'
+      repeat_interval: 1h
+
+receivers:
+  # ============================================================================
+  # Default receiver - outputs to stdout (visible in docker logs)
+  # ============================================================================
+  - name: 'default'
+    webhook_configs:
+      # ⚠️ Placeholder — replace with a real receiver (Slack/email/PagerDuty).
+      # Alerts are currently visible in Alertmanager UI (port 9093) but NOT delivered.
+      # See examples below for Slack, Email, and PagerDuty configuration.
+
+  # ============================================================================
+  # Example: Slack notifications
+  # Uncomment and configure with your Slack webhook URL
+  # ============================================================================
+  # - name: 'slack-critical'
+  #   slack_configs:
+  #     - api_url: 'SLACK_WEBHOOK_URL_REDACTED'
+  #       channel: '#absensi-alerts'
+  #       send_resolved: true
+  #       title: '{{ .GroupLabels.alertname }} [{{ .GroupLabels.severity }}]'
+  #       text: >-
+  #         {{ range .Alerts }}
+  #           *Alert:* {{ .Annotations.summary }}
+  #           *Description:* {{ .Annotations.description }}
+  #           *Dashboard:* {{ .Annotations.dashboard }}
+  #           *Runbook:* {{ .Annotations.runbook }}
+  #         {{ end }}
+
+  # ============================================================================
+  # Example: Email notifications
+  # ============================================================================
+  # - name: 'email-infra'
+  #   email_configs:
+  #     - to: 'infra@absensiqr.com'
+  #       send_resolved: true
+  #       headers:
+  #         subject: '{{ .GroupLabels.alertname }} [{{ .GroupLabels.severity }}]'
+
+  # ============================================================================
+  # Example: PagerDuty for critical alerts
+  # ============================================================================
+  # - name: 'pagerduty-critical'
+  #   pagerduty_configs:
+  #     - routing_key: 'your-pagerduty-routing-key'
+  #       send_resolved: true
+  #       severity: '{{ .GroupLabels.severity }}'

@@ -10,10 +10,10 @@ Mobile App (React Native) ←→ Backend API (Laravel) ←→ Web Frontend (Reac
                               PostgreSQL + Redis
 ```
 
-## Backend (Laravel 12)
+## Backend (Laravel 11)
 
 ### Core Technologies
-- **Framework**: Laravel 12 (PHP 8.2+)
+- **Framework**: Laravel 11 (PHP 8.2+)
 - **Database**: PostgreSQL 15+ (SQLite for development)
 - **Cache**: Redis (optional for development)
 - **Authentication**: Laravel Sanctum (JWT tokens)

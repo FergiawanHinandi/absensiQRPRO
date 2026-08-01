@@ -13,7 +13,7 @@ class StudentCardProgressController extends Controller
 {
     public function progress(Request $request)
     {
-        $this->authorize('update', User::class);
+        $this->authorize('viewAny', User::class);
         $admin = $request->user();
         $schoolId = $admin->school_id;
         $cacheKey = 'student_card_progress_'.$schoolId;

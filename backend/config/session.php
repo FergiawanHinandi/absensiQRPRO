@@ -14,7 +14,10 @@ return [
     | persist session data. Database storage is a great default choice.
     |
     | Supported: "file", "cookie", "database", "memcached",
-    |            "redis", "dynamodb", "array"
+    |            "redis", "dynamodb", "array", "tenant_redis"
+    |
+    | Note: "tenant_redis" provides multi-tenant session isolation with
+    | automatic fallback to database when Redis is unavailable.
     |
     */
 
@@ -47,7 +50,7 @@ return [
     |
     */
 
-    'encrypt' => env('SESSION_ENCRYPT', false),
+    'encrypt' => env('SESSION_ENCRYPT', true),
 
     /*
     |--------------------------------------------------------------------------
@@ -102,6 +105,18 @@ return [
     */
 
     'store' => env('SESSION_STORE'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Key Prefix
+    |--------------------------------------------------------------------------
+    |
+    | This value is used to prefix session keys in Redis storage.
+    | Used by the tenant_redis driver for multi-tenant session isolation.
+    |
+    */
+
+    'prefix' => env('SESSION_PREFIX', 'session'),
 
     /*
     |--------------------------------------------------------------------------

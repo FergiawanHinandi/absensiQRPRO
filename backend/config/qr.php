@@ -56,7 +56,7 @@ return [
     | Default: 365 days (1 year)
     |
     */
-    'student_card_max_age_days' => env('QR_STUDENT_CARD_MAX_AGE_DAYS', 365),
+    'student_card_max_age_days' => env('QR_STUDENT_CARD_MAX_AGE_DAYS', 1),
 
     /*
     |--------------------------------------------------------------------------

@@ -193,7 +193,7 @@ class BackupScheduler
      */
     private function executeBackgroundCommand(string $command, string $type): void
     {
-        $logFile = storage_path("logs/backup_{$type}_" . date('Y-m-d') . ".log");
+        $logFile = storage_path("logs/backup_{$type}_" . \App\Helpers\TimezoneHelper::now()->format('Y-m-d') . ".log");
         
         // For Windows
         if (PHP_OS_FAMILY === 'Windows') {
@@ -278,7 +278,7 @@ class BackupScheduler
      */
     private function log(string $message): void
     {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = \App\Helpers\TimezoneHelper::now()->format('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}\n";
         
         echo $logMessage;

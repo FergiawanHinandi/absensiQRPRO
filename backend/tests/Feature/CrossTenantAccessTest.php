@@ -83,7 +83,7 @@ class CrossTenantAccessTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_from_school_a_cannot_access_student_from_school_b_via_api()
     {
         Sanctum::actingAs($this->adminA, ['*']);
@@ -98,7 +98,7 @@ class CrossTenantAccessTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_cannot_update_student_from_different_school()
     {
         Sanctum::actingAs($this->adminA, ['*']);
@@ -119,7 +119,7 @@ class CrossTenantAccessTest extends TestCase
         $this->assertNotEquals('Hacked Name', $this->studentB->name);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_view_attendance_from_different_school()
     {
         Sanctum::actingAs($this->studentA, ['*']);
@@ -162,7 +162,7 @@ class CrossTenantAccessTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_cannot_view_classes_from_different_school()
     {
         Sanctum::actingAs($this->adminA, ['*']);
@@ -190,7 +190,7 @@ class CrossTenantAccessTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_scan_qr_code_from_different_school()
     {
         Sanctum::actingAs($this->studentA, ['*']);
@@ -217,7 +217,7 @@ class CrossTenantAccessTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function list_endpoints_only_return_same_school_data()
     {
         Sanctum::actingAs($this->adminA, ['*']);
@@ -257,7 +257,7 @@ class CrossTenantAccessTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function dashboard_stats_only_include_same_school_data()
     {
         Sanctum::actingAs($this->adminA, ['*']);

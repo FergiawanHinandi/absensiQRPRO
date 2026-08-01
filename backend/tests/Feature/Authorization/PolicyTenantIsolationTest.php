@@ -140,7 +140,7 @@ class PolicyTenantIsolationTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_from_school_a_cannot_access_school_b_student()
     {
         // Teacher A tries to access Student B (from different school)
@@ -149,7 +149,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertFalse($canView, 'Teacher A should not be able to view Student B from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_from_school_a_cannot_access_school_b_student()
     {
         // Admin A tries to access Student B (from different school)
@@ -158,7 +158,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertFalse($canView, 'Admin A should not be able to view Student B from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_from_school_a_cannot_update_school_b_student()
     {
         // Admin A tries to update Student B (from different school)
@@ -171,7 +171,7 @@ class PolicyTenantIsolationTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_from_school_a_cannot_access_school_b_teacher()
     {
         // Teacher A tries to access Teacher B (from different school)
@@ -180,7 +180,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertFalse($canView, 'Teacher A should not be able to view Teacher B from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_from_school_a_cannot_update_school_b_teacher()
     {
         // Admin A tries to update Teacher B (from different school)
@@ -189,7 +189,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertFalse($canUpdate, 'Admin A should not be able to update Teacher B from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_access_own_school_students()
     {
         // Admin A can access Student A (same school)
@@ -198,7 +198,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertTrue($canView, 'Admin A should be able to view Student A from same school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_update_own_school_students()
     {
         // Admin A can update Student A (same school)
@@ -207,7 +207,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertTrue($canUpdate, 'Admin A should be able to update Student A from same school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_from_school_a_cannot_access_school_b_class()
     {
         // Get academic year for School B
@@ -231,7 +231,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertFalse($canView, 'Teacher A should not be able to view Class B from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_from_school_a_cannot_update_school_b_class()
     {
         // Get academic year for School B
@@ -253,7 +253,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertFalse($canUpdate, 'Admin A should not be able to update Class B from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_from_school_a_cannot_access_school_b_schedule()
     {
         // Get academic year for School B
@@ -288,7 +288,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertFalse($canView, 'Teacher A should not be able to view Schedule B from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_access_any_school_student()
     {
         // Create super admin
@@ -309,7 +309,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertTrue($canView, 'Super admin should be able to view any student');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_access_other_students_from_same_school()
     {
         // Create another student in School A
@@ -331,7 +331,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertFalse($canView, 'Student should not be able to view other students');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_can_only_view_own_profile()
     {
         // Student A views own profile
@@ -342,7 +342,7 @@ class PolicyTenantIsolationTest extends TestCase
         $this->assertTrue($canView, 'Student should be able to view own profile');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function policy_prevents_cross_tenant_access_even_with_direct_model_query()
     {
         // Admin A tries to directly access Student B via policy

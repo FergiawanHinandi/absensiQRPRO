@@ -12,23 +12,19 @@ use Tests\TestCase;
 
 /**
  * IdempotencyTest
- *
  * Test idempotency key protection for attendance requests.
- *
  * SCENARIO:
  * - Send 5 requests with the same idempotency key
  * - Only the first request should succeed (201 Created)
  * - Remaining 4 should be rejected (409 Conflict)
- *
  * PROTECTION MECHANISMS:
  * - Idempotency key validation
  * - Database unique constraint on idempotency_keys table
  * - Request deduplication
- *
- * @group idempotency
- * @group attendance
- * @group critical
  */
+#[\PHPUnit\Framework\Attributes\Group('idempotency')]
+#[\PHPUnit\Framework\Attributes\Group('attendance')]
+#[\PHPUnit\Framework\Attributes\Group('critical')]
 class IdempotencyTest extends TestCase
 {
     use RefreshDatabase;
@@ -70,14 +66,12 @@ class IdempotencyTest extends TestCase
 
     /**
      * Test idempotency key prevents duplicate requests
-     *
      * SCENARIO:
      * - Send 5 requests with the same idempotency key
      * - Only first request succeeds (201)
      * - Remaining 4 requests rejected (409)
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_requests_with_same_idempotency_key()
     {
         $idempotencyKey = Str::uuid()->toString();
@@ -143,9 +137,8 @@ class IdempotencyTest extends TestCase
 
     /**
      * Test different idempotency keys allow multiple requests
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_multiple_requests_with_different_idempotency_keys()
     {
         $checkInData = [
@@ -185,9 +178,8 @@ class IdempotencyTest extends TestCase
 
     /**
      * Test idempotency key expires after TTL
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_request_after_idempotency_key_expires()
     {
         $idempotencyKey = Str::uuid()->toString();
@@ -227,9 +219,8 @@ class IdempotencyTest extends TestCase
 
     /**
      * Test idempotency key validation
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_idempotency_key_format()
     {
         $checkInData = [
@@ -250,9 +241,8 @@ class IdempotencyTest extends TestCase
 
     /**
      * Test idempotency key returns cached response
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_cached_response_for_duplicate_request()
     {
         $idempotencyKey = Str::uuid()->toString();
@@ -293,9 +283,8 @@ class IdempotencyTest extends TestCase
 
     /**
      * Test concurrent requests with same idempotency key
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_concurrent_requests_with_same_idempotency_key()
     {
         $idempotencyKey = Str::uuid()->toString();
@@ -335,9 +324,8 @@ class IdempotencyTest extends TestCase
 
     /**
      * Test idempotency key cleanup
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cleans_up_expired_idempotency_keys()
     {
         // Create expired idempotency key

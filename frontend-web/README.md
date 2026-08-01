@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+# AbsensiQR Pro — Frontend Web (Admin Dashboard)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript admin dashboard for the AbsensiQR Pro multi-tenant attendance system.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 19** with TypeScript
+- **Vite** — build tool & dev server
+- **TailwindCSS** — utility-first styling
+- **Zustand** — lightweight state management (`useAuthStore`)
+- **TanStack Query** (React Query) — server-state with 5-min staleTime
+- **Axios** — HTTP client with auto-injected bearer token & 401 redirect
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+cp .env.example .env     # set VITE_API_URL
+npm run dev               # http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Environment Variables
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_URL` | `http://localhost:8000/api/v1` | Backend API base URL |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Project Structure
+
 ```
+src/
+├── lib/api.ts                 # Axios instance (bearer, 401, 503 interceptors)
+├── modules/
+│   ├── auth/                  # Login, stores, guards
+│   ├── dashboard/             # Role-based dashboards
+│   ├── students/              # Student CRUD
+│   ├── teachers/              # Teacher management
+│   ├── schedules/             # Schedule management
+│   ├── attendance/            # Attendance reports
+│   └── settings/              # School settings
+├── utils/toast.ts             # showToast.success / .error / .warning
+├── App.tsx                    # Role-based routing
+└── main.tsx                   # React Query provider, router
+```
+
+## Role-Based Access
+
+| Role | Dashboard Path |
+|------|---------------|
+| `super_admin` | `/super-admin/dashboard` |
+| `admin` / `school_admin` | `/admin/dashboard` |
+| `teacher` / `homeroom_teacher` | `/teacher/dashboard` |
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | Production build to `dist/` |
+| `npm test` | Run Vitest |
+| `npm run lint` | ESLint check |
+
+## Key Conventions
+
+- **Auth tokens** stored in `sessionStorage` (not localStorage) via `tokenStore`
+- **Toast notifications** via `showToast` — never use `alert()`
+- **API errors**: 401 → auto-redirect to login; 503 → maintenance mode page

@@ -26,7 +26,7 @@ class SecurityAuditServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_security_event_successfully()
     {
         $event = $this->service->logEvent(
@@ -45,7 +45,7 @@ class SecurityAuditServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_generates_correct_event_message()
     {
         $event = $this->service->logEvent(
@@ -59,7 +59,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertStringContainsString('allowed area', $event->message);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_calculates_threat_score_correctly()
     {
         Cache::flush();
@@ -85,7 +85,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertEquals(40, $score);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_caps_threat_score_at_100()
     {
         Cache::flush();
@@ -105,7 +105,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertEquals(100, $score);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_detects_impossible_travel()
     {
         // Create initial location event
@@ -129,7 +129,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertTrue($isSuspicious);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_does_not_flag_normal_travel()
     {
         // Create initial location event
@@ -153,7 +153,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertFalse($isSuspicious);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_resolves_events_correctly()
     {
         $event = $this->service->logEvent(
@@ -173,7 +173,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertNotNull($resolvedEvent->resolved_at);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_bulk_resolves_events_by_type()
     {
         // Create multiple events of same type
@@ -201,7 +201,7 @@ class SecurityAuditServiceTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_generates_dashboard_summary()
     {
         // Create various events
@@ -223,7 +223,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertEquals('critical', $summary['risk_level']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_sanitizes_sensitive_context_data()
     {
         $event = $this->service->logEvent(
@@ -244,7 +244,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertEquals('should_stay', $event->context['normal_data']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_analyzes_login_attempts()
     {
         $request = Request::create('/api/v1/auth/login', 'POST');
@@ -261,7 +261,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertContains('new_device', $analysis['reasons']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_generates_audit_report()
     {
         // Create events over several days
@@ -282,7 +282,7 @@ class SecurityAuditServiceTest extends TestCase
         $this->assertArrayHasKey('resolution_rate', $report['response_metrics']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_gets_high_risk_users()
     {
         // Create events for user

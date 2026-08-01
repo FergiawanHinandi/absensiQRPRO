@@ -24,8 +24,8 @@ if %ERRORLEVEL% EQU 0 (
     set SECRETS_FOUND=1
 )
 
-REM Pattern 2: Database passwords
-git diff --cached | findstr /R "^\+.*DB_PASSWORD=" | findstr /V "your-secure-password" > nul
+REM Pattern 2: Database passwords (exclude placeholders and shell expansions)
+git diff --cached | findstr /R "^\+.*DB_PASSWORD=" | findstr /V "your-secure-password" | findstr /V /L "DB_PASSWORD=#" | findstr /V /L "$DB_" > nul
 if %ERRORLEVEL% EQU 0 (
     echo [91m❌ BLOCKED: DB_PASSWORD with actual value detected![0m
     echo [93m   Never commit real database passwords[0m

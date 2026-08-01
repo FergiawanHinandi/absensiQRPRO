@@ -45,7 +45,7 @@ class LoginBruteForceProtectionTest extends TestCase
         Cache::flush();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function successful_login_returns_token()
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -68,7 +68,7 @@ class LoginBruteForceProtectionTest extends TestCase
         $this->assertNull($this->user->locked_until);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failed_login_records_attempt()
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -83,7 +83,7 @@ class LoginBruteForceProtectionTest extends TestCase
         $this->assertNotNull($this->user->last_failed_login_at);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limiting_blocks_after_5_attempts()
     {
         // Make 5 failed attempts
@@ -107,7 +107,7 @@ class LoginBruteForceProtectionTest extends TestCase
         $this->assertStringContainsString('Terlalu banyak percobaan login', $errorMessage);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function account_locks_after_10_failed_attempts()
     {
         // Make 10 failed attempts
@@ -135,7 +135,7 @@ class LoginBruteForceProtectionTest extends TestCase
         $this->assertStringContainsString('dikunci', $errorMessage);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function locked_account_unlocks_after_timeout()
     {
         // Lock the account manually
@@ -158,7 +158,7 @@ class LoginBruteForceProtectionTest extends TestCase
         $this->assertEquals(0, $this->user->failed_login_attempts);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_is_based_on_ip_and_email_combination()
     {
         // Create second user
@@ -200,7 +200,7 @@ class LoginBruteForceProtectionTest extends TestCase
         $this->assertStringNotContainsString('Terlalu banyak', $response2->json('errors.email.0'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generic_error_message_does_not_reveal_which_field_is_wrong()
     {
         // Wrong username
@@ -223,7 +223,7 @@ class LoginBruteForceProtectionTest extends TestCase
         $this->assertStringContainsString('Kredensial yang Anda masukkan tidak valid', $message1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failed_login_attempts_are_logged()
     {
         $this->postJson('/api/v1/auth/login', [
@@ -238,7 +238,7 @@ class LoginBruteForceProtectionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function successful_login_creates_audit_log()
     {
         $this->postJson('/api/v1/auth/login', [
@@ -253,7 +253,7 @@ class LoginBruteForceProtectionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function progressive_delay_slows_down_repeated_attempts()
     {
         // This test verifies the delay mechanism exists
@@ -274,7 +274,7 @@ class LoginBruteForceProtectionTest extends TestCase
         $this->assertGreaterThanOrEqual(4, $this->user->failed_login_attempts);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function account_lockout_is_logged()
     {
         // Make 10 failed attempts to trigger lockout

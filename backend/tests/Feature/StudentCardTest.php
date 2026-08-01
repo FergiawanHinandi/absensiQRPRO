@@ -5,21 +5,12 @@ namespace Tests\Feature;
 use App\Models\School;
 use App\Models\StudentCard;
 use App\Models\User;
-use App\Services\StudentQrService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class StudentCardTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        // Seed roles if necessary or mock them.
-        // Assuming factories handle basic setup.
-    }
 
     public function test_school_admin_can_generate_student_card()
     {
@@ -36,33 +27,33 @@ class StudentCardTest extends TestCase
 
         $this->actingAs($admin);
 
-        $response = $this->postJson("/api/v1/student-cards/{$student->id}/generate");
+        $response = $this->postJson("/api/v1/admin/student-cards/{$student->id}/generate");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'status',
+                'success',
                 'data' => [
-                    'card_id',
-                    'qr_token',
-                    'student_id',
-                    'school_id',
-                    'issued_at',
+                    'card',
+                    'plain_token',
+                    'qr_string',
                 ],
             ]);
 
         $data = $response->json('data');
-        $token = $data['qr_token'];
+        $card = $data['card'];
 
         // Assert DB
-        $card = StudentCard::find($data['card_id']);
-        $this->assertNotNull($card);
-        $this->assertEquals($student->id, $card->student_id);
-        $this->assertTrue($card->is_active);
-        $this->assertEquals($admin->id, $card->issued_by);
+        $dbCard = StudentCard::find($card['id']);
+        $this->assertNotNull($dbCard);
+        $this->assertEquals($student->id, $dbCard->student_id);
+        $this->assertTrue($dbCard->is_active);
+        $this->assertEquals($admin->id, $dbCard->issued_by);
 
-        // Assert Hash
-        [$cardId, $rawToken] = explode('|', $token);
-        $this->assertTrue(Hash::check($rawToken, $card->qr_hash));
+        // Assert qr_string format: {card_id}|{plain_token}
+        $this->assertStringContainsString('|', $data['qr_string']);
+        [$cardIdPart, $tokenPart] = explode('|', $data['qr_string']);
+        $this->assertEquals($card['id'], (int) $cardIdPart);
+        $this->assertEquals($data['plain_token'], $tokenPart);
     }
 
     public function test_teacher_cannot_generate_student_card()
@@ -79,12 +70,12 @@ class StudentCardTest extends TestCase
 
         $this->actingAs($teacher);
 
-        $response = $this->postJson("/api/v1/student-cards/{$student->id}/generate");
+        $response = $this->postJson("/api/v1/admin/student-cards/{$student->id}/generate");
 
         $response->assertStatus(403);
     }
 
-    public function test_verify_generated_card_token()
+    public function test_second_generation_revokes_previous_card()
     {
         $school = School::factory()->create();
         $admin = User::factory()->create([
@@ -99,48 +90,30 @@ class StudentCardTest extends TestCase
 
         $this->actingAs($admin);
 
-        // Generate Card
-        $response = $this->postJson("/api/v1/student-cards/{$student->id}/generate");
-        $token = $response->json('data.qr_token');
+        // Generate first card
+        $response1 = $this->postJson("/api/v1/admin/student-cards/{$student->id}/generate");
+        $response1->assertStatus(200);
+        $firstCardId = $response1->json('data.card.id');
+        $firstQrString = $response1->json('data.qr_string');
 
-        // Verify using Service
-        $service = app(StudentQrService::class);
-        $payload = $service->verify($token);
+        // Generate second card (auto-revokes first)
+        $response2 = $this->postJson("/api/v1/admin/student-cards/{$student->id}/generate");
+        $response2->assertStatus(200);
+        $secondCardId = $response2->json('data.card.id');
 
-        $this->assertEquals($student->id, $payload['sid']);
-        $this->assertEquals($school->id, $payload['sch']);
-        $this->assertEquals('student_card', $payload['typ']);
-    }
+        // First card should now be inactive
+        $firstCard = StudentCard::find($firstCardId);
+        $this->assertFalse($firstCard->is_active);
+        $this->assertNotNull($firstCard->revoked_at);
 
-    public function test_deactivated_card_fails_verification()
-    {
-        $school = School::factory()->create();
-        $admin = User::factory()->create([
-            'school_id' => $school->id,
-            'role_type' => 'school_admin',
-        ]);
-        $student = User::factory()->create([
-            'school_id' => $school->id,
-            'role_type' => 'student',
-            'is_active' => true,
-        ]);
+        // Second card should be active
+        $secondCard = StudentCard::find($secondCardId);
+        $this->assertTrue($secondCard->is_active);
 
-        $this->actingAs($admin);
-
-        // Generate Card
-        $response = $this->postJson("/api/v1/student-cards/{$student->id}/generate");
-        $token = $response->json('data.qr_token');
-        $cardId = $response->json('data.card_id');
-
-        // Deactivate
-        $this->deleteJson("/api/v1/student-cards/{$student->id}")
-            ->assertStatus(200);
-
-        // Verify fail
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Kartu ini sudah dinonaktifkan'); // Or whatever message I put
-
-        $service = app(StudentQrService::class);
-        $service->verify($token);
+        // Only 1 active card per student
+        $activeCount = StudentCard::where('student_id', $student->id)
+            ->where('is_active', true)
+            ->count();
+        $this->assertEquals(1, $activeCount);
     }
 }

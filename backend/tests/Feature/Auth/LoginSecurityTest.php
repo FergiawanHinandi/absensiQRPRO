@@ -11,17 +11,15 @@ use Tests\TestCase;
 
 /**
  * LoginSecurityTest
- *
  * Comprehensive test suite for login security features:
  * - Timing attack prevention
  * - Brute force protection
  * - Rate limiting
  * - Account lockout
  * - Audit logging
- *
- * @group auth
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\Group('auth')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 class LoginSecurityTest extends TestCase
 {
     use RefreshDatabase;
@@ -48,7 +46,7 @@ class LoginSecurityTest extends TestCase
     // TIMING ATTACK PREVENTION
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_constant_time_comparison_for_invalid_user()
     {
         $startTime = hrtime(true);
@@ -70,7 +68,7 @@ class LoginSecurityTest extends TestCase
         $this->assertGreaterThanOrEqual(100_000_000, $elapsedInvalid, 'Response time should be at least 100ms');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_constant_time_comparison_for_wrong_password()
     {
         $startTime = hrtime(true);
@@ -88,7 +86,7 @@ class LoginSecurityTest extends TestCase
         $this->assertGreaterThanOrEqual(100_000_000, $elapsedWrong, 'Response time should be at least 100ms');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_generic_error_message_for_invalid_credentials()
     {
         // Test with non-existent user
@@ -115,7 +113,7 @@ class LoginSecurityTest extends TestCase
         $this->assertStringNotContainsString('password', strtolower($response1->json('errors.email.0')));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_performs_hash_check_even_for_nonexistent_user()
     {
         // This test verifies that Hash::check is called even when user doesn't exist
@@ -147,7 +145,7 @@ class LoginSecurityTest extends TestCase
     // RATE LIMITING
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rate_limits_login_attempts_by_ip_and_email()
     {
         // Make 5 failed attempts (should succeed)
@@ -169,7 +167,7 @@ class LoginSecurityTest extends TestCase
         $this->assertStringContainsString('Terlalu banyak percobaan', $response->json('errors.email.0'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_clears_rate_limit_on_successful_login()
     {
         // Make 4 failed attempts
@@ -201,7 +199,7 @@ class LoginSecurityTest extends TestCase
     // ACCOUNT LOCKOUT
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_locks_account_after_10_failed_attempts()
     {
         // Make 10 failed attempts
@@ -222,7 +220,7 @@ class LoginSecurityTest extends TestCase
         $this->assertGreaterThanOrEqual(10, $this->user->failed_login_attempts);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_login_when_account_is_locked()
     {
         // Lock the account
@@ -242,7 +240,7 @@ class LoginSecurityTest extends TestCase
         $this->assertStringContainsString('menit', $response->json('errors.email.0'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_unlocks_account_after_lockout_period_expires()
     {
         // Lock the account with expired lockout
@@ -267,7 +265,7 @@ class LoginSecurityTest extends TestCase
         $this->assertEquals(0, $this->user->failed_login_attempts);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_clears_failed_attempts_on_successful_login()
     {
         // Set some failed attempts
@@ -293,7 +291,7 @@ class LoginSecurityTest extends TestCase
     // PROGRESSIVE DELAY
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_applies_progressive_delay_after_multiple_failures()
     {
         Cache::flush();
@@ -329,7 +327,7 @@ class LoginSecurityTest extends TestCase
     // AUDIT LOGGING
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_failed_login_attempts()
     {
         $this->postJson('/api/v1/auth/login', [
@@ -344,7 +342,7 @@ class LoginSecurityTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_successful_login()
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -361,7 +359,7 @@ class LoginSecurityTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_account_lockout()
     {
         // Make 10 failed attempts to trigger lockout
@@ -380,7 +378,7 @@ class LoginSecurityTest extends TestCase
         $this->assertNotNull($this->user->locked_until);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_increments_failed_login_attempts_counter()
     {
         // Initial state
@@ -407,7 +405,7 @@ class LoginSecurityTest extends TestCase
     // SUCCESSFUL LOGIN
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_login_with_correct_credentials()
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -432,7 +430,7 @@ class LoginSecurityTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_login_with_username()
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -443,7 +441,7 @@ class LoginSecurityTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_updates_last_login_timestamp()
     {
         $this->assertNull($this->user->last_login_at);
@@ -461,7 +459,7 @@ class LoginSecurityTest extends TestCase
     // EDGE CASES
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_login_for_inactive_users()
     {
         $this->user->update(['is_active' => false]);
@@ -474,7 +472,7 @@ class LoginSecurityTest extends TestCase
         $response->assertStatus(422);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_case_insensitive_email_login()
     {
         $response = $this->postJson('/api/v1/auth/login', [

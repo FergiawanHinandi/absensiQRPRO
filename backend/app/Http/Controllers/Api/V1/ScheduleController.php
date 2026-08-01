@@ -8,18 +8,14 @@ use Illuminate\Http\Request;
 
 class ScheduleController extends Controller
 {
+    public function __construct(private \App\Services\TeacherScheduleService $teacherScheduleService) {}
+
     /**
      * Get today's schedules for authenticated teacher
      */
     public function today(Request $request)
     {
-        $dayOfWeek = now()->dayOfWeek;
-        $schedules = Schedule::where('school_id', $request->user()->school_id)
-            ->where('teacher_id', $request->user()->id)
-            ->where('day_of_week', $dayOfWeek)
-            ->with('subject', 'class')
-            ->orderBy('start_time')
-            ->get();
+        $schedules = $this->teacherScheduleService->getTodaySchedules($request->user());
 
         return response()->success([
             'schedules' => $schedules,
@@ -31,15 +27,11 @@ class ScheduleController extends Controller
      */
     public function index(Request $request)
     {
-        $schedules = Schedule::where('school_id', $request->user()->school_id)
-            ->where('teacher_id', $request->user()->id)
-            ->with('subject', 'class')
-            ->orderBy('day_of_week')
-            ->orderBy('start_time')
-            ->get();
+        // Using getWeeklySchedules which is optimized and grouping aware
+        $groupedSchedules = $this->teacherScheduleService->getWeeklySchedules($request->user());
 
         return response()->success([
-            'schedules' => $schedules,
+            'schedules' => current($groupedSchedules) !== false ? $groupedSchedules : [],
         ]);
     }
 }

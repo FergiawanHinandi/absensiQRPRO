@@ -17,7 +17,7 @@ class ReadReplicaTest extends TestCase
 {
     use RefreshDatabase;
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_write_connection_for_inserts()
     {
         // Enable query logging
@@ -44,7 +44,7 @@ class ReadReplicaTest extends TestCase
         DB::connection()->disableQueryLog();
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_write_connection_for_updates()
     {
         $attendance = Attendance::create([
@@ -73,7 +73,7 @@ class ReadReplicaTest extends TestCase
         DB::connection()->disableQueryLog();
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_can_read_from_replica_or_primary()
     {
         // Create test data
@@ -110,7 +110,7 @@ class ReadReplicaTest extends TestCase
         DB::connection()->disableQueryLog();
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_high_read_load()
     {
         // Create test data
@@ -143,7 +143,7 @@ class ReadReplicaTest extends TestCase
         $this->assertLessThan(1000, $duration, "100 reads took {$duration}ms");
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_maintains_write_stability_during_high_read_load()
     {
         // Create initial data
@@ -190,7 +190,7 @@ class ReadReplicaTest extends TestCase
         $this->assertEquals(95.00, $updated->attendance_rate);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_sticky_connections_after_write()
     {
         // This test verifies that after a write, subsequent reads
@@ -219,7 +219,7 @@ class ReadReplicaTest extends TestCase
         $this->assertEquals(85, $fresh->total_present);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_falls_back_to_primary_when_replica_unavailable()
     {
         // This test verifies that when DB_READ_HOST is not set,
@@ -255,7 +255,7 @@ class ReadReplicaTest extends TestCase
         $this->assertEquals(100, $retrieved->total_students);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_complex_read_queries()
     {
         // Create multiple summaries
@@ -288,7 +288,7 @@ class ReadReplicaTest extends TestCase
         $this->assertEquals(81, $results->first()->total_present);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_reports_connection_configuration()
     {
         $config = config('database.connections.mysql');

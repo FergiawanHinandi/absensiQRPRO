@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\V1\SuperAdmin\SecurityController;
 use App\Http\Controllers\Api\V1\SuperAdmin\SystemController;
 use App\Http\Controllers\Api\V1\SuperAdmin\GlobalReportController;
 use App\Http\Controllers\Api\V1\SuperAdmin\AnnouncementController;
+use App\Http\Controllers\Api\V1\SuperAdmin\ProfileController;
+use App\Http\Controllers\Api\V1\MonitoringController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +34,11 @@ Route::prefix('super-admin')
     ->middleware(['auth:sanctum', 'role:super_admin', 'log.superadmin'])
     ->group(function () {
         
+        // Profile
+        Route::get('/profile', [ProfileController::class, 'show']);
+        Route::put('/profile', [ProfileController::class, 'update']);
+        Route::post('/change-password', [ProfileController::class, 'changePassword']);
+
         // Dashboard
         Route::prefix('dashboard')->group(function () {
             Route::get('/stats', [DashboardController::class, 'index']);
@@ -65,7 +72,7 @@ Route::prefix('super-admin')
             Route::get('/activity-logs', [UserManagementController::class, 'activityLogs']);
         });
         
-        // Billing — Subscription Packages
+        // Billing — Subscription Packages & Invoices
         Route::prefix('billing')->group(function () {
             Route::get('/packages', [SubscriptionPackageController::class, 'index']);
             Route::post('/packages', [SubscriptionPackageController::class, 'store']);
@@ -73,10 +80,15 @@ Route::prefix('super-admin')
             Route::put('/packages/{id}', [SubscriptionPackageController::class, 'update']);
             Route::delete('/packages/{id}', [SubscriptionPackageController::class, 'destroy']);
             
-            // Payments
+            // Payments — digunakan oleh InvoiceManagement & PaymentHistory
             Route::get('/payments', [PaymentController::class, 'index']);
             Route::post('/payments', [PaymentController::class, 'store']);
             Route::patch('/payments/{id}/status', [PaymentController::class, 'updateStatus']);
+            
+            // BE-06 FIX: Daftarkan BillingController yang sebelumnya orphan
+            Route::get('/invoices', [BillingController::class, 'invoices']);
+            Route::get('/payment-history', [BillingController::class, 'paymentHistory']);
+            Route::get('/statistics', [BillingController::class, 'statistics']);
         });
         
         // Platform Configuration
@@ -104,6 +116,9 @@ Route::prefix('super-admin')
             Route::get('/maintenance/status', [SystemController::class, 'getMaintenanceStatus']);
             Route::post('/maintenance', [SystemController::class, 'toggleMaintenanceMode']);
             Route::get('/backup', [SystemController::class, 'backupDatabase']);
+            Route::get('/health', [MonitoringController::class, 'systemHealth']);
+            Route::get('/metrics/queue', [MonitoringController::class, 'queueMetrics']);
+            Route::get('/monitoring/dashboard', [MonitoringController::class, 'dashboard']);
         });
         
         // Reports

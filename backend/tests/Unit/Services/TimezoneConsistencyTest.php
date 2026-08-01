@@ -14,7 +14,7 @@ class TimezoneConsistencyTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_school_timezone_instead_of_server_utc()
     {
         // 1. Setup School with Asia/Jakarta (UTC+7)
@@ -41,7 +41,7 @@ class TimezoneConsistencyTest extends TestCase
         $this->assertEquals('Asia/Jakarta', $schoolNow->timezoneName);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function helper_returns_correct_date_string()
     {
         $school = School::factory()->create(['timezone' => 'Asia/Tokyo']); // UTC+9
@@ -54,7 +54,7 @@ class TimezoneConsistencyTest extends TestCase
         $this->assertEquals('2026-05-21', $today);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generate_qr_uses_school_timezone_for_validity()
     {
         // Scenario: Student scans QR generated near midnight

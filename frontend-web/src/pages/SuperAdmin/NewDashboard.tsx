@@ -1311,6 +1311,10 @@ export const NewDashboard = () => {
 
                 {/* Page Content */}
                 <main className="p-4 md:p-6 flex-1 overflow-y-auto">
+                    {/* Mock data warning banner */}
+                    <div className="mb-4 px-4 py-3 rounded-lg bg-yellow-500/20 border border-yellow-500/40 text-yellow-300 text-sm font-medium">
+                        ⚠️ Dashboard V2 - Data masih menggunakan mock/contoh, belum terhubung ke API
+                    </div>
                     <motion.h1
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}

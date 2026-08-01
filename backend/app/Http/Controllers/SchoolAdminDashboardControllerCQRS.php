@@ -55,10 +55,11 @@ class SchoolAdminDashboardControllerCQRS extends Controller
     {
         $schoolId = $request->user()->school_id;
         $cacheKey = "dashboard_summary_cqrs_school_{$schoolId}";
+        $tz = school_timezone();
         
         // Cache for 60 seconds (read model updates asynchronously)
-        $summary = Cache::remember($cacheKey, 60, function () use ($schoolId) {
-            $today = Carbon::today();
+        $summary = Cache::remember($cacheKey, 60, function () use ($schoolId, $tz) {
+            $today = now()->timezone($tz)->startOfDay();
             
             // Get counts from main tables (lightweight)
             $school = School::withCount(['students', 'teachers'])->find($schoolId);
@@ -105,7 +106,8 @@ class SchoolAdminDashboardControllerCQRS extends Controller
     public function liveAttendance(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $today = Carbon::today();
+        $today = now()->timezone($tz)->startOfDay();
+        $tz = school_timezone();
         $grade = $request->input('grade');
         $classId = $request->input('class_id');
         
@@ -157,7 +159,8 @@ class SchoolAdminDashboardControllerCQRS extends Controller
     public function monthlyAttendanceStats(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $month = $request->input('month', Carbon::now()->format('Y-m'));
+        $tz = school_timezone();
+        $month = $request->input('month', now()->timezone(\school_timezone())->format('Y-m'));
         
         [$year, $monthNum] = explode('-', $month);
         $startDate = Carbon::create($year, $monthNum, 1)->startOfMonth();
@@ -211,7 +214,7 @@ class SchoolAdminDashboardControllerCQRS extends Controller
     public function classHealthAnalytics(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $thirtyDaysAgo = Carbon::today()->subDays(30);
+        $thirtyDaysAgo = now()->timezone($tz)->startOfDay()->subDays(30);
         
         $classes = Classroom::where('school_id', $schoolId)
             ->withCount('students')

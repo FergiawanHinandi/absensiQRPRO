@@ -11,10 +11,9 @@ use Tests\TestCase;
 
 /**
  * Unit tests for LoginRateLimiter
- *
- * @group auth
- * @group rate-limiting
  */
+#[\PHPUnit\Framework\Attributes\Group('auth')]
+#[\PHPUnit\Framework\Attributes\Group('rate-limiting')]
 class LoginRateLimiterTest extends TestCase
 {
     use RefreshDatabase;
@@ -50,9 +49,7 @@ class LoginRateLimiterTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function initial_attempts_returns_zero(): void
     {
         $request = $this->createRequest();
@@ -62,9 +59,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertEquals(0, $attempts);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function hit_increments_attempt_counter(): void
     {
         $request = $this->createRequest();
@@ -78,9 +73,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertEquals(2, $this->rateLimiter->attempts($request, 'test@example.com'));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function too_many_attempts_returns_false_under_threshold(): void
     {
         $request = $this->createRequest();
@@ -93,9 +86,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertFalse($this->rateLimiter->tooManyAttempts($request, 'test@example.com'));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function too_many_attempts_returns_true_at_threshold(): void
     {
         $request = $this->createRequest();
@@ -108,9 +99,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertTrue($this->rateLimiter->tooManyAttempts($request, 'test@example.com'));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function clear_resets_attempts(): void
     {
         $request = $this->createRequest();
@@ -128,9 +117,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertEquals(0, $this->rateLimiter->attempts($request, 'test@example.com'));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function record_failed_attempt_increments_user_counter(): void
     {
         $this->assertEquals(0, $this->user->failed_login_attempts);
@@ -142,9 +129,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertNotNull($this->user->last_failed_login_at);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function should_lock_user_returns_true_at_threshold(): void
     {
         $this->user->update(['failed_login_attempts' => 9]);
@@ -154,9 +139,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertTrue($this->rateLimiter->shouldLockUser($this->user));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function lock_account_sets_locked_until(): void
     {
         $this->assertNull($this->user->locked_until);
@@ -168,9 +151,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertTrue($this->user->locked_until->isFuture());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function is_account_locked_returns_true_when_locked(): void
     {
         $this->assertFalse($this->rateLimiter->isAccountLocked($this->user));
@@ -180,9 +161,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertTrue($this->rateLimiter->isAccountLocked($this->user));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function is_account_locked_returns_false_when_lock_expired(): void
     {
         $this->user->update(['locked_until' => now()->subMinutes(1)]);
@@ -194,9 +173,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertNull($this->user->locked_until);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function clear_account_attempts_resets_user_counters(): void
     {
         $this->user->update([
@@ -213,9 +190,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertNull($this->user->locked_until);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function lockout_remaining_seconds_returns_correct_value(): void
     {
         $this->user->update(['locked_until' => now()->addMinutes(5)]);
@@ -227,9 +202,7 @@ class LoginRateLimiterTest extends TestCase
         $this->assertLessThanOrEqual(300, $remaining);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function throttle_key_combines_email_and_ip(): void
     {
         $request1 = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '192.168.1.1']);

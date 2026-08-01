@@ -14,16 +14,14 @@ use Tests\TestCase;
 
 /**
  * Security Test: Tenant Isolation
- * 
  * Tests multi-tenant data isolation:
  * - School A cannot access School B data
  * - Global scopes filter by school_id
  * - API returns 403/404 for cross-tenant access
  * - Read models filtered by tenant
- * 
- * @group security
- * @group tenant-isolation
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('tenant-isolation')]
 class TenantIsolationTest extends TestCase
 {
     use RefreshDatabase;
@@ -61,9 +59,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-001: School A cannot access School B attendance
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_cross_tenant_attendance_access(): void
     {
         // Arrange
@@ -84,9 +81,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-002: School A cannot modify School B data
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_cross_tenant_data_modification(): void
     {
         // Arrange
@@ -113,9 +109,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-003: Global scope filters by school_id
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_applies_global_scope_for_tenant_filtering(): void
     {
         // Arrange
@@ -145,9 +140,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-004: Dashboard shows only own school data
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_shows_only_own_school_data_in_dashboard(): void
     {
         // Arrange
@@ -180,9 +174,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-005: Super admin can access all schools
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_super_admin_to_access_all_schools(): void
     {
         // Arrange
@@ -203,9 +196,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-006: Teacher cannot access other schools
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_teacher_from_accessing_other_schools(): void
     {
         // Arrange
@@ -222,9 +214,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-007: Student cannot access other schools
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_student_from_accessing_other_schools(): void
     {
         // Arrange
@@ -247,9 +238,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-008: Read model filtered by tenant
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_filters_read_model_by_tenant(): void
     {
         // Arrange
@@ -273,9 +263,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-009: API list endpoints filtered by tenant
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_filters_api_list_endpoints_by_tenant(): void
     {
         // Arrange
@@ -306,9 +295,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-010: Event listeners respect tenant context
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_respects_tenant_context_in_event_listeners(): void
     {
         // Arrange
@@ -351,9 +339,8 @@ class TenantIsolationTest extends TestCase
 
     /**
      * TI-011: Bulk operations respect tenant boundaries
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_respects_tenant_boundaries_in_bulk_operations(): void
     {
         // Arrange

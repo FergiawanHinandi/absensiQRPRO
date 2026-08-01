@@ -380,26 +380,33 @@ class DemoDataSeeder extends Seeder
                     default => 'present',
                 };
 
-                $exists = DB::table('attendances')
-                    ->where('schedule_id', $schedule->id)
+                $exists = \App\Models\Attendance::where('schedule_id', $schedule->id)
                     ->where('student_id', $studentId)
                     ->where('attendance_date', now()->toDateString())
                     ->exists();
 
                 if (! $exists) {
-                    DB::table('attendances')->insert([
+                    // Create attendance using state machine
+                    $attendance = \App\Models\Attendance::create([
                         'school_id' => $school->id,
                         'schedule_id' => $schedule->id,
                         'student_id' => $studentId,
                         'attendance_date' => now()->toDateString(),
-                        'status' => $status,
-                        'check_in_time' => $status === 'present' || $status === 'late' ? now()->subMinutes(rand(1, 10)) : null,
                         'is_manual' => $status !== 'present',
                         'notes' => $status === 'late' ? 'Terlambat' : null,
                         'recorded_by' => $admin->id,
-                        'created_at' => now(),
-                        'updated_at' => now(),
                     ]);
+
+                    // Use state machine methods for check-in
+                    if ($status === 'present' || $status === 'late') {
+                        $attendance->checkIn(
+                            recordedBy: $admin,
+                            latitude: -6.2088,
+                            longitude: 106.8456,
+                            deviceId: 'seeder-device'
+                        );
+                    }
+                    // For sick, permit, absent - leave in INIT state (default)
                 }
             }
         }

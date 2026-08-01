@@ -86,8 +86,8 @@ SaaS berbasis berlangganan dengan tiga tier:
 
 ## � Tech Stack
 
-### Backend (Laravel 12)
-- **Framework**: Laravel 12 (PHP 8.2+)
+### Backend (Laravel 11)
+- **Framework**: Laravel 11 (PHP 8.2+)
 - **Database**: PostgreSQL 15+ (SQLite untuk development)
 - **Cache**: Redis (opsional untuk development)
 - **Authentication**: Laravel Sanctum (JWT tokens)
@@ -165,10 +165,11 @@ npm run android  # atau npm run ios
 
 ```
 absensiQRPro/
-├── backend/                    # Laravel 12 API Backend
+├── backend/                    # Laravel 11 API Backend
 ├── frontend-web/               # React TypeScript Frontend  
 ├── AbsensiQRMobile/           # React Native Mobile App
 ├── docs/                      # Project Documentation
+├── _archived/                 # Archived prototypes (Flutter)
 ├── start-dev.bat             # Development launcher script
 └── README.md                 # Main project documentation
 ```
@@ -275,31 +276,8 @@ SESSION_DRIVER=redis
 
 # Security
 SANCTUM_STATEFUL_DOMAINS=yourdomain.com
-CORS_ALLOWED_ORIGINS=http
-
----
-
-## 🔐 Security Features
-
-1. **JWT Authentication** (Laravel Sanctum)
-2. **Role-based Authorization** (Spatie Permission)
-3. **CORS Protection**
-4. **Rate Limiting** (API throttling)
-5. **Input Validation** (Form Requests)
-6. **SQL Injection Prevention** (Eloquent ORM)
-7. **XSS Protection** (React escaping)
-8. **CSRF Protection** (SPA mode)
-
----
-
-## 📈 Performance Optimization
-
-- **Eager Loading** untuk avoid N+1 queries
-- **Database Indexing** pada foreign keys dan search columns
-- **Redis Caching** (optional, untuk scaling)
-- **Asset Optimization** (Vite bundling)
-- **Lazy Loading** React components
-- **WebSocket** untuk mengurangi polling HTTP
+CORS_ALLOWED_ORIGINS=https://yourdomain.com
+```
 
 ---
 
@@ -310,7 +288,6 @@ CORS_ALLOWED_ORIGINS=http
 - Some TypeScript `any` types in older components (being cleaned up)
 
 ### Planned Features
-- [ ] Mobile App (React Native/Flutter)
 - [ ] Advanced Analytics Dashboard
 - [ ] Parent Mobile App
 - [ ] SMS Notification (beside WhatsApp)
@@ -346,6 +323,4 @@ Developed with ❤️ using:
 ---
 
 **Version**: 1.0.0  
-**Last Updated**: 2026-01-23
-#   a b s e n s i Q R P R O  
- 
+**Last Updated**: 2026-06-02

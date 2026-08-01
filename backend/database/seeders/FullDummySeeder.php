@@ -267,19 +267,25 @@ class FullDummySeeder extends Seeder
                         $checkIn = null;
                     }
 
-                    // Skip recording randomly for realism
-                    // if (rand(1, 100) > 98) continue;
-
-                    DB::table('attendances')->insert([
+                    // Create attendance using state machine
+                    $attendance = \App\Models\Attendance::create([
                         'school_id' => $school->id,
                         'schedule_id' => $sch['id'],
                         'student_id' => $stuId,
                         'attendance_date' => $date->toDateString(),
-                        'status' => $status,
-                        'check_in_time' => $checkIn,
                         'is_manual' => in_array($status, ['sick', 'permission', 'alpha']),
-                        'created_at' => $date, 'updated_at' => $date,
                     ]);
+
+                    // Use state machine methods for check-in
+                    if ($checkIn !== null) {
+                        $attendance->checkIn(
+                            recordedBy: $admin,
+                            latitude: -6.2088,
+                            longitude: 106.8456,
+                            deviceId: 'seeder-device'
+                        );
+                    }
+                    // For sick, alpha - leave in INIT state (default)
                 }
             }
         }

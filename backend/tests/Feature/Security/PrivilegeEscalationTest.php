@@ -9,18 +9,15 @@ use Tests\TestCase;
 
 /**
  * Privilege Escalation Security Test
- *
  * Menguji ketahanan terhadap upaya kenaikan hak akses secara ilegal.
- * 
  * Scenarios:
  * 1. Role Modification (Horizontal & Vertical Escalation)
  * 2. Unauthorized Access to Super Admin Endpoints
  * 3. School Scope Bypass Attempt
  * 4. School ID Mutation Attempt
- * 
- * @group security
- * @group escalation
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('escalation')]
 class PrivilegeEscalationTest extends TestCase
 {
     use RefreshDatabase;

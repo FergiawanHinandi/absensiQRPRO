@@ -53,7 +53,7 @@ class HybridQrValidationTest extends TestCase
         $this->qrService = app(StudentQrService::class);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function active_student_with_valid_qr_can_be_validated()
     {
         // Arrange: Buat siswa aktif
@@ -84,7 +84,7 @@ class HybridQrValidationTest extends TestCase
         $this->assertEquals('hybrid_hmac_db', $result['validation_method']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function inactive_student_cannot_use_qr_even_if_signature_valid()
     {
         // Arrange: Buat siswa
@@ -114,7 +114,7 @@ class HybridQrValidationTest extends TestCase
         $this->validator->validateStudentQr($qrToken, $this->school1->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function transferred_student_cannot_use_old_qr_card()
     {
         // Arrange: Buat siswa di sekolah 1
@@ -144,7 +144,7 @@ class HybridQrValidationTest extends TestCase
         $this->validator->validateStudentQr($qrToken, $this->school1->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_scan_at_different_school()
     {
         // Arrange: Buat siswa di sekolah 1
@@ -171,7 +171,7 @@ class HybridQrValidationTest extends TestCase
         $this->validator->validateStudentQr($qrToken, $this->school2->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function deleted_student_cannot_use_qr()
     {
         // Arrange: Buat siswa
@@ -201,7 +201,7 @@ class HybridQrValidationTest extends TestCase
         $this->validator->validateStudentQr($qrToken, $this->school1->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validation_without_expected_school_still_checks_student_status()
     {
         // Arrange: Buat siswa tidak aktif
@@ -228,7 +228,7 @@ class HybridQrValidationTest extends TestCase
         $this->validator->validateStudentQr($qrToken, null);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function device_id_validation_allows_first_time_registration()
     {
         // Arrange: Siswa tanpa device_id
@@ -253,7 +253,7 @@ class HybridQrValidationTest extends TestCase
         $this->assertEquals($deviceId, $student->fresh()->device_id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function device_id_validation_rejects_different_device()
     {
         // Arrange: Siswa dengan device_id terdaftar
@@ -277,7 +277,7 @@ class HybridQrValidationTest extends TestCase
         $this->validator->validateDeviceId($student, $differentDeviceId);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function device_id_validation_accepts_same_device()
     {
         // Arrange: Siswa dengan device_id terdaftar
@@ -299,7 +299,7 @@ class HybridQrValidationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validation_logs_security_anomaly_for_inactive_student()
     {
         // Arrange: Siswa tidak aktif
@@ -330,7 +330,7 @@ class HybridQrValidationTest extends TestCase
         $this->assertTrue(true); // Placeholder - implement log assertion
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function hmac_layer_rejects_tampered_qr()
     {
         // Arrange: Buat QR valid
@@ -359,7 +359,7 @@ class HybridQrValidationTest extends TestCase
         $this->validator->validateStudentQr($tamperedQr, $this->school1->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function validation_returns_complete_student_data()
     {
         // Arrange

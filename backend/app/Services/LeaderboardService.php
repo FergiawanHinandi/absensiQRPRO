@@ -57,7 +57,7 @@ class LeaderboardService
         // Formula: (Present + Late) / Total Recorded * 100
         // We only consider students with at least 1 record to avoid 0/0
 
-        $results = DB::table('attendances')
+        $results = \App\Models\Attendance::query()
             ->join('users', 'attendances.student_id', '=', 'users.id')
             ->where('users.school_id', $schoolId)
             ->where('users.role', 'student') // Ensure only students
@@ -103,7 +103,7 @@ class LeaderboardService
     private function generateTopStudentStreaks($schoolId, $periodKey)
     {
         // Snapshot of current streaks
-        $students = DB::table('users')
+        $students = \App\Models\User::query()
             ->where('school_id', $schoolId)
             ->where('role', 'student')
             ->where('current_streak', '>', 0)
@@ -146,7 +146,7 @@ class LeaderboardService
         // or assumes structure: attendances.class_id is best if reliable.
         // Let's try to join via class_students active for now as a fallback or primary.
 
-        $results = DB::table('attendances')
+        $results = \App\Models\Attendance::query()
             ->join('class_students', 'attendances.student_id', '=', 'class_students.student_id')
             ->join('classes', 'class_students.class_id', '=', 'classes.id')
             ->where('classes.school_id', $schoolId)

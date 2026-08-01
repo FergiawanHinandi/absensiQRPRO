@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Exceptions\AttendanceException;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Traits\IDORProtection;
 use App\Http\Requests\Attendance\DailyReportRequest;
 use App\Http\Requests\Attendance\ManualAttendanceRequest;
 use App\Http\Requests\Attendance\ScanAttendanceRequest;
 use App\Services\AttendanceService;
+use App\Traits\UsesCacheTags;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -28,6 +30,8 @@ use Illuminate\Support\Facades\Log;
  */
 class AttendanceController extends Controller
 {
+    use IDORProtection, UsesCacheTags;
+
     public function __construct(
         private AttendanceService $attendanceService,
         private \App\Services\AttendanceCheckInService $checkInService
@@ -163,41 +167,40 @@ class AttendanceController extends Controller
     public function manual(ManualAttendanceRequest $request)
     {
         $validated = $request->validated();
-        
-        // ZERO-TRUST: Policy Check
-        // Ensure user has permission for specific schedule
-        $schedule = \App\Models\Schedule::findOrFail($validated['schedule_id']);
-        \Illuminate\Support\Facades\Gate::authorize('manualEntry', [\App\Models\Attendance::class, $schedule]);
 
-        // SECURITY: Validate student and schedule belong to same school
+        // SECURITY: Validate student belongs to authenticated user's school
         $student = $this->validateSchoolOwnershipById(
             \App\Models\User::class,
             $validated['student_id'],
             'Siswa tidak ditemukan atau bukan milik sekolah Anda.'
         );
 
+        // SECURITY: Validate schedule belongs to same school (single query — replaces previous double-query)
         $schedule = $this->validateSchoolOwnershipById(
             \App\Models\Schedule::class,
             $validated['schedule_id'],
             'Jadwal tidak ditemukan atau bukan milik sekolah Anda.'
         );
 
+        // ZERO-TRUST: Policy Check using already-loaded schedule
+        \Illuminate\Support\Facades\Gate::authorize('manualEntry', [\App\Models\Attendance::class, $schedule]);
+
         // BUSINESS LOGIC: Delegated to service layer
         $attendance = $this->checkInService->manualCheckIn(
             [
-                'school_id' => $request->user()->school_id,
-                'student_id' => $validated['student_id'],
-                'schedule_id' => $validated['schedule_id'],
+                'school_id'       => $request->user()->school_id,
+                'student_id'      => $validated['student_id'],
+                'schedule_id'     => $validated['schedule_id'],
                 'attendance_date' => $validated['attendance_date'],
-                'status' => $validated['status'],
-                'notes' => $validated['notes'] ?? null,
+                'status'          => $validated['status'],
+                'notes'           => $validated['notes'] ?? null,
             ],
             $request->user()->id
         );
 
         return response()->json([
             'success' => true,
-            'data' => [
+            'data'    => [
                 'attendance' => $attendance,
             ],
             'message' => 'Absensi manual berhasil disimpan',
@@ -253,7 +256,7 @@ class AttendanceController extends Controller
             'schedule.teacher:id,name'
         ])
             ->where('schedule_id', $scheduleId)
-            ->where('attendance_date', now()->toDateString())
+            ->where('attendance_date', now()->timezone(auth()->user()->school->timezone ?? config('app.timezone'))->toDateString())
             ->get()
             ->keyBy('student_id');
 
@@ -293,7 +296,7 @@ class AttendanceController extends Controller
 
         // SECURITY FIX: Validate date format before parsing to prevent exception
         $dateParam = $request->query('date');
-        $today = now()->toDateString();
+        $today = now()->timezone($request->user()->school->timezone ?? config('app.timezone'))->toDateString();
 
         if ($dateParam) {
             // Validate date format (YYYY-MM-DD)

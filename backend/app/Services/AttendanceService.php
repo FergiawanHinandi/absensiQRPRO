@@ -147,8 +147,7 @@ class AttendanceService
             throw new AttendanceException('Sesi ini tidak aktif dan tidak dapat digunakan untuk absensi.');
         }
 
-        // 6. Get school timezone for accurate time validation
-        $schoolTimezone = $teacher->school->timezone ?? 'Asia/Jakarta';
+        $schoolTimezone = $teacher->school->timezone ?? config('app.timezone');
         $now = \Carbon\Carbon::now($schoolTimezone);
         
         // 7. Validate day_of_week matches today
@@ -443,13 +442,18 @@ class AttendanceService
                 ],
                 [
                     'status' => $data['status'],
-                    'check_in_time' => now()->format('H:i:s'),
+                    'check_in_time' => now()->timezone($student->school->timezone ?? config('app.timezone'))->format('H:i:s'),
                     'is_manual' => true,
                     'attendance_type' => 'manual',
                     'recorded_by' => $recordedBy,
                     'notes' => $data['notes'] ?? null,
                 ]
             );
+
+            // Check if attendance already existed (constraint violation handling)
+            if (!$attendance->wasRecentlyCreated) {
+                throw new AttendanceException('Absensi untuk siswa ini pada jadwal dan tanggal tersebut sudah ada.');
+            }
 
             // Log manual attendance
             Log::channel('audit')->info('manual_attendance_created', [
@@ -458,7 +462,7 @@ class AttendanceService
                 'schedule_id' => $schedule->id,
                 'recorded_by' => $recordedBy,
                 'school_id' => $schoolId,
-                'timestamp' => now(),
+                'timestamp' => now()->timezone($student->school->timezone ?? config('app.timezone')),
             ]);
 
             DB::commit();
@@ -521,7 +525,7 @@ class AttendanceService
         }
 
         $validStatuses = ['present', 'late', 'sick', 'permit', 'alpha'];
-        $today = now()->format('Y-m-d');
+        $today = now()->timezone($teacher->school->timezone ?? config('app.timezone'))->format('Y-m-d');
         $created = 0;
         $updated = 0;
         $errors = [];
@@ -567,7 +571,7 @@ class AttendanceService
                     ],
                     [
                         'status' => $status,
-                        'check_in_time' => now()->format('H:i:s'),
+                        'check_in_time' => now()->timezone($teacher->school->timezone ?? config('app.timezone'))->format('H:i:s'),
                         'is_manual' => true,
                         'attendance_type' => 'manual',
                         'recorded_by' => $teacher->id,
@@ -598,7 +602,7 @@ class AttendanceService
                 'created' => $created,
                 'updated' => $updated,
                 'errors_count' => count($errors),
-                'timestamp' => now(),
+                'timestamp' => now()->timezone($teacher->school->timezone ?? config('app.timezone')),
             ]);
 
             DB::commit();

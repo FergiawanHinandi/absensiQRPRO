@@ -36,7 +36,8 @@ class StudentRiskAnalysisService
      */
     public function getRiskOverview(int $schoolId): array
     {
-        $cacheKey = "risk_overview_{$schoolId}_".now()->format('Y-m-d');
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
+        $cacheKey = "risk_overview_{$schoolId}_".now()->timezone($tz)->format('Y-m-d');
 
         return Cache::remember($cacheKey, 3600, function () use ($schoolId) {
             return [
@@ -55,8 +56,9 @@ class StudentRiskAnalysisService
      */
     public function getTotalStudentsByRisk(int $schoolId): array
     {
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
         // Calculate attendance percentage for each student in last 30 days
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        $thirtyDaysAgo = now()->timezone($tz)->subDays(30);
 
         $studentRisks = DB::select("
             WITH student_attendance AS (
@@ -137,7 +139,8 @@ class StudentRiskAnalysisService
      */
     public function getClassesWithHighRisk(int $schoolId): array
     {
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
+        $thirtyDaysAgo = now()->timezone($tz)->subDays(30);
 
         $classRisks = DB::select("
             WITH student_risk_by_class AS (
@@ -220,11 +223,12 @@ class StudentRiskAnalysisService
      */
     public function getRiskTrend30Days(int $schoolId): array
     {
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
         $trends = [];
 
         // Calculate risk for each of the last 30 days
         for ($i = 29; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i);
+            $date = now()->timezone($tz)->subDays($i);
             $weekStart = $date->copy()->subDays(6); // 7-day rolling window
 
             $dailyRisk = DB::select("
@@ -287,7 +291,8 @@ class StudentRiskAnalysisService
      */
     public function getCriticalStudents(int $schoolId): array
     {
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
+        $thirtyDaysAgo = now()->timezone($tz)->subDays(30);
 
         $criticalStudents = DB::select("
             SELECT 
@@ -344,7 +349,7 @@ class StudentRiskAnalysisService
                 ],
                 'last_attendance_date' => $student->last_attendance_date,
                 'days_since_last_attendance' => $student->last_attendance_date
-                    ? Carbon::parse($student->last_attendance_date)->diffInDays(now())
+                    ? Carbon::parse($student->last_attendance_date)->diffInDays(now()->timezone($tz))
                     : null,
                 'risk_level' => 'critical',
                 'action_required' => $this->getActionRequired($student->attendance_percentage, $student->alpha_days),
@@ -357,7 +362,8 @@ class StudentRiskAnalysisService
      */
     public function getSummaryStats(int $schoolId): array
     {
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
+        $thirtyDaysAgo = now()->timezone($tz)->subDays(30);
 
         $stats = DB::select("
             WITH school_stats AS (
@@ -402,7 +408,7 @@ class StudentRiskAnalysisService
             'school_avg_attendance_rate' => (float) ($stat->school_avg_attendance_rate ?? 0),
             'analysis_period' => '30 days',
             'analysis_start_date' => $thirtyDaysAgo->format('Y-m-d'),
-            'analysis_end_date' => now()->format('Y-m-d'),
+            'analysis_end_date' => now()->timezone($tz)->format('Y-m-d'),
         ];
     }
 
@@ -423,7 +429,8 @@ class StudentRiskAnalysisService
      */
     public function getStudentsByRiskLevel(int $schoolId, string $riskLevel, ?int $classId = null, int $limit = 20): array
     {
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
+        $thirtyDaysAgo = now()->timezone($tz)->subDays(30);
         $parentWarningService = app(ParentEarlyWarningService::class);
         // Build threshold conditions based on risk level
         $thresholdCondition = match ($riskLevel) {
@@ -499,7 +506,7 @@ class StudentRiskAnalysisService
                 ],
                 'last_attendance_date' => $student->last_attendance_date,
                 'days_since_last_attendance' => $student->last_attendance_date
-                    ? Carbon::parse($student->last_attendance_date)->diffInDays(now())
+                    ? Carbon::parse($student->last_attendance_date)->diffInDays(now()->timezone($tz))
                     : null,
                 'risk_level' => $riskLevel,
                 'action_required' => $this->getActionRequired($student->attendance_percentage, $student->alpha_days),
@@ -512,6 +519,7 @@ class StudentRiskAnalysisService
      */
     public function getRiskTrendData(int $schoolId, int $days = 30): array
     {
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
         return $this->getRiskTrend30Days($schoolId); // Reuse existing method
     }
 
@@ -520,6 +528,7 @@ class StudentRiskAnalysisService
      */
     public function getExportData(int $schoolId, bool $includeDetails = false): array
     {
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
         $overview = $this->getRiskOverview($schoolId);
 
         $exportData = [

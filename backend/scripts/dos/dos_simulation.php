@@ -33,7 +33,7 @@ for ($i = 0; $i < 100; $i++) {
     $payload = [
         'student_id' => $i + 1, // User 1-100
         'schedule_id' => 1,
-        'attendance_date' => date('Y-m-d'),
+        'attendance_date' => \App\Helpers\TimezoneHelper::now()->toDateString(),
         'status' => 'present'
     ];
     
@@ -80,7 +80,7 @@ for ($i = 0; $i < 50; $i++) {
     $payload = [
         'student_id' => $studentId, 
         'schedule_id' => 1,
-        'attendance_date' => date('Y-m-d'),
+        'attendance_date' => \App\Helpers\TimezoneHelper::now()->toDateString(),
         'status' => 'present'
     ];
     

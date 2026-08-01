@@ -11,9 +11,7 @@ use Tests\TestCase;
 
 /**
  * AttendanceStateMachineTest
- *
  * Comprehensive test suite for Attendance Aggregate Root and State Machine.
- *
  * COVERAGE:
  * - All valid state transitions
  * - All invalid state transitions
@@ -23,10 +21,9 @@ use Tests\TestCase;
  * - Direct status modification blocking
  * - Transaction rollback on failure
  * - Audit trail logging
- *
- * @group attendance
- * @group state-machine
  */
+#[\PHPUnit\Framework\Attributes\Group('attendance')]
+#[\PHPUnit\Framework\Attributes\Group('state-machine')]
 class AttendanceStateMachineTest extends TestCase
 {
     use RefreshDatabase;
@@ -50,7 +47,7 @@ class AttendanceStateMachineTest extends TestCase
     // VALID TRANSITIONS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_can_transition_from_init_to_checked_in()
     {
         $attendance = Attendance::factory()->create([
@@ -74,7 +71,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('present', $attendance->status); // Legacy status synced
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_can_transition_from_checked_in_to_checked_out()
     {
         $attendance = Attendance::factory()->create([
@@ -98,7 +95,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('present', $attendance->status); // Legacy status synced
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_can_transition_from_checked_out_to_pending_approval()
     {
         $attendance = Attendance::factory()->create([
@@ -115,7 +112,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('pending', $attendance->status); // Legacy status synced
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_can_transition_from_pending_approval_to_approved()
     {
         $attendance = Attendance::factory()->create([
@@ -132,7 +129,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('present', $attendance->status); // Legacy status synced
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_can_transition_from_pending_approval_to_rejected()
     {
         $attendance = Attendance::factory()->create([
@@ -149,7 +146,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('rejected', $attendance->status); // Legacy status synced
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_can_transition_from_rejected_to_pending_approval_for_retry()
     {
         $attendance = Attendance::factory()->create([
@@ -167,7 +164,7 @@ class AttendanceStateMachineTest extends TestCase
     // INVALID TRANSITIONS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_check_in_twice()
     {
         $attendance = Attendance::factory()->create([
@@ -181,7 +178,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkIn($this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_check_in_after_check_out()
     {
         $attendance = Attendance::factory()->create([
@@ -195,7 +192,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkIn($this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_check_out_before_check_in()
     {
         $attendance = Attendance::factory()->create([
@@ -209,7 +206,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkOut($this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_request_correction_before_check_out()
     {
         $attendance = Attendance::factory()->create([
@@ -222,7 +219,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->requestCorrection($this->student, 'Some reason');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_approve_before_pending()
     {
         $attendance = Attendance::factory()->create([
@@ -235,7 +232,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->approve($this->admin);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_reject_before_pending()
     {
         $attendance = Attendance::factory()->create([
@@ -248,7 +245,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->reject($this->admin, 'Some reason');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_modify_approved_state()
     {
         $attendance = Attendance::factory()->create([
@@ -261,7 +258,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->requestCorrection($this->student, 'Try to modify approved');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_transition_from_init_to_checked_out()
     {
         $attendance = Attendance::factory()->create([
@@ -274,7 +271,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkOut($this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cannot_transition_from_init_to_pending_approval()
     {
         $attendance = Attendance::factory()->create([
@@ -291,7 +288,7 @@ class AttendanceStateMachineTest extends TestCase
     // DIRECT MODIFICATION BLOCKING
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_status_modification_via_update()
     {
         $attendance = Attendance::factory()->create([
@@ -305,7 +302,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->update(['status' => 'present']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_state_modification_via_update()
     {
         $attendance = Attendance::factory()->create([
@@ -319,7 +316,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->update(['state' => AttendanceState::CHECKED_IN]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_status_modification_via_attribute_setter()
     {
         $attendance = Attendance::factory()->create([
@@ -333,7 +330,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->save();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_state_modification_via_attribute_setter()
     {
         $attendance = Attendance::factory()->create([
@@ -351,7 +348,7 @@ class AttendanceStateMachineTest extends TestCase
     // TRANSACTION ROLLBACK
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rolls_back_transaction_on_invalid_transition()
     {
         $attendance = Attendance::factory()->create([
@@ -380,7 +377,7 @@ class AttendanceStateMachineTest extends TestCase
     // AUDIT TRAIL
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_state_transitions()
     {
         $attendance = Attendance::factory()->create([
@@ -402,7 +399,7 @@ class AttendanceStateMachineTest extends TestCase
     // STATE INSPECTION METHODS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_provides_state_inspection_methods()
     {
         $attendance = Attendance::factory()->create([
@@ -420,7 +417,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertTrue($attendance->countsAsPresent());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_identifies_final_state()
     {
         $attendance = Attendance::factory()->create([
@@ -437,7 +434,7 @@ class AttendanceStateMachineTest extends TestCase
     // COMPLETE WORKFLOW TESTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_completes_full_happy_path_workflow()
     {
         // 1. Create attendance in INIT state
@@ -465,7 +462,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertTrue($attendance->isFinalState());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_completes_rejection_and_retry_workflow()
     {
         // 1. Create attendance and go to PENDING_APPROVAL
@@ -494,7 +491,7 @@ class AttendanceStateMachineTest extends TestCase
     // LEGACY STATUS SYNC
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_syncs_legacy_status_field_on_state_change()
     {
         $attendance = Attendance::factory()->create([
@@ -521,7 +518,7 @@ class AttendanceStateMachineTest extends TestCase
     // GUARD TESTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function status_and_state_are_not_in_fillable()
     {
         $fillable = (new Attendance())->getFillable();
@@ -530,7 +527,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertNotContains('state', $fillable);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function status_and_state_are_in_guarded()
     {
         $guarded = (new Attendance())->getGuarded();

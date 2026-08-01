@@ -24,7 +24,28 @@ class EloquentAttendanceRepository implements AttendanceRepositoryInterface
 
     public function create(array $data): Attendance
     {
-        return Attendance::create($data);
+        // Use firstOrCreate to prevent duplicates
+        // Extract unique keys for the constraint
+        $uniqueKeys = [
+            'student_id' => $data['student_id'],
+            'schedule_id' => $data['schedule_id'],
+            'attendance_date' => $data['attendance_date'],
+            'school_id' => $data['school_id'],
+        ];
+
+        // Remove unique keys from data to avoid duplication
+        $attributes = array_diff_key($data, $uniqueKeys);
+
+        $attendance = Attendance::firstOrCreate($uniqueKeys, $attributes);
+
+        // Check if attendance already existed (constraint violation handling)
+        if (!$attendance->wasRecentlyCreated) {
+            throw new \App\Exceptions\AttendanceException(
+                'Attendance record already exists for this student, schedule, and date.'
+            );
+        }
+
+        return $attendance;
     }
 
     public function find(int $id): ?Attendance

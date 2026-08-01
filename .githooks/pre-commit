@@ -42,8 +42,9 @@ if git diff --cached | grep -E "^\+.*APP_KEY=base64:[A-Za-z0-9+/]{40,}" > /dev/n
     SECRETS_FOUND=1
 fi
 
-# Pattern 2: Database passwords (not placeholder, not CI/CD variable)
-if git diff --cached | grep -E "^\+.*DB_PASSWORD=[^'\"]*[a-zA-Z0-9]{8,}" | grep -v "your-secure-password" | grep -v '\${{' | grep -v "DB_PASSWORD=$" > /dev/null; then
+# Pattern 2: Database passwords (not placeholder, not CI/CD variable,
+# not a comment placeholder like 'DB_PASSWORD=# ...', not shell expansion like '$DB_PASSWORD')
+if git diff --cached | grep -E "^\+.*DB_PASSWORD=[^'\"]*[a-zA-Z0-9]{8,}" | grep -v "your-secure-password" | grep -v '\${{' | grep -v "DB_PASSWORD=$" | grep -v "DB_PASSWORD=#" | grep -v '\$DB_' > /dev/null; then
     echo -e "${RED}❌ BLOCKED: DB_PASSWORD with actual value detected!${NC}"
     echo -e "${YELLOW}   Never commit real database passwords${NC}"
     SECRETS_FOUND=1

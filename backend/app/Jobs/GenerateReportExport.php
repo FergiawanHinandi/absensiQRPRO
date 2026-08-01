@@ -7,11 +7,6 @@ use App\Models\Attendance;
 use App\Models\ReportExport;
 use App\Models\School;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
@@ -21,11 +16,16 @@ use Maatwebsite\Excel\Facades\Excel;
  *
  * This job handles heavy report generation (Excel/PDF) in the background
  * to prevent API timeout and improve user experience.
+ * 
+ * TENANT SAFETY:
+ * - Extends TenantAwareJob to ensure school_id context
+ * - Validates ReportExport belongs to the correct school
+ * - All queries are scoped to the school_id
+ * 
+ * @version 2.0.0 - Updated to extend TenantAwareJob for tenant safety
  */
-class GenerateReportExport implements ShouldQueue
+class GenerateReportExport extends TenantAwareJob
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
     /**
      * The number of times the job may be attempted.
      */
@@ -42,22 +42,47 @@ class GenerateReportExport implements ShouldQueue
     public int $backoff = 60;
 
     /**
-     * Create a new job instance.
+     * The report export ID
      */
-    public function __construct(
-        public ReportExport $reportExport
-    ) {}
+    protected int $reportExportId;
+
+    /**
+     * Create a new job instance.
+     *
+     * @param int $schoolId School ID for tenant context (REQUIRED for tenant safety)
+     * @param int $reportExportId Report export record ID
+     */
+    public function __construct(int $schoolId, int $reportExportId)
+    {
+        parent::__construct($schoolId);
+        $this->reportExportId = $reportExportId;
+    }
 
     /**
      * Execute the job.
      */
     public function handle(): void
     {
-        $export = $this->reportExport;
+        // Load the report export
+        $export = ReportExport::findOrFail($this->reportExportId);
+
+        // ✅ TENANT SAFETY: Validate export belongs to this school
+        if ($export->school_id !== $this->schoolId) {
+            Log::error('Tenant context violation in GenerateReportExport', [
+                'job_school_id' => $this->schoolId,
+                'export_school_id' => $export->school_id,
+                'export_id' => $this->reportExportId,
+            ]);
+            throw new \RuntimeException(
+                "Tenant context violation: ReportExport {$this->reportExportId} belongs to school {$export->school_id} " .
+                "but job is for school {$this->schoolId}"
+            );
+        }
 
         try {
             Log::info('Starting report export', [
                 'export_id' => $export->id,
+                'school_id' => $this->schoolId,
                 'type' => $export->type,
                 'format' => $export->format,
             ]);
@@ -81,13 +106,15 @@ class GenerateReportExport implements ShouldQueue
 
             Log::info('Report export completed', [
                 'export_id' => $export->id,
+                'school_id' => $this->schoolId,
                 'file_path' => $result['path'],
                 'file_size' => $result['size'],
             ]);
 
         } catch (\Exception $e) {
             Log::error('Report export failed', [
-                'export_id' => $export->id,
+                'export_id' => $this->reportExportId,
+                'school_id' => $this->schoolId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -105,7 +132,9 @@ class GenerateReportExport implements ShouldQueue
     private function generateAttendanceReport(ReportExport $export): array
     {
         $params = $export->parameters;
-        $schoolId = $export->school_id;
+        
+        // ✅ TENANT SAFETY: Use job's school_id, not from params
+        $schoolId = $this->schoolId;
 
         $export->updateProgress(10);
 
@@ -163,7 +192,7 @@ class GenerateReportExport implements ShouldQueue
     {
         $export->updateProgress(20);
 
-        // Query attendance data
+        // ✅ TENANT SAFETY: Query attendance data with explicit school_id filter
         $query = Attendance::with(['student', 'schedule.class', 'schedule.subject'])
             ->where('school_id', $schoolId)
             ->whereBetween('attendance_date', [$params['start_date'], $params['end_date']]);
@@ -235,13 +264,24 @@ class GenerateReportExport implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         Log::error('Report export job failed permanently', [
-            'export_id' => $this->reportExport->id,
+            'export_id' => $this->reportExportId,
+            'school_id' => $this->schoolId,
             'error' => $exception->getMessage(),
         ]);
 
-        $this->reportExport->markAsFailed(
-            "Export gagal setelah {$this->tries} percobaan: ".$exception->getMessage()
-        );
+        try {
+            $export = ReportExport::find($this->reportExportId);
+            if ($export) {
+                $export->markAsFailed(
+                    "Export gagal setelah {$this->tries} percobaan: ".$exception->getMessage()
+                );
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to mark export as failed', [
+                'export_id' => $this->reportExportId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -252,5 +292,17 @@ class GenerateReportExport implements ShouldQueue
         return [
             (new \Illuminate\Queue\Middleware\RateLimited('heavy_jobs')),
         ];
+    }
+
+    /**
+     * Get the tags that should be assigned to the job.
+     */
+    public function tags(): array
+    {
+        return array_merge(parent::tags(), [
+            'export',
+            'report',
+            "export:{$this->reportExportId}",
+        ]);
     }
 }

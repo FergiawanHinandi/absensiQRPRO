@@ -128,7 +128,10 @@ class StudentCardService
         $generated = 0;
         $skipped = 0;
         $regenerated = 0;
+        $pdfPaths = [];
         $studentCount = $students->count();
+
+        $qrAvailable = class_exists('\\SimpleSoftwareIO\\QrCode\\Facades\\QrCode');
 
         foreach ($students as $student) {
             $total++;
@@ -139,7 +142,6 @@ class StudentCardService
             if ($activeCard) {
                 if (! $forceRegenerate) {
                     $skipped++;
-
                     continue;
                 }
                 $this->regenerateCard($student, $admin, 'Bulk regenerate');
@@ -148,56 +150,59 @@ class StudentCardService
                 $this->generateCard($student, $admin);
                 $generated++;
             }
-            // Generate PDF for each student
-            $card = StudentCard::where('student_id', $student->id)->where('is_active', true)->first();
-            if ($card) {
-                // Decrypt token (it's automatically encrypted by model cast, so accessing it decrypts it if using encrypted cast)
-                // However, generateCard returns plain_token separately because model might hash it. 
-                // Let's assume we need to regenerate plain token or redundant retrieval if encryption is one-way.
-                // Based on generateCard logic: 'qr_token_encrypted' => $plainToken.
-                // If cast is 'encrypted', accessing $card->qr_token_encrypted returns decrypted string.
-                $token = $card->qr_token_encrypted;
 
-                $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(200)->generate($token);
-                $qrBase64 = 'data:image/png;base64,' . base64_encode($qrCode);
+            // Generate PDF for each student (skip if QR package not available)
+            if ($qrAvailable) {
+                try {
+                    $card = StudentCard::where('student_id', $student->id)->where('is_active', true)->first();
+                    if ($card) {
+                        $token = $card->qr_token_encrypted;
+                        $qrCode = \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(200)->generate($token);
+                        $qrBase64 = 'data:image/png;base64,' . base64_encode($qrCode);
 
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.student-card', [
-                    'student' => $student,
-                    'qrCode' => $qrBase64,
-                    'card' => $card,
-                    'school' => $student->school
-                ]);
+                        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.student-card', [
+                            'student' => $student,
+                            'qrCode' => $qrBase64,
+                            'card' => $card,
+                            'school' => $student->school
+                        ]);
 
-                $filename = 'card_' . preg_replace('/[^a-zA-Z0-9]/', '_', $student->name) . '_' . $student->nis . '.pdf';
-                $path = 'temp/cards/' . $filename;
-                \Illuminate\Support\Facades\Storage::put($path, $pdf->output());
-                $pdfPaths[] = $path;
-            }
-        }
-
-        // Create Zip archive
-        $zipFileName = 'student_cards_batch_' . now()->format('Ymd_His') . '.zip';
-        $zipPath = storage_path('app/temp/' . $zipFileName);
-        
-        // Ensure temp directory exists
-        if (!file_exists(dirname($zipPath))) {
-            mkdir(dirname($zipPath), 0755, true);
-        }
-
-        $zip = new \ZipArchive;
-        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
-            foreach ($pdfPaths as $pdfFile) {
-                if (\Illuminate\Support\Facades\Storage::exists($pdfFile)) {
-                    $zip->addFile(storage_path('app/' . $pdfFile), basename($pdfFile));
+                        $filename = 'card_' . preg_replace('/[^a-zA-Z0-9]/', '_', $student->name) . '_' . $student->nis . '.pdf';
+                        $path = 'temp/cards/' . $filename;
+                        \Illuminate\Support\Facades\Storage::put($path, $pdf->output());
+                        $pdfPaths[] = $path;
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('PDF generation skipped for student ' . $student->id . ': ' . $e->getMessage());
                 }
             }
-            $zip->close();
-
-            // Cleanup temp PDFs
-            \Illuminate\Support\Facades\Storage::delete($pdfPaths);
-        } else {
-            \Illuminate\Support\Facades\Log::error('Failed to create ZIP archive for student cards');
         }
+
+        $zipFileName = null;
+        // Create Zip archive only if PDFs were generated
+        if (!empty($pdfPaths)) {
+            $zipFileName = 'student_cards_batch_' . now()->format('Ymd_His') . '.zip';
+            $zipPath = storage_path('app/temp/' . $zipFileName);
+
+            if (!file_exists(dirname($zipPath))) {
+                mkdir(dirname($zipPath), 0755, true);
+            }
+
+            $zip = new \ZipArchive;
+            if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
+                foreach ($pdfPaths as $pdfFile) {
+                    if (\Illuminate\Support\Facades\Storage::exists($pdfFile)) {
+                        $zip->addFile(storage_path('app/' . $pdfFile), basename($pdfFile));
+                    }
+                }
+                $zip->close();
+                \Illuminate\Support\Facades\Storage::delete($pdfPaths);
+            } else {
+                Log::error('Failed to create ZIP archive for student cards');
+                $zipFileName = null;
+            }
+        }
+
         Log::channel('audit')->info('bulk_student_card_generation', [
             'admin_id' => $admin->id,
             'filters_used' => $filters,
@@ -215,6 +220,7 @@ class StudentCardService
             'cards_skipped' => $skipped,
             'cards_regenerated' => $regenerated,
             'zip_path' => $zipFileName,
+            'pdf_generated' => !empty($pdfPaths),
         ];
     }
 

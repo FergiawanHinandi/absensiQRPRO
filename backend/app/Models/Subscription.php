@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use App\Traits\BelongsToSchool;
 
 /**
  * Subscription Model
@@ -29,6 +30,7 @@ use Carbon\Carbon;
 class Subscription extends Model
 {
     use HasFactory;
+    use BelongsToSchool; // Multi-tenancy: otomatis filter berdasarkan school_id
 
     protected $fillable = [
         'school_id',

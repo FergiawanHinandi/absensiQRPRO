@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { FileText, Download, Calendar, FileSpreadsheet } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { FileText, Download, Calendar, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
+import { useExportJob } from '../../hooks/useExportJob';
 import { useDailyReport } from '../../modules/admin/hooks';
 import { useMonthlyReport, useAdminClasses } from '../../modules/admin/hooks/useAdminService';
-import * as adminService from '../../services/adminService';
 import showToast from '../../utils/toast';
 
 const AdminReports: React.FC = () => {
@@ -16,7 +16,11 @@ const AdminReports: React.FC = () => {
 
     const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [exportType, setExportType] = useState<'daily' | 'monthly'>('daily');
-    const [isExporting, setIsExporting] = useState(false);
+
+    const { exportJob, isPolling, startExport, downloadExport, resetExport } = useExportJob({
+        onComplete: () => {},
+        onError: (msg) => console.error('Export failed:', msg),
+    });
 
     const { data: dailyData, isLoading: dailyLoading, error: dailyError } = useDailyReport(selectedDate);
     const { data: monthlyData, isLoading: monthlyLoading } = useMonthlyReport(
@@ -25,86 +29,38 @@ const AdminReports: React.FC = () => {
     );
     const { data: classData } = useAdminClasses();
 
-    const handleExportPDF = async () => {
-        setIsExporting(true);
-        try {
-            const params: any = {
-                report_type: exportType,
-            };
+    const getExportParams = useCallback(() => {
+        const params: any = {
+            format: 'pdf' as const,
+        };
 
-            if (exportType === 'daily') {
-                params.start_date = selectedDate;
-                params.end_date = selectedDate;
-            } else {
-                const [year, month] = selectedMonth.split('-');
-                const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-                params.start_date = `${year}-${month}-01`;
-                params.end_date = `${year}-${month}-${lastDay}`;
-            }
-
-            if (selectedClassId) {
-                params.class_id = parseInt(selectedClassId);
-            }
-
-            const blob = await adminService.exportReportPDF(params);
-
-            // Download file
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `laporan-${exportType}-${exportType === 'daily' ? selectedDate : selectedMonth}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            showToast.success('Laporan PDF berhasil diunduh');
-        } catch (error: any) {
-            showToast.error(error?.response?.data?.message || 'Gagal mengunduh laporan PDF');
-        } finally {
-            setIsExporting(false);
+        if (exportType === 'daily') {
+            params.start_date = selectedDate;
+            params.end_date = selectedDate;
+        } else {
+            const [year, month] = selectedMonth.split('-');
+            const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+            params.start_date = `${year}-${month}-01`;
+            params.end_date = `${year}-${month}-${lastDay}`;
         }
+
+        if (selectedClassId) {
+            params.class_id = parseInt(selectedClassId);
+        }
+
+        return params;
+    }, [exportType, selectedDate, selectedMonth, selectedClassId]);
+
+    const handleExportPDF = async () => {
+        const params = getExportParams();
+        params.format = 'pdf';
+        await startExport(params);
     };
 
     const handleExportExcel = async () => {
-        setIsExporting(true);
-        try {
-            const params: any = {
-                report_type: exportType,
-            };
-
-            if (exportType === 'daily') {
-                params.start_date = selectedDate;
-                params.end_date = selectedDate;
-            } else {
-                const [year, month] = selectedMonth.split('-');
-                const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-                params.start_date = `${year}-${month}-01`;
-                params.end_date = `${year}-${month}-${lastDay}`;
-            }
-
-            if (selectedClassId) {
-                params.class_id = parseInt(selectedClassId);
-            }
-
-            const blob = await adminService.exportReportExcel(params);
-
-            // Download file
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `laporan-${exportType}-${exportType === 'daily' ? selectedDate : selectedMonth}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            showToast.success('Laporan Excel berhasil diunduh');
-        } catch (error: any) {
-            showToast.error(error?.response?.data?.message || 'Gagal mengunduh laporan Excel');
-        } finally {
-            setIsExporting(false);
-        }
+        const params = getExportParams();
+        params.format = 'excel';
+        await startExport(params);
     };
 
     if (dailyLoading && !dailyData) {
@@ -207,22 +163,111 @@ const AdminReports: React.FC = () => {
                 {/* Export Buttons */}
                 <div className="flex flex-wrap gap-3">
                     <button
-                        onClick={handleExportPDF}
-                        disabled={isExporting}
-                        className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={exportJob?.status === 'completed' ? downloadExport : handleExportPDF}
+                        disabled={isPolling}
+                        className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+                            exportJob?.status === 'completed'
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
                     >
-                        <FileText className="w-5 h-5" />
-                        {isExporting ? 'Memproses...' : 'Export PDF'}
+                        {isPolling ? (
+                            <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                {exportJob?.statusLabel || 'Memproses...'}
+                            </>
+                        ) : exportJob?.status === 'completed' ? (
+                            <>
+                                <Download className="w-5 h-5" />
+                                Unduh PDF
+                            </>
+                        ) : (
+                            <>
+                                <FileText className="w-5 h-5" />
+                                Export PDF
+                            </>
+                        )}
                     </button>
                     <button
-                        onClick={handleExportExcel}
-                        disabled={isExporting}
-                        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={exportJob?.status === 'completed' ? downloadExport : handleExportExcel}
+                        disabled={isPolling}
+                        className={`px-6 py-3 rounded-lg font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+                            exportJob?.status === 'completed'
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
                     >
-                        <FileSpreadsheet className="w-5 h-5" />
-                        {isExporting ? 'Memproses...' : 'Export Excel'}
+                        {isPolling ? (
+                            <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                {exportJob?.statusLabel || 'Memproses...'}
+                            </>
+                        ) : exportJob?.status === 'completed' ? (
+                            <>
+                                <Download className="w-5 h-5" />
+                                Unduh Excel
+                            </>
+                        ) : (
+                            <>
+                                <FileSpreadsheet className="w-5 h-5" />
+                                Export Excel
+                            </>
+                        )}
                     </button>
+
+                    {/* Reset button when completed */}
+                    {exportJob?.status === 'completed' && (
+                        <button
+                            onClick={resetExport}
+                            className="px-4 py-3 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium flex items-center gap-2"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Export Baru
+                        </button>
+                    )}
+
+                    {/* Failed state */}
+                    {exportJob?.status === 'failed' && (
+                        <div className="flex items-center gap-3 w-full">
+                            <div className="flex items-center gap-2 text-red-600 text-sm">
+                                <AlertCircle className="w-4 h-4" />
+                                {exportJob.errorMessage}
+                            </div>
+                            <button
+                                onClick={resetExport}
+                                className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium"
+                            >
+                                Coba Lagi
+                            </button>
+                        </div>
+                    )}
                 </div>
+
+                {/* Progress bar when processing */}
+                {isPolling && exportJob && (
+                    <div className="mt-4">
+                        <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="text-slate-600">{exportJob.statusLabel}</span>
+                            <span className="text-slate-500 font-mono">{exportJob.progress}%</span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div
+                                className="bg-blue-600 h-full rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${exportJob.progress}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Success confirmation */}
+                {exportJob?.status === 'completed' && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700 text-sm">
+                        <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>
+                            Laporan siap diunduh! {exportJob.fileSize && `(${exportJob.fileSize})`}
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Daily Report Preview */}

@@ -1,5 +1,9 @@
 # Offline-First QR Attendance System
 
+> **⚠️ Archived**: This document describes the Flutter prototype that has been archived to `_archived/mobile_flutter/`.
+> The active mobile app is **React Native** (`AbsensiQRMobile/`). Refer to this document only as a design reference
+> if implementing similar offline-first patterns in the React Native codebase.
+
 ## Overview
 
 This Flutter implementation provides a robust offline-first attendance scanning system that:

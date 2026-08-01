@@ -7,7 +7,6 @@ import { Input } from '../../../components/ui/Input';
 import { getErrorMessage } from '../../../utils/errorHandler';
 
 export const LoginForm: React.FC = () => {
-    console.log('[LOGIN_FORM] Rendered');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -33,7 +32,9 @@ export const LoginForm: React.FC = () => {
             // Use React Router navigation (preserves state)
             navigate(redirectUrl, { replace: true });
         } catch (err: unknown) {
-            console.error('[LOGIN] Error:', err);
+            if (import.meta.env.DEV) {
+                console.error('[LOGIN] Error:', err);
+            }
             setError(getErrorMessage(err));
         } finally {
             setLoading(false);

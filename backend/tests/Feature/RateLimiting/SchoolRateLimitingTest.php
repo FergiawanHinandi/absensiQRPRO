@@ -59,7 +59,7 @@ class SchoolRateLimitingTest extends TestCase
         Cache::flush();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function attendance_scan_is_rate_limited_per_school()
     {
         // Create token (Sanctum tokens work without ability checks if middleware not applied)
@@ -89,7 +89,7 @@ class SchoolRateLimitingTest extends TestCase
         $this->assertArrayHasKey('retry_after', $response->json());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function report_generation_is_rate_limited_per_school()
     {
         // Create token
@@ -115,7 +115,7 @@ class SchoolRateLimitingTest extends TestCase
         $this->assertArrayHasKey('retry_after', $response->json());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_headers_are_present()
     {
         // Create token
@@ -135,7 +135,7 @@ class SchoolRateLimitingTest extends TestCase
         $this->assertNotNull($response->headers->get('X-RateLimit-Reset'), 'X-RateLimit-Reset header missing');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function different_schools_have_separate_rate_limits()
     {
         // Clear cache to ensure clean state
@@ -200,7 +200,7 @@ class SchoolRateLimitingTest extends TestCase
             'School 2 should not be rate limited (uses different school_id in cache key)');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_key_uses_school_id_not_just_ip()
     {
         $token = $this->student->createToken('test', ['attendance:scan'])->plainTextToken;
@@ -226,7 +226,7 @@ class SchoolRateLimitingTest extends TestCase
         $this->assertTrue(true);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_returns_proper_json_error()
     {
         $token = $this->student->createToken('test', ['attendance:scan'])->plainTextToken;
@@ -258,7 +258,7 @@ class SchoolRateLimitingTest extends TestCase
         $this->assertGreaterThan(0, $json['retry_after']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function manual_attendance_is_also_rate_limited()
     {
         // Create teacher

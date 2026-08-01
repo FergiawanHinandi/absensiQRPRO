@@ -23,8 +23,8 @@ class StudentAttendanceRisk extends Model
     ];
 
     protected $casts = [
-        'factors_json' => 'array',
-        'calculated_at' => 'datetime',
+        'factors_json'   => 'array',
+        'calculated_at'  => 'datetime',
     ];
 
     public function student()
@@ -35,7 +35,5 @@ class StudentAttendanceRisk extends Model
     public function school()
     {
         return $this->belongsTo(School::class);
-    }
-}
     }
 }

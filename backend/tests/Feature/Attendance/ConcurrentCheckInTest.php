@@ -13,23 +13,19 @@ use Tests\TestCase;
 
 /**
  * ConcurrentCheckInTest
- *
  * Test concurrent check-in requests to ensure race condition protection.
- *
  * SCENARIO:
  * - 20 parallel check-in requests for the same student
  * - Only 1 should succeed (201 Created)
  * - 19 should fail (409 Conflict)
- *
  * PROTECTION MECHANISMS:
  * - Database unique constraint
  * - State machine validation
  * - Transaction isolation
- *
- * @group concurrency
- * @group attendance
- * @group critical
  */
+#[\PHPUnit\Framework\Attributes\Group('concurrency')]
+#[\PHPUnit\Framework\Attributes\Group('attendance')]
+#[\PHPUnit\Framework\Attributes\Group('critical')]
 class ConcurrentCheckInTest extends TestCase
 {
     use RefreshDatabase;
@@ -71,14 +67,12 @@ class ConcurrentCheckInTest extends TestCase
 
     /**
      * Test concurrent check-in requests
-     *
      * SCENARIO:
      * - 20 parallel requests to check-in the same student
      * - Only 1 should succeed (201 Created)
      * - 19 should fail (409 Conflict or 422 Validation Error)
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_concurrent_check_in_for_same_student()
     {
         // Prepare check-in data
@@ -190,11 +184,9 @@ class ConcurrentCheckInTest extends TestCase
 
     /**
      * Test concurrent check-in via API endpoint
-     *
      * This test simulates real API requests
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_concurrent_check_in_via_api()
     {
         $this->markTestSkipped('API endpoint test - requires actual HTTP server for true concurrency');
@@ -211,9 +203,8 @@ class ConcurrentCheckInTest extends TestCase
 
     /**
      * Test database unique constraint
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_enforces_unique_constraint_on_attendance()
     {
         // Create first attendance
@@ -241,9 +232,8 @@ class ConcurrentCheckInTest extends TestCase
 
     /**
      * Test state machine prevents double check-in
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_double_check_in_via_state_machine()
     {
         // Create attendance
@@ -269,9 +259,8 @@ class ConcurrentCheckInTest extends TestCase
 
     /**
      * Test pessimistic locking
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_pessimistic_locking_for_check_in()
     {
         // Create attendance
@@ -299,9 +288,8 @@ class ConcurrentCheckInTest extends TestCase
 
     /**
      * Test transaction isolation
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_maintains_transaction_isolation()
     {
         $attendance = Attendance::create([

@@ -1,5 +1,7 @@
 import React from 'react';
 import Loading from '../../components/common/Loading';
+import ErrorMessage from '../../components/common/ErrorMessage';
+import { getErrorMessage } from '../../utils/errorHandler';
 import {
     Calendar,
     Clock,
@@ -10,10 +12,12 @@ import {
     ChevronRight,
     Shield
 } from 'lucide-react';
+import ParentNotificationCenter from '../../components/dashboard/ParentNotificationCenter';
 import {
     useStudentInfo,
     useTodayAttendance,
-    useAttendanceHistory
+    useAttendanceHistory,
+    useAttendanceSummary
 } from '../../modules/parent/hooks';
 import { AnnouncementWidget } from '../../components/AnnouncementWidget';
 import { useNavigate } from 'react-router-dom';
@@ -22,11 +26,49 @@ import { id } from 'date-fns/locale';
 
 const ParentDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { data: student, isLoading: studentLoading } = useStudentInfo();
-    const { data: today, isLoading: todayLoading } = useTodayAttendance();
-    const { data: history, isLoading: historyLoading } = useAttendanceHistory();
+    const {
+        data: student,
+        isLoading: studentLoading,
+        error: studentError,
+        refetch: refetchStudent,
+    } = useStudentInfo();
+    const {
+        data: today,
+        isLoading: todayLoading,
+        error: todayError,
+        refetch: refetchToday,
+    } = useTodayAttendance();
+    const {
+        data: history,
+        isLoading: historyLoading,
+        error: historyError,
+        refetch: refetchHistory,
+    } = useAttendanceHistory();
+    const {
+        data: weeklySummary,
+        isLoading: summaryLoading,
+        error: summaryError,
+        refetch: refetchSummary,
+    } = useAttendanceSummary(undefined, 'week');
 
-    if (studentLoading || todayLoading || historyLoading) return <Loading text="Memuat data siswa..." />;
+    if (studentLoading || todayLoading || historyLoading || summaryLoading) return <Loading text="Memuat data siswa..." />;
+
+    const fetchError = studentError || todayError || historyError || summaryError;
+    if (fetchError) {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <ErrorMessage
+                    message={getErrorMessage(fetchError)}
+                    onRetry={() => {
+                        refetchStudent();
+                        refetchToday();
+                        refetchHistory();
+                        refetchSummary();
+                    }}
+                />
+            </div>
+        );
+    }
 
     // Helper untuk status warna dan icon
     const getStatusColor = (status: string) => {
@@ -60,11 +102,16 @@ const ParentDashboard: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900 max-w-md mx-auto md:max-w-none shadow-xl md:shadow-none min-h-screen bg-white md:bg-slate-50">
+        <div className="min-h-screen bg-slate-50 pb-20 font-sans text-slate-900 max-w-md mx-auto md:max-w-none shadow-xl md:shadow-none">
             {/* Mobile-First Header */}
             <div className="bg-blue-600 pt-8 pb-16 px-6 rounded-b-[2.5rem] shadow-lg relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Shield className="w-48 h-48 text-white rotate-12" />
+                </div>
+
+                {/* Notification Bell - Top Right */}
+                <div className="absolute top-4 right-4 z-20">
+                    <ParentNotificationCenter />
                 </div>
 
                 <div className="relative z-10 flex items-center gap-4 mb-6">
@@ -112,15 +159,15 @@ const ParentDashboard: React.FC = () => {
                     </h3>
                     <div className="grid grid-cols-3 gap-3">
                         <div className="bg-green-50 p-3 rounded-xl border border-green-100 flex flex-col items-center">
-                            <span className="text-2xl font-bold text-green-600">4</span>
+                            <span className="text-2xl font-bold text-green-600">{weeklySummary?.present_count ?? 0}</span>
                             <span className="text-xs text-green-700 font-medium">Hadir</span>
                         </div>
                         <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-100 flex flex-col items-center">
-                            <span className="text-2xl font-bold text-yellow-600">1</span>
+                            <span className="text-2xl font-bold text-yellow-600">{weeklySummary?.late_count ?? 0}</span>
                             <span className="text-xs text-yellow-700 font-medium">Telat</span>
                         </div>
                         <div className="bg-red-50 p-3 rounded-xl border border-red-100 flex flex-col items-center">
-                            <span className="text-2xl font-bold text-red-600">0</span>
+                            <span className="text-2xl font-bold text-red-600">{weeklySummary?.absent_count ?? 0}</span>
                             <span className="text-xs text-red-700 font-medium">Alpha</span>
                         </div>
                     </div>

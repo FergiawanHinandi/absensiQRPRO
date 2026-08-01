@@ -14,17 +14,14 @@ use Tests\TestCase;
 
 /**
  * Audit Log Verification Test
- * 
  * Memastikan setiap operasi sensitif tercatat dengan benar di Audit Log.
- * 
  * Scenarios:
  * 1. Manual Override (Status Change)
  * 2. Tenant Bypass (Super Admin Access)
  * 3. Security Incident (Replay/Spoofing) - Log Verification
- * 
- * @group audit
- * @group logging
  */
+#[\PHPUnit\Framework\Attributes\Group('audit')]
+#[\PHPUnit\Framework\Attributes\Group('logging')]
 class AuditLogTest extends TestCase
 {
     use RefreshDatabase;

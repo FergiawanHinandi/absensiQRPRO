@@ -22,3 +22,26 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Security: Test/debug scripts (never commit)
+test_*.php
+check_*.php
+cek_*.php
+fix_*.php
+verify_*.php
+replace_*.php
+reset_*.php
+create_*.php
+tokens.json
+tokens.example.json
+load-test.js
+traffic-spike.js
+replace.py
+tmpclaude-*
+
+# Load test logs
+loadtest*.log
+loadtest_output.txt
+
+# IDE temp files
+tmpclaude-*

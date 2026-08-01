@@ -20,7 +20,7 @@ class QrNonce extends Model
     ];
 
     protected $casts = [
-        'used_at' => 'datetime',
+        'used_at'    => 'datetime',
         'expires_at' => 'datetime',
     ];
 
@@ -54,5 +54,4 @@ class QrNonce extends Model
     {
         $this->update(['used_at' => now()]);
     }
-}
 }

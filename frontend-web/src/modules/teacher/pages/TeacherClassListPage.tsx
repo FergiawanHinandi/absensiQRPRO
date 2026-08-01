@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Loading from '../../../components/common/Loading';
 import ErrorMessage from '../../../components/common/ErrorMessage';
+import { EmptyState } from '../../../components/ui/EmptyStates';
 import { apiClient } from '../../../lib/api';
 
 const TeacherClassListPage: React.FC = () => {
@@ -23,7 +24,16 @@ const TeacherClassListPage: React.FC = () => {
       <div className="bg-white rounded-xl shadow p-6 border border-slate-200">
         <h2 className="text-lg font-bold mb-4">Daftar Kelas</h2>
         <ul className="divide-y">
-          {data.length === 0 && <li className="py-4 text-gray-500">Tidak ada data kelas.</li>}
+          {data.length === 0 && (
+            <li className="py-4">
+              <EmptyState
+                preset="no-data"
+                title="Belum Ada Kelas"
+                description="Belum ada kelas yang terdaftar. Kelas akan muncul setelah admin menambahkan data kelas."
+                size="sm"
+              />
+            </li>
+          )}
           {data.map((c) => (
             <li key={c.id} className="py-4">
               <div className="font-semibold">{c.name}</div>

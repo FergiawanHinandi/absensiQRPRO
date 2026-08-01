@@ -13,16 +13,14 @@ use Tests\TestCase;
 
 /**
  * Spoofing & Brute Force Simulation
- * 
  * Uji ketahanan terhadap:
  * 1. Device Spoofing (Unregistered Device ID)
  * 2. GPS Spoofing (Mock Location / Bad Accuracy)
  * 3. Replay Attack (Idempotency Reuse)
  * 4. Brute Force Login
- * 
- * @group security
- * @group spoofing
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('spoofing')]
 class SpoofingSimulationTest extends TestCase
 {
     use RefreshDatabase;

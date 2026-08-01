@@ -66,7 +66,7 @@ class AttendanceStateMachineTest extends TestCase
     // VALID TRANSITIONS
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_creates_attendance_in_init_state(): void
     {
         $attendance = Attendance::create([
@@ -81,7 +81,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertTrue($attendance->isInit());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_transitions_from_init_to_checked_in(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -97,7 +97,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('device-001', $attendance->device_id_in);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_transitions_from_checked_in_to_checked_out(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::CHECKED_IN);
@@ -110,7 +110,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals(123.456, $attendance->lat_out);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_transitions_from_checked_out_to_pending_approval(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::CHECKED_OUT);
@@ -124,7 +124,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertNotNull($attendance->correction_requested_at);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_transitions_from_pending_approval_to_approved(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::PENDING_APPROVAL);
@@ -138,7 +138,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('Correction approved', $attendance->approval_notes);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_transitions_from_pending_approval_to_rejected(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::PENDING_APPROVAL);
@@ -152,7 +152,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('Invalid correction request', $attendance->rejection_reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_retry_from_rejected_to_pending_approval(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::REJECTED);
@@ -166,7 +166,7 @@ class AttendanceStateMachineTest extends TestCase
     // INVALID TRANSITIONS - SHOULD THROW StateViolationException
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_checking_in_from_checked_in_state(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::CHECKED_IN);
@@ -177,7 +177,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkIn($this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_checking_in_from_checked_out_state(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::CHECKED_OUT);
@@ -188,7 +188,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkIn($this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_checking_out_from_init_state(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -199,7 +199,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkOut($this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_approving_from_init_state(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -209,7 +209,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->approve($this->admin, 'Approved');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_rejecting_from_checked_in_state(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::CHECKED_IN);
@@ -219,7 +219,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->reject($this->admin, 'Rejected');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_requesting_correction_from_init_state(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -229,7 +229,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->requestCorrection($this->student, 'Need correction');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_approving_already_approved(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::APPROVED);
@@ -243,7 +243,7 @@ class AttendanceStateMachineTest extends TestCase
     // DIRECT MODIFICATION BLOCKING
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_status_modification_on_existing_record(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -254,7 +254,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->status = 'present';
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_status_modification_during_creation(): void
     {
         $this->expectException(StateViolationException::class);
@@ -273,7 +273,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->status = 'present';
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_state_modification_on_existing_record(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -284,7 +284,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->state = AttendanceState::CHECKED_IN;
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_state_string_modification_on_existing_record(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -299,7 +299,7 @@ class AttendanceStateMachineTest extends TestCase
     // MASS ASSIGNMENT PROTECTION
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_ignores_status_in_mass_assignment(): void
     {
         // Laravel may throw MassAssignmentException when trying to create with guarded attributes
@@ -323,7 +323,7 @@ class AttendanceStateMachineTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_ignores_state_in_mass_assignment(): void
     {
         // Laravel may throw MassAssignmentException when trying to create with guarded attributes
@@ -347,7 +347,7 @@ class AttendanceStateMachineTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_ignores_status_in_update_via_fill(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -372,7 +372,7 @@ class AttendanceStateMachineTest extends TestCase
     // LEGACY STATUS SYNC
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_syncs_legacy_status_on_check_in(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);
@@ -382,7 +382,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('present', $attendance->fresh()->status);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_syncs_legacy_status_on_approval(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::PENDING_APPROVAL);
@@ -392,7 +392,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals('present', $attendance->fresh()->status);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_syncs_legacy_status_on_rejection(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::PENDING_APPROVAL);
@@ -406,7 +406,7 @@ class AttendanceStateMachineTest extends TestCase
     // STATE INSPECTION METHODS
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_correctly_reports_final_state(): void
     {
         $approved = $this->createAttendanceInState(AttendanceState::APPROVED);
@@ -416,7 +416,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertFalse($checkedIn->isFinalState());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_correctly_reports_counts_as_present(): void
     {
         $checkedIn = $this->createAttendanceInState(AttendanceState::CHECKED_IN);
@@ -435,14 +435,14 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertFalse($rejected->countsAsPresent());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_correct_state_label(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::CHECKED_IN);
         $this->assertNotEmpty($attendance->state_label);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_correct_state_color(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::CHECKED_IN);
@@ -453,7 +453,7 @@ class AttendanceStateMachineTest extends TestCase
     // TRANSITION HELPERS
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function can_transition_to_returns_correct_value(): void
     {
         $attendance = $this->createAttendanceInState(AttendanceState::INIT);

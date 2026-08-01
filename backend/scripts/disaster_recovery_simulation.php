@@ -28,7 +28,7 @@ class DisasterRecoverySimulation
     {
         $this->startTime = microtime(true);
         $this->backupPath = storage_path('disaster_recovery');
-        $this->logFile = $this->backupPath . '/recovery_log_' . date('Y-m-d_H-i-s') . '.txt';
+        $this->logFile = $this->backupPath . '/recovery_log_' . \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s') . '.txt';
         
         // Ensure backup directory exists
         if (!file_exists($this->backupPath)) {
@@ -205,7 +205,7 @@ class DisasterRecoverySimulation
     {
         $this->log("Creating database backup...");
         
-        $backupFile = $this->backupPath . '/database_backup_' . date('Y-m-d_H-i-s') . '.sql';
+        $backupFile = $this->backupPath . '/database_backup_' . \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s') . '.sql';
         
         // Get database configuration
         $database = config('database.connections.mysql.database');
@@ -227,7 +227,7 @@ class DisasterRecoverySimulation
         if (config('database.default') === 'sqlite') {
             $sqliteFile = database_path('database.sqlite');
             if (file_exists($sqliteFile)) {
-                copy($sqliteFile, $this->backupPath . '/database_backup_' . date('Y-m-d_H-i-s') . '.sqlite');
+                copy($sqliteFile, $this->backupPath . '/database_backup_' . \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s') . '.sqlite');
                 $this->log("✅ SQLite database backed up successfully");
             }
         } else {
@@ -235,7 +235,7 @@ class DisasterRecoverySimulation
             // exec($command, $output, $returnCode);
             
             // Simulate successful backup
-            file_put_contents($backupFile, "-- Database backup simulation\n-- Created: " . date('Y-m-d H:i:s'));
+            file_put_contents($backupFile, "-- Database backup simulation\n-- Created: " . \App\Helpers\TimezoneHelper::now()->format('Y-m-d H:i:s'));
             $this->log("✅ Database backup created: " . basename($backupFile));
         }
     }
@@ -244,7 +244,7 @@ class DisasterRecoverySimulation
     {
         $this->log("Creating storage backup...");
         
-        $storageBackupPath = $this->backupPath . '/storage_backup_' . date('Y-m-d_H-i-s');
+        $storageBackupPath = $this->backupPath . '/storage_backup_' . \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s');
         
         if (!file_exists($storageBackupPath)) {
             mkdir($storageBackupPath, 0755, true);
@@ -389,7 +389,7 @@ class DisasterRecoverySimulation
     
     private function log($message)
     {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = \App\Helpers\TimezoneHelper::now()->format('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}\n";
         
         echo $logMessage;

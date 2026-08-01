@@ -21,7 +21,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         Cache::flush();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_access_with_active_subscription()
     {
         $school = School::factory()->create();
@@ -39,7 +39,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_access_with_expired_subscription()
     {
         $school = School::factory()->create();
@@ -69,7 +69,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_access_within_grace_period()
     {
         $school = School::factory()->create();
@@ -89,7 +89,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $response->assertHeader('X-Grace-Period-Days-Remaining', '1');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_access_beyond_grace_period()
     {
         $school = School::factory()->create();
@@ -110,7 +110,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_warns_when_subscription_expiring_soon()
     {
         $school = School::factory()->create();
@@ -130,7 +130,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $response->assertHeader('X-Days-Until-Expiry', '5');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_access_without_subscription()
     {
         $school = School::factory()->create();
@@ -149,7 +149,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_access_with_inactive_subscription()
     {
         $school = School::factory()->create();
@@ -170,7 +170,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_access_for_user_without_school()
     {
         $user = User::factory()->student()->create(['school_id' => null]);
@@ -185,7 +185,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_access_for_unauthenticated_user()
     {
         $response = $this->getJson('/api/v1/student/attendance');
@@ -193,7 +193,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_caches_subscription_check()
     {
         $school = School::factory()->create();
@@ -218,7 +218,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $this->assertEquals($subscription->id, $cached->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_cached_subscription_on_subsequent_requests()
     {
         $school = School::factory()->create();
@@ -244,7 +244,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_clears_cache_when_subscription_expires()
     {
         $school = School::factory()->create();
@@ -266,7 +266,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $this->assertFalse(Cache::has($cacheKey));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_respects_school_timezone()
     {
         $school = School::factory()->create([
@@ -301,7 +301,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $response->assertStatus(402);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_selects_latest_subscription_when_multiple_exist()
     {
         $school = School::factory()->create();
@@ -328,7 +328,7 @@ class EnhancedCheckActiveSubscriptionTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_attaches_subscription_to_request()
     {
         $school = School::factory()->create();

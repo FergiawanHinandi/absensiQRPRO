@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\ProcessedWebhook;
+use App\Services\WebhookMonitoringService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -95,13 +96,22 @@ class WebhookController extends Controller
         // =============================================================================
 
         $lockKey = "webhook_lock:{$orderId}";
-        $lock = Cache::lock($lockKey, 300); // 300 seconds (5 minutes) lock timeout
+        $lockTimeout = config('webhook.lock_timeout', 300);
+        $lock = Cache::lock($lockKey, $lockTimeout); // 300 seconds (5 minutes) lock timeout
 
         try {
+            // Track lock acquisition start time
+            $lockStartTime = microtime(true) * 1000;
+
             // CRITICAL: Block for up to 60 seconds waiting for lock (5 seconds in testing)
             // If lock not acquired after timeout, another request is processing
-            $blockTimeout = app()->environment(['testing', 'local']) ? 5 : 60;
+            $blockTimeout = app()->environment(['testing', 'local']) 
+                ? 5 
+                : config('webhook.lock_acquisition_timeout', 60);
             if (! $lock->block($blockTimeout)) {
+                // Track lock contention
+                WebhookMonitoringService::trackLockContention($orderId, 'timeout');
+
                 Log::warning('Webhook lock timeout - another request is processing', [
                     'order_id' => $orderId,
                     'transaction_id' => $transactionId,
@@ -115,6 +125,13 @@ class WebhookController extends Controller
                 ], 429);
             }
 
+            // Track successful lock acquisition
+            $lockAcquisitionTime = (microtime(true) * 1000) - $lockStartTime;
+            WebhookMonitoringService::trackLockAcquisition($orderId, $lockAcquisitionTime);
+
+            // Start processing timer
+            $processingStartTime = WebhookMonitoringService::startProcessing($orderId);
+
             // Lock acquired! Now check idempotency INSIDE the lock
             if (ProcessedWebhook::isAlreadyProcessed($orderId)) {
                 Log::info('Webhook already processed (idempotency)', [
@@ -123,7 +140,9 @@ class WebhookController extends Controller
                     'ip' => $request->ip(),
                 ]);
 
-                return response()->json([
+                // Return cached response
+                $cachedResponse = ProcessedWebhook::getCachedResponse($orderId);
+                return response()->json($cachedResponse ?? [
                     'success' => true,
                     'message' => 'Already processed',
                     'idempotent' => true,
@@ -138,7 +157,9 @@ class WebhookController extends Controller
                     'ip' => $request->ip(),
                 ]);
 
-                return response()->json([
+                // Return cached response
+                $cachedResponse = ProcessedWebhook::getCachedResponse($orderId);
+                return response()->json($cachedResponse ?? [
                     'success' => true,
                     'message' => 'Transaction already processed',
                     'idempotent' => true,
@@ -153,7 +174,9 @@ class WebhookController extends Controller
                     'ip' => $request->ip(),
                 ]);
 
-                return response()->json([
+                // Return processing response
+                $processingResponse = ProcessedWebhook::getProcessingResponse($orderId);
+                return response()->json($processingResponse ?? [
                     'success' => true,
                     'message' => 'Currently processing',
                     'processing' => true,
@@ -169,7 +192,7 @@ class WebhookController extends Controller
             ]);
 
             // CRITICAL: Use database transaction for atomic processing
-            return DB::transaction(function () use ($request, $orderId, $transactionId) {
+            return DB::transaction(function () use ($request, $orderId, $transactionId, $processingStartTime) {
                 try {
                     // CRITICAL: Verify Midtrans signature
                     $serverKey = config('services.midtrans.server_key');
@@ -200,6 +223,9 @@ class WebhookController extends Controller
                             'notes' => 'Invalid signature',
                         ]);
 
+                        // Track processing end
+                        WebhookMonitoringService::endProcessing($orderId, $processingStartTime, 'failed');
+
                         return response()->json(['message' => 'Invalid signature'], 401);
                     }
 
@@ -216,6 +242,9 @@ class WebhookController extends Controller
                         'payment_method' => $result['payment_method'] ?? 'midtrans',
                         'notes' => $result['notes'] ?? 'Processed successfully',
                     ]);
+
+                    // Track processing end
+                    WebhookMonitoringService::endProcessing($orderId, $processingStartTime, 'success');
 
                     return response()->json([
                         'success' => true,
@@ -240,6 +269,9 @@ class WebhookController extends Controller
                         'signature_hash' => $request->input('signature_key'),
                         'notes' => 'Processing failed: '.$e->getMessage(),
                     ]);
+
+                    // Track processing end
+                    WebhookMonitoringService::endProcessing($orderId, $processingStartTime, 'failed');
 
                     return response()->json(['message' => 'Processing failed'], 500);
                 }

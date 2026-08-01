@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\V1\SecureFileUploadController;
 Route::prefix('files')->middleware(['auth:sanctum'])->group(function () {
     
     // Upload file securely
+    // (Validation handled by SecureFileUploadRequest — MIME check, content scanning,
+    //  EXIF analysis, PDF header/JS validation, size limit 2MB)
     Route::post('/upload', [SecureFileUploadController::class, 'upload'])
         ->name('files.upload');
     

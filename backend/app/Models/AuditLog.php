@@ -6,7 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class AuditLog extends Model
 {
-    protected $guarded = ['id'];
+    /**
+     * SEC-02: Explicit fillable untuk mencegah mass assignment vulnerability.
+     * Hanya field yang aman untuk diisi via request yang dimasukkan.
+     *
+     * @see database/migrations/2026_01_21_055802_create_audit_logs_table.php
+     */
+    protected $fillable = [
+        'user_id',
+        'school_id',
+        'action',
+        'description',
+        'ip_address',
+        'user_agent',
+    ];
 
     const SEVERITY_INFO = 'info';
 

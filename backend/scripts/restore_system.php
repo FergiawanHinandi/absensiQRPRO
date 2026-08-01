@@ -27,7 +27,7 @@ class RestoreSystem
     public function __construct()
     {
         $this->backupPath = storage_path('backups');
-        $this->logFile = storage_path('logs/restore_log_' . date('Y-m-d_H-i-s') . '.txt');
+        $this->logFile = storage_path('logs/restore_log_' . \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s') . '.txt');
         
         // Ensure log directory exists
         $logDir = dirname($this->logFile);
@@ -120,7 +120,7 @@ class RestoreSystem
     
     private function extractBackup($backupFile)
     {
-        $extractDir = storage_path('temp/restore_' . date('Y-m-d_H-i-s'));
+        $extractDir = storage_path('temp/restore_' . \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s'));
         
         if (!file_exists(dirname($extractDir))) {
             mkdir(dirname($extractDir), 0755, true);
@@ -192,7 +192,7 @@ class RestoreSystem
     
     private function createPreRestoreSnapshot()
     {
-        $snapshotDir = storage_path('snapshots/pre_restore_' . date('Y-m-d_H-i-s'));
+        $snapshotDir = storage_path('snapshots/pre_restore_' . \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s'));
         
         if (!file_exists(dirname($snapshotDir))) {
             mkdir(dirname($snapshotDir), 0755, true);
@@ -599,7 +599,7 @@ class RestoreSystem
     
     private function log($message)
     {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = \App\Helpers\TimezoneHelper::now()->format('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}\n";
         
         echo $logMessage;

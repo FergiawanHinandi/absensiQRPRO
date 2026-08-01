@@ -6,35 +6,29 @@ import 'leaflet/dist/leaflet.css'
 import './index.css'
 import App from './App.tsx'
 
-console.log('Main.tsx loaded');
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes default stale time
+      staleTime: 5 * 60 * 1000, // 5 menit
       refetchOnWindowFocus: false, // Optional: customize based on needs
     },
   },
 })
 
 const rootElement = document.getElementById('root');
-console.log('Root element:', rootElement);
 
 if (rootElement) {
-  try {
-    createRoot(rootElement).render(
-      // StrictMode disabled temporarily to fix LoaderCircle insertBefore error
-      // <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <App />
-        <ReactQueryDevtools initialIsOpen={false} />
-      </QueryClientProvider>
-      // </StrictMode>,
-    )
-    console.log('React app rendered');
-  } catch (error) {
-    console.error('Error rendering React app:', error);
-  }
+  createRoot(rootElement).render(
+    // StrictMode disabled temporarily to fix LoaderCircle insertBefore error
+    // <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <App />
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+    // </StrictMode>,
+  )
 } else {
-  console.error('Root element not found');
+  if (import.meta.env.DEV) {
+    console.error('Root element not found');
+  }
 }

@@ -42,16 +42,6 @@ use Illuminate\Support\Str;
  */
 final class AttendanceCheckInService
 {
-    /**
-     * @deprecated Use AttendanceLockService instead
-     */
-    private const LOCK_TIMEOUT = 10;  // Increased from 5 to 10 seconds
-
-    /**
-     * @deprecated Use AttendanceLockService instead
-     */
-    private const LOCK_WAIT = 8;  // Increased from 3 to 8 seconds
-
     public function __construct(
         private StudentQrService $qrService,
         private AttendanceLogger $logger,
@@ -59,6 +49,8 @@ final class AttendanceCheckInService
         private GamificationService $gamificationService,
         private AttendanceLockService $lockService,
         private AttendanceIdempotencyService $idempotencyService,
+        private AttendanceGeofenceService $geofenceService,
+        private AttendanceTimeWindowService $timeWindowService,
         private ?QRSignatureService $signatureService = null,
         private ?QrReplayPreventionService $replayPreventionService = null,
         private ?SecurityAlertService $alertService = null,
@@ -144,7 +136,9 @@ final class AttendanceCheckInService
          * - Database transaction with row lock
          * - Unique constraint
          */
-        $serverDate = now()->toDateString();
+        $tz = $student->school->timezone ?? config('app.timezone');
+        $serverDate = now()->timezone($tz)->toDateString();
+        
         if (!$this->idempotencyService->tryAcquire($schedule->id, $student->id, $serverDate)) {
             Log::channel('attendance')->info('Redis idempotency blocked duplicate scan', [
                 'schedule_id' => $schedule->id,
@@ -178,11 +172,15 @@ final class AttendanceCheckInService
             // STEP 4: Validate device (anti-joki)
             $this->validateDevice($student, $data['device_id'] ?? null, $request);
 
-            // STEP 5: Validate geofence
-            $this->validateLocation($student->school, $data['lat'] ?? null, $data['lng'] ?? null, $request);
+            // STEP 5: Validate geofence (delegated to GeofenceService)
+            $this->geofenceService->validate($student->school, $data['lat'] ?? null, $data['lng'] ?? null, $request);
 
-            // STEP 6: Validate time window
-            $attendanceStatus = $this->validateTimeWindow($schedule, $student->school);
+            // STEP 6: Validate time window (delegated to TimeWindowService)
+            // ARCH-03: Pass client scanned_at for offline sync timestamp correction
+            $clientScannedAt = !empty($data['scanned_at'])
+                ? Carbon::parse($data['scanned_at'])
+                : null;
+            $attendanceStatus = $this->timeWindowService->validate($schedule, $student->school, $clientScannedAt);
 
             // STEP 7: Atomic check-in with race condition prevention
             $attendance = $this->atomicCheckIn(
@@ -268,7 +266,7 @@ final class AttendanceCheckInService
                     'is_manual' => true,
                     'attendance_type' => 'manual',
                     'recorded_by' => $recordedBy,
-                    'check_in_time' => now(),
+                    'check_in_time' => now()->timezone(School::find($data['school_id'])?->timezone ?? config('app.timezone')),
                 ]
             );
         });
@@ -317,10 +315,10 @@ final class AttendanceCheckInService
         $this->validateStudentInClass($student, $schedule);
 
         // 6. Validate Teacher Location (Geofence)
-        $this->validateLocation($teacher->school, $data['lat'] ?? null, $data['lng'] ?? null, $request);
+        $this->geofenceService->validate($teacher->school, $data['lat'] ?? null, $data['lng'] ?? null, $request);
 
         // 7. Validate Time Window
-        $attendanceStatus = $this->validateTimeWindow($schedule, $teacher->school);
+        $attendanceStatus = $this->timeWindowService->validate($schedule, $teacher->school);
 
         // 8. Atomic Check-In
         $requestId = $data['request_id'] ?? (string) Str::uuid();
@@ -583,17 +581,21 @@ final class AttendanceCheckInService
             throw AttendanceException::scheduleNotFound();
         }
 
+        $school = School::find($schoolId);
+        $tz = $school?->timezone ?? config('app.timezone');
+        $dayOfWeek = now()->timezone($tz)->dayOfWeek;
+
         $schedule = Schedule::where('id', $scheduleId)
             ->where('school_id', $schoolId)
             ->where('is_active', true)
-            ->where('day_of_week', strtolower(now()->format('l')))
+            ->where('day_of_week', $dayOfWeek)
             ->first();
 
         if (! $schedule) {
             if ($request) {
                 $this->logger->checkInFailed($request, 'schedule_not_found', [
                     'schedule_id' => $scheduleId,
-                    'day_of_week' => strtolower(now()->format('l')),
+                    'day_of_week' => $dayOfWeek ?? strtolower(now()->format('l')),
                 ]);
             }
             throw AttendanceException::noActiveSchedule();
@@ -623,82 +625,6 @@ final class AttendanceCheckInService
             }
             throw AttendanceException::deviceMismatch();
         }
-    }
-
-    /**
-     * STEP 5: Validate geofence location
-     */
-    private function validateLocation(
-        ?School $school,
-        ?float $lat,
-        ?float $lng,
-        ?Request $request = null
-    ): void {
-        if (! $school || ! $school->latitude || ! $school->longitude) {
-            // No geofence configured, skip validation
-            return;
-        }
-
-        if (! $lat || ! $lng) {
-            // Location not provided, skip validation (or throw if required)
-            return;
-        }
-
-        $distance = $this->calculateDistance($lat, $lng, $school->latitude, $school->longitude);
-        $maxRadius = $school->radius_meters ?? 100;
-
-        if ($distance > $maxRadius) {
-            if ($request) {
-                $this->logger->securityAnomaly(
-                    $request,
-                    'outside_geofence',
-                    'Attendance attempt from outside allowed radius',
-                    [
-                        'distance_meters' => round($distance, 2),
-                        'max_radius' => $maxRadius,
-                        'latitude' => $lat,
-                        'longitude' => $lng,
-                        'severity' => 'medium',
-                    ]
-                );
-            }
-            throw AttendanceException::outsideRadius();
-        }
-    }
-
-    /**
-     * STEP 6: Validate time window and determine status
-     */
-    private function validateTimeWindow(Schedule $schedule, ?School $school): string
-    {
-        $now = now();
-        $today = $now->format('Y-m-d');
-
-        $startTime = Carbon::parse("{$today} {$schedule->start_time}");
-        $endTime = Carbon::parse("{$today} {$schedule->end_time}");
-
-        // Get grace period settings
-        $settings = $school?->settings ?? [];
-        $earlyGrace = $settings['attendance_grace_early'] ?? 15;
-        $lateTolerance = $settings['attendance_grace_late'] ?? 15;
-
-        $earliestAllowed = $startTime->copy()->subMinutes($earlyGrace);
-        $lateThreshold = $startTime->copy()->addMinutes($lateTolerance);
-
-        // Too early
-        if ($now->lessThan($earliestAllowed)) {
-            throw AttendanceException::custom(
-                "Absensi belum dibuka. Silakan scan mulai pukul {$earliestAllowed->format('H:i')}."
-            );
-        }
-
-        // Class ended
-        if ($now->greaterThan($endTime)) {
-            throw AttendanceException::outsideTimeWindow();
-        }
-
-        // Determine status: present or late
-        return $now->greaterThan($lateThreshold) ? 'late' : 'present';
     }
 
     /**
@@ -744,15 +670,18 @@ final class AttendanceCheckInService
          */
 
         // Layer 1: Application-level distributed lock with retry
+        $lockTz = $student->school->timezone ?? config('app.timezone');
         return $this->lockService->lockStudentCheckIn(
             $student->id,
             $schedule->id,
-            now()->toDateString(),
+            now()->timezone($lockTz)->toDateString(),
             function () use ($student, $schedule, $status, $data, $requestId, $nonce, $request) {
                 // Layer 2: Database transaction with serializable isolation for this critical section
                 return DB::transaction(function () use ($student, $schedule, $status, $data, $requestId, $nonce, $request) {
                     // SERVER TIME - Used for all timestamp comparisons
-                    $serverNow = now();
+                    // SERVER TIME - Used for all timestamp comparisons
+                    $tz = $student->school->timezone ?? config('app.timezone');
+                    $serverNow = now()->timezone($tz);
                     $serverDate = $serverNow->toDateString();
 
                     /*
@@ -882,8 +811,8 @@ final class AttendanceCheckInService
                     ]);
 
                     if ($status === 'late') {
-                        $scheduledStart = Carbon::parse($schedule->start_time);
-                        $minutesLate = now()->diffInMinutes($scheduledStart);
+                        $scheduledStart = Carbon::parse("{$serverDate} {$schedule->start_time}", $tz);
+                        $minutesLate = $serverNow->diffInMinutes($scheduledStart);
 
                         $this->logger->lateCheckIn($attendance, $request, $minutesLate, [
                             'scheduled_start' => $scheduledStart->toTimeString(),
@@ -945,26 +874,6 @@ final class AttendanceCheckInService
     }
 
     /**
-     * @deprecated Use findExistingAttendanceWithLock instead
-     */
-    private function findExistingAttendance(
-        int $studentId,
-        int $scheduleId,
-        string $date,
-        bool $lockForUpdate = false
-    ): ?Attendance {
-        $query = Attendance::where('student_id', $studentId)
-            ->where('schedule_id', $scheduleId)
-            ->whereDate('attendance_date', $date);
-
-        if ($lockForUpdate) {
-            $query->lockForUpdate();
-        }
-
-        return $query->first();
-    }
-
-    /**
      * Check if exception is a duplicate key violation
      */
     private function isDuplicateKeyException(\Illuminate\Database\QueryException $e): bool
@@ -979,35 +888,17 @@ final class AttendanceCheckInService
     }
 
     /**
-     * Haversine formula for distance calculation (in meters)
+     * Check if student already checked in today (with timezone support)
+     *
+     * @param int $studentId
+     * @param School|null $school School for timezone-aware date (optional, falls back to app timezone)
+     * @return bool
      */
-    private function calculateDistance(float $lat1, float $lon1, float $lat2, float $lon2): float
+    public function hasCheckedInToday(int $studentId, ?School $school = null): bool
     {
-        $earthRadius = 6371000; // Earth's radius in meters
-
-        $latFrom = deg2rad($lat1);
-        $lonFrom = deg2rad($lon1);
-        $latTo = deg2rad($lat2);
-        $lonTo = deg2rad($lon2);
-
-        $latDelta = $latTo - $latFrom;
-        $lonDelta = $lonTo - $lonFrom;
-
-        $angle = 2 * asin(sqrt(
-            pow(sin($latDelta / 2), 2) +
-            cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)
-        ));
-
-        return $angle * $earthRadius;
-    }
-
-    /**
-     * Check if student already checked in today (without schedule)
-     */
-    public function hasCheckedInToday(int $studentId): bool
-    {
+        $tz = $school?->timezone ?? config('app.timezone');
         return Attendance::where('student_id', $studentId)
-            ->whereDate('attendance_date', now()->toDateString())
+            ->whereDate('attendance_date', now()->timezone($tz)->toDateString())
             ->exists();
     }
 
@@ -1078,8 +969,9 @@ final class AttendanceCheckInService
         }
 
         // 4. Find Active Schedule (Teacher specific logic)
-        $dayOfWeek = now()->dayOfWeek;
-        $now = now();
+        $tz = $teacher->school->timezone ?? config('app.timezone');
+        $now = now()->timezone($tz);
+        $dayOfWeek = $now->dayOfWeek;
         
         // Get tolerances from policy service if available, otherwise default
         $toleranceBefore = $this->policyService ? $this->policyService->getScheduleToleranceBefore($teacher->school_id) : 15;
@@ -1140,7 +1032,7 @@ final class AttendanceCheckInService
             $teacher->id,
             $student->id,
             $schedule->id,
-            today()->format('Y-m-d'),
+            $now->format('Y-m-d'),
             function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken) {
                 return DB::transaction(function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken) {
                     // Nonce Check
@@ -1153,7 +1045,7 @@ final class AttendanceCheckInService
                     }
 
                 // Check Existing
-                $existingAttendance = $this->findExistingAttendanceWithLock($student->id, $schedule->id, today()->toDateString());
+                $existingAttendance = $this->findExistingAttendanceWithLock($student->id, $schedule->id, $now->toDateString());
                 
                 if ($existingAttendance) {
                      if ($this->replayPreventionService) {
@@ -1176,12 +1068,13 @@ final class AttendanceCheckInService
                 }
 
                 // Create (using firstOrCreate)
-                $status = $this->determineAttendanceStatus($schedule, $teacher->school_id);
+                $toleranceAfter = $this->policyService ? $this->policyService->getScheduleToleranceAfter($teacher->school_id) : 15;
+                $status = $this->timeWindowService->determineStatus($schedule, $toleranceAfter, $teacher->school);
                 $attendance = Attendance::firstOrCreate(
                     [
                         'student_id' => $student->id,
                         'schedule_id' => $schedule->id,
-                        'attendance_date' => today(),
+                        'attendance_date' => $now->toDateString(),
                         'school_id' => $teacher->school_id,
                     ],
                     [
@@ -1189,7 +1082,7 @@ final class AttendanceCheckInService
                         'subject_id' => $schedule->subject_id,
                         'attendance_type' => 'teacher_scan',
                         'status' => $status,
-                        'check_in_time' => now(),
+                        'check_in_time' => $now,
                         'lat_in' => $lat,
                         'lng_in' => $lng,
                         'device_id_in' => $deviceId,
@@ -1229,13 +1122,6 @@ final class AttendanceCheckInService
             'token_preview' => substr($token, 0, 10) . '...',
             'message' => $message
         ]);
-    }
-
-    private function determineAttendanceStatus(Schedule $schedule, int $schoolId): string
-    {
-        $lateTolerance = $this->policyService ? $this->policyService->getScheduleToleranceAfter($schoolId) : 15;
-        $lateThreshold = Carbon::parse($schedule->start_time)->addMinutes($lateTolerance);
-        return now()->format('H:i:s') > $lateThreshold->format('H:i:s') ? 'late' : 'present';
     }
 
     /**

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Save, Download } from 'lucide-react';
-// import { apiClient } from '../../../lib/api';
+import { apiClient } from '../../../lib/api';
 import showToast from '../../../utils/toast';
+import { SkeletonTable } from '../../../components/ui/LoadingStates';
+import { EmptyState } from '../../../components/ui/EmptyStates';
 
 interface StudentAttendance {
     student_id: number;
@@ -26,21 +28,30 @@ export const HomeroomDailyAttendance: React.FC = () => {
     const fetchAttendance = async () => {
         try {
             setLoading(true);
-            // API Endpoint pending implementation
-            // const response = await apiClient.get(`/teacher/homeroom/attendance?date=${date}`);
+            const response = await apiClient.get(`/teacher/attendance/today-sessions`);
+            const data = response.data?.data || response.data;
 
-            // Mock Data
-            await new Promise(r => setTimeout(r, 800));
-            setClassName('X IPA 1'); // Should be fetched from API
-            setStudents([
-                { student_id: 1, student_name: 'Ahmad Rizki', student_nis: '1001', status: 'present', check_in_time: '07:05' },
-                { student_id: 2, student_name: 'Budi Santoso', student_nis: '1002', status: 'late', check_in_time: '07:20' },
-                { student_id: 3, student_name: 'Citra Dewi', student_nis: '1003', status: 'sick', notes: 'Demam' },
-                { student_id: 4, student_name: 'Doni Pratama', student_nis: '1004', status: 'alpha' },
-                { student_id: 5, student_name: 'Eka Putri', student_nis: '1005', status: 'present', check_in_time: '06:55' },
-            ]);
-        } catch (error) {
+            if (data) {
+                // Extract class name from response
+                setClassName(data.class_name || data.className || 'Kelas Perwalian');
+
+                // Map students from API response
+                const studentList = (data.students || data.attendances || []).map((s: any) => ({
+                    student_id: s.student_id || s.id,
+                    student_name: s.student_name || s.name,
+                    student_nis: s.student_nis || s.nis || s.username || '',
+                    status: s.status || 'not_marked',
+                    check_in_time: s.check_in_time || s.checkInTime || undefined,
+                    notes: s.notes || '',
+                }));
+                setStudents(studentList);
+            }
+        } catch (error: any) {
             console.error('Failed to fetch attendance:', error);
+            // Graceful fallback — show empty state if API unavailable
+            if (error.response?.status !== 404) {
+                showToast.error('Gagal memuat data kehadiran');
+            }
         } finally {
             setLoading(false);
         }
@@ -55,11 +66,19 @@ export const HomeroomDailyAttendance: React.FC = () => {
     const handleSave = async () => {
         try {
             setSaving(true);
-            // await apiClient.post('/teacher/homeroom/attendance', { date, students });
+            const payload = students.map(s => ({
+                student_id: s.student_id,
+                status: s.status,
+                notes: s.notes || '',
+            }));
+            await apiClient.post('/teacher/attendance/manual/bulk', {
+                date,
+                attendances: payload,
+            });
             showToast.success('Perubahan berhasil disimpan');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to save:', error);
-            showToast.error('Gagal menyimpan perubahan');
+            showToast.error(error.response?.data?.message || 'Gagal menyimpan perubahan');
         } finally {
             setSaving(false);
         }
@@ -137,9 +156,18 @@ export const HomeroomDailyAttendance: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {loading ? (
-                            <tr><td colSpan={6} className="py-8 text-center text-slate-500">Memuat data...</td></tr>
+                            <tr><td colSpan={6} className="p-4"><SkeletonTable rows={5} cols={6} /></td></tr>
                         ) : students.length === 0 ? (
-                            <tr><td colSpan={6} className="py-8 text-center text-slate-500">Tidak ada data siswa.</td></tr>
+                            <tr>
+                                <td colSpan={6} className="p-4">
+                                    <EmptyState
+                                        preset="no-students"
+                                        title="Semua Siswa Sudah Hadir! 🎉"
+                                        description="Tidak ada data siswa yang perlu diinput untuk tanggal ini."
+                                        size="sm"
+                                    />
+                                </td>
+                            </tr>
                         ) : (
                             students.map((student, index) => (
                                 <tr key={student.student_id} className="hover:bg-slate-50">

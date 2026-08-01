@@ -14,16 +14,14 @@ use Tests\TestCase;
 
 /**
  * Security Test: Subscription Enforcement
- * 
  * Tests subscription-based access control:
  * - Expired subscription blocks API access
  * - Active subscription allows access
  * - Quota limits enforced
  * - Webhook idempotency
- * 
- * @group security
- * @group subscription
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('subscription')]
 class SubscriptionEnforcementTest extends TestCase
 {
     use RefreshDatabase;
@@ -48,9 +46,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-001: Expired subscription blocks API access
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_api_access_with_expired_subscription(): void
     {
         // Arrange: Create expired subscription
@@ -78,9 +75,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-002: Active subscription allows API access
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_api_access_with_active_subscription(): void
     {
         // Arrange: Create active subscription
@@ -107,9 +103,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-003: Quota limit enforced (attendance count)
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_enforces_quota_limit_for_attendance_count(): void
     {
         // Arrange: Create subscription with quota limit
@@ -151,9 +146,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-004: Webhook idempotency (duplicate webhooks)
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_duplicate_webhook_deliveries_idempotently(): void
     {
         // Arrange
@@ -195,9 +189,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-005: Subscription upgrade immediate effect
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_applies_subscription_upgrade_immediately(): void
     {
         // Arrange: Start with basic subscription
@@ -228,9 +221,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-006: Subscription downgrade grace period
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_provides_grace_period_for_subscription_downgrade(): void
     {
         // Arrange: Premium subscription expiring soon
@@ -255,9 +247,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-007: Trial period expiration handling
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_trial_period_expiration(): void
     {
         // Arrange: Trial subscription expired
@@ -286,9 +277,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-008: Payment failure suspends access
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_suspends_access_on_payment_failure(): void
     {
         // Arrange: Subscription with payment failed
@@ -316,9 +306,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-009: Subscription renewal extends quota
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_extends_quota_on_subscription_renewal(): void
     {
         // Arrange: Subscription near quota limit
@@ -344,9 +333,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-010: Multiple webhook deliveries (only 1 processed)
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_processes_only_one_webhook_from_multiple_deliveries(): void
     {
         // Arrange
@@ -381,9 +369,8 @@ class SubscriptionEnforcementTest extends TestCase
 
     /**
      * ST-011: Subscription check middleware
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_applies_subscription_check_middleware_to_protected_routes(): void
     {
         // Arrange: No subscription

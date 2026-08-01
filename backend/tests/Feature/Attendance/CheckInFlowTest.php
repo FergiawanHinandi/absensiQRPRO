@@ -19,16 +19,13 @@ use Tests\TestCase;
 
 /**
  * Integration Test: Full Check-In Flow
- * 
  * Tests the complete flow from controller to database to events to read model.
- * 
  * Flow:
  * Student scan → Controller → Application Service → Handler → Aggregate → DB
  *   → Event → Listener → Projector → Read Model Updated
- * 
- * @group integration
- * @group attendance
  */
+#[\PHPUnit\Framework\Attributes\Group('integration')]
+#[\PHPUnit\Framework\Attributes\Group('attendance')]
 class CheckInFlowTest extends TestCase
 {
     use RefreshDatabase;
@@ -68,9 +65,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-001: Full check-in flow: Controller → DB → Event → Summary
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_completes_full_check_in_flow(): void
     {
         // Arrange
@@ -109,9 +105,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-002: Event listener updates read model
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_updates_read_model_after_check_in(): void
     {
         // Arrange
@@ -143,9 +138,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-003: Dashboard query uses read model
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_queries_dashboard_from_read_model(): void
     {
         // Arrange
@@ -174,9 +168,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-004: No duplicate attendance allowed
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_check_in(): void
     {
         // Arrange
@@ -205,9 +198,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-005: Cache invalidation on attendance change
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_invalidates_cache_on_attendance_change(): void
     {
         // Arrange
@@ -239,9 +231,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-006: Bulk check-in flow
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_bulk_check_in(): void
     {
         // Arrange
@@ -269,9 +260,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-007: Check-out flow
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_completes_check_out_flow(): void
     {
         // Arrange
@@ -302,9 +292,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-008: Correction request flow
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_completes_correction_request_flow(): void
     {
         // Arrange
@@ -336,9 +325,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-009: API endpoint integration
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_check_in_via_api_endpoint(): void
     {
         // Arrange
@@ -372,9 +360,8 @@ class CheckInFlowTest extends TestCase
 
     /**
      * IT-010: Weekly trend query
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_retrieves_weekly_trend_from_read_model(): void
     {
         // Arrange

@@ -79,9 +79,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * TEST 1: Scan Valid QR Code
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_valid_qr_code_success()
     {
         // Create active QR code
@@ -131,9 +130,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * TEST 2: Scan Duplicate (Already Scanned)
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_duplicate_qr_code_rejected()
     {
         // Create QR code
@@ -180,9 +178,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * TEST 3: Scan Expired QR Code
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_expired_qr_code_rejected()
     {
         // Create expired QR code
@@ -226,9 +223,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * TEST 4: Scan Outside School Area (GPS Validation)
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_outside_school_area_rejected()
     {
         $qrCode = QrCode::create([
@@ -268,9 +264,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * TEST 5: Manual Attendance with "present" Status Rejected
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_manual_attendance_present_status_rejected()
     {
         // Try to create manual attendance with "present" status
@@ -298,9 +293,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * BONUS TEST: Manual Attendance with Valid Status (sick) Success
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_manual_attendance_sick_status_success()
     {
         $response = $this->actingAs($this->teacher, 'sanctum')
@@ -328,9 +322,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * EDGE CASE 1: Scan Before School Hours
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_before_school_hours_marked_as_absent()
     {
         // Create schedule for later today (e.g., 14:00-15:30)
@@ -378,9 +371,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * EDGE CASE 2: Scan Slightly Late
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_slightly_late_marked_as_late()
     {
         // Create schedule with grace period settings
@@ -432,9 +424,8 @@ class AttendanceScanTest extends TestCase
 
     /**
      * EDGE CASE 3: Multiple Scans - Only First Valid
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_multiple_scans_only_first_valid_counted()
     {
         $qrCode = QrCode::create([

@@ -33,9 +33,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 1: Redis health endpoint returns healthy status when Redis is operational
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function redis_health_endpoint_returns_healthy_when_operational(): void
     {
         $response = $this->getJson('/api/v1/health/redis');
@@ -59,9 +58,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 2: System continues to function when Redis is unavailable
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function system_continues_functioning_when_redis_unavailable(): void
     {
         // Mock SafeRedisService to simulate Redis unavailability
@@ -92,9 +90,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 3: Cache automatically falls back to database when Redis fails
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cache_automatically_falls_back_to_database(): void
     {
         // Use failover cache store
@@ -114,9 +111,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 4: Circuit breaker opens after repeated Redis failures
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function circuit_breaker_opens_after_repeated_failures(): void
     {
         $service = app(SafeRedisService::class);
@@ -134,9 +130,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 5: Redis health check performs read/write verification
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function redis_health_check_performs_read_write_verification(): void
     {
         $service = app(SafeRedisService::class);
@@ -159,9 +154,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 6: Redis failure events are logged for monitoring
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function redis_failure_events_are_logged(): void
     {
         // Mock SafeRedisService to simulate failure
@@ -197,9 +191,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 7: Failover cache maintains data consistency across stores
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failover_cache_maintains_data_consistency(): void
     {
         $testData = [
@@ -221,9 +214,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 8: Redis health check handles half-open circuit breaker state
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function redis_health_check_handles_half_open_circuit(): void
     {
         // Mock SafeRedisService for half-open state
@@ -263,9 +255,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 9: Multiple concurrent cache operations don't cause race conditions
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function concurrent_cache_operations_are_safe(): void
     {
         $service = app(SafeRedisService::class);
@@ -291,9 +282,8 @@ class RedisHealthGuardTest extends TestCase
 
     /**
      * Test 10: Redis health monitoring provides actionable metrics
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function redis_health_monitoring_provides_actionable_metrics(): void
     {
         $response = $this->getJson('/api/v1/health/redis');

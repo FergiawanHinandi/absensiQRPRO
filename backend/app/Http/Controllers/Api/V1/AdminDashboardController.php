@@ -14,6 +14,32 @@ class AdminDashboardController extends Controller
         private AdminDashboardService $dashboardService
     ) {}
 
+    /**
+     * A3-H4 FIX: Tambahkan endpoint index yang mengagregasi semua dashboard data.
+     * Sebelumnya hanya ada GET /admin/dashboard/class-attendance, teacher-absent, dll
+     * tapi tidak ada GET /admin/dashboard (index) yang dibutuhkan frontend AdminDashboard.tsx.
+     *
+     * GET /api/v1/admin/dashboard
+     */
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        $date = $request->query('date');
+        $schoolId = $user->school_id;
+        $key = "school_dashboard_overview_{$schoolId}_".($date ?? 'today');
+
+        $payload = $this->cacheWithTags(['dashboard', "school_{$schoolId}"], $key, 180, function () use ($user, $date) {
+            return [
+                'class_attendance' => $this->dashboardService->getClassAttendanceSummary($user, $date),
+                'teacher_absent'   => $this->dashboardService->getTeacherAbsence($user, $date),
+                'late_alpha'       => $this->dashboardService->getLateAlpha($user, $date),
+                'anomalies'        => $this->dashboardService->getAttendanceAnomalies($user, $date),
+            ];
+        });
+
+        return response()->success($payload);
+    }
+
     public function classAttendance(Request $request)
     {
         $date = $request->query('date');

@@ -11,13 +11,11 @@ use Tests\TestCase;
 
 /**
  * Unit tests for DeadlockRetryMiddleware
- *
  * Tests automatic retry logic with exponential backoff for database deadlocks.
- *
- * @group middleware
- * @group concurrency
- * @group deadlock
  */
+#[\PHPUnit\Framework\Attributes\Group('middleware')]
+#[\PHPUnit\Framework\Attributes\Group('concurrency')]
+#[\PHPUnit\Framework\Attributes\Group('deadlock')]
 class DeadlockRetryMiddlewareTest extends TestCase
 {
     protected DeadlockRetryMiddleware $middleware;
@@ -30,9 +28,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
         Log::spy();
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function successful_request_passes_through_without_retry(): void
     {
         $request = Request::create('/api/v1/attendance', 'POST');
@@ -48,9 +44,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
         Log::shouldNotHaveReceived('warning');
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function mysql_deadlock_triggers_retry(): void
     {
         $request = Request::create('/api/v1/attendance', 'POST');
@@ -86,9 +80,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
             }));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function postgresql_deadlock_triggers_retry(): void
     {
         $request = Request::create('/api/v1/attendance', 'POST');
@@ -117,9 +109,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
         Log::shouldHaveReceived('warning')->once();
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function exponential_backoff_increases_delay(): void
     {
         $request = Request::create('/api/v1/attendance', 'POST');
@@ -155,9 +145,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
         $this->assertEquals([100, 200], $delays, 'Delays should follow exponential backoff: 100ms, 200ms');
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function max_retries_exhausted_throws_exception(): void
     {
         $request = Request::create('/api/v1/attendance', 'POST');
@@ -195,9 +183,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function non_deadlock_exception_not_retried(): void
     {
         $request = Request::create('/api/v1/attendance', 'POST');
@@ -223,9 +209,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function deadlock_message_detection_works(): void
     {
         $request = Request::create('/api/v1/attendance', 'POST');
@@ -252,9 +236,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
         Log::shouldHaveReceived('warning')->once();
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function lock_wait_timeout_triggers_retry(): void
     {
         $request = Request::create('/api/v1/attendance', 'POST');
@@ -283,9 +265,7 @@ class DeadlockRetryMiddlewareTest extends TestCase
         Log::shouldHaveReceived('warning')->once();
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function retry_logs_include_request_context(): void
     {
         $request = Request::create('/api/v1/attendance/scan', 'POST');

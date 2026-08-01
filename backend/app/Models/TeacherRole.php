@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,7 +35,7 @@ class TeacherRole extends Model
      */
     public function homeroomClass(): BelongsTo
     {
-        return $this->belongsTo(Classes::class, 'homeroom_class_id');
+        return $this->belongsTo(ClassModel::class, 'homeroom_class_id');
     }
 
     /**

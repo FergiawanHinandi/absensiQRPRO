@@ -101,10 +101,11 @@ class SecurityHeaders
             // Default: only allow same-origin
             "default-src 'self'",
 
-            // Scripts: self + nonce-based + eval (for some JS libs)
-            "script-src 'self' 'nonce-{$nonce}' 'unsafe-eval'",
+            // Scripts: self + nonce-based only (no unsafe-eval)
+            // Vite uses nonce for all scripts during build
+            "script-src 'self' 'nonce-{$nonce}'",
 
-            // Styles: self + inline (for dynamic styles)
+            // Styles: self + inline (for dynamic styles) + Google Fonts
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 
             // Images: self + data URIs + HTTPS sources
@@ -113,8 +114,14 @@ class SecurityHeaders
             // Fonts: self + data URIs + Google Fonts
             "font-src 'self' data: https://fonts.gstatic.com",
 
-            // Connect: self + WebSockets for real-time features
+            // Connect: self + WebSockets for real-time features + APIs
             "connect-src 'self' ws: wss: ".$this->getAllowedConnectSources(),
+
+            // Workers: restrict to same-origin
+            "worker-src 'self' blob:",
+
+            // Media: same-origin only
+            "media-src 'self'",
 
             // Frame ancestors: deny all embedding
             "frame-ancestors 'none'",
@@ -125,8 +132,11 @@ class SecurityHeaders
             // Form actions: only allow same-origin
             "form-action 'self'",
 
-            // Object/embed: disable plugins
+            // Object/embed: disable plugins completely
             "object-src 'none'",
+
+            // Manifest: same-origin
+            "manifest-src 'self'",
 
             // Upgrade insecure requests in production
             ...(app()->environment('production') ? ['upgrade-insecure-requests'] : []),

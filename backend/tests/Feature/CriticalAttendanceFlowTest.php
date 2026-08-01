@@ -94,7 +94,7 @@ class CriticalAttendanceFlowTest extends TestCase
     // CATEGORY 1: QR Code Generation
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_qr_token_generation_is_valid()
     {
         $payload = [
@@ -116,7 +116,7 @@ class CriticalAttendanceFlowTest extends TestCase
         $this->assertEquals('in', $validated['type']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_qr_token_expires_after_timeout()
     {
         $payload = [
@@ -132,7 +132,7 @@ class CriticalAttendanceFlowTest extends TestCase
         $this->qrService->validate($token);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_tampered_qr_token_is_rejected()
     {
         $payload = [
@@ -154,7 +154,7 @@ class CriticalAttendanceFlowTest extends TestCase
     // CATEGORY 2: Successful Attendance Scan
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_valid_scan_creates_attendance_record()
     {
         // Create QR code
@@ -193,7 +193,7 @@ class CriticalAttendanceFlowTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_out_records_checkout_time()
     {
         // First create check-in attendance
@@ -242,7 +242,7 @@ class CriticalAttendanceFlowTest extends TestCase
     // CATEGORY 3: Error Cases
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_expired_qr_code_is_rejected()
     {
         $qrCode = QrCode::create([
@@ -274,7 +274,7 @@ class CriticalAttendanceFlowTest extends TestCase
             ->assertJson(['success' => false]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_duplicate_scan_same_schedule_is_rejected()
     {
         // Create existing attendance
@@ -315,7 +315,7 @@ class CriticalAttendanceFlowTest extends TestCase
         $response->assertStatus(409);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_idempotent_request_with_same_request_id()
     {
         $qrCode = QrCode::create([
@@ -369,7 +369,7 @@ class CriticalAttendanceFlowTest extends TestCase
     // CATEGORY 4: Security Cases
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_scan_outside_geofence_is_flagged()
     {
         $qrCode = QrCode::create([
@@ -405,7 +405,7 @@ class CriticalAttendanceFlowTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_mock_location_flag_creates_anomaly()
     {
         $qrCode = QrCode::create([
@@ -437,7 +437,7 @@ class CriticalAttendanceFlowTest extends TestCase
         $this->assertTrue(in_array($response->status(), [200, 400, 403]));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_unauthenticated_scan_is_rejected()
     {
         $token = $this->qrService->generate([
@@ -459,7 +459,7 @@ class CriticalAttendanceFlowTest extends TestCase
     // CATEGORY 5: Multi-tenant Isolation
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_student_cannot_scan_other_school_qr()
     {
         // Create another school
@@ -520,7 +520,7 @@ class CriticalAttendanceFlowTest extends TestCase
     // CATEGORY 6: Rate Limiting
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_rate_limit_applied_to_scan_endpoint()
     {
         $qrCode = QrCode::create([

@@ -34,8 +34,10 @@ class TeacherScheduleService
             return collect([]);
         }
 
+        $schoolTimezone = $teacher->school->timezone ?? config('app.timezone');
+
         // Parse week parameter or use current week
-        $weekStart = $this->parseWeekStart($week);
+        $weekStart = $this->parseWeekStart($week, $schoolTimezone);
         $weekEnd = $weekStart->copy()->endOfWeek();
 
         // Build optimized query
@@ -120,8 +122,8 @@ class TeacherScheduleService
      */
     public function getTodaySchedules(User $teacher): Collection
     {
-        // Get school timezone (default to Asia/Jakarta if not set)
-        $schoolTimezone = $teacher->school->timezone ?? 'Asia/Jakarta';
+        // Get school timezone (default to global config if not set)
+        $schoolTimezone = $teacher->school->timezone ?? config('app.timezone');
         
         // Get today's day_of_week based on school timezone
         // Carbon dayOfWeek: 0=Sunday, 1=Monday, ..., 6=Saturday
@@ -192,10 +194,10 @@ class TeacherScheduleService
      * @param string|null $week ISO week format (e.g., "2026-W06")
      * @return Carbon
      */
-    private function parseWeekStart(?string $week): Carbon
+    private function parseWeekStart(?string $week, string $timezone = 'UTC'): Carbon
     {
         if (!$week) {
-            return Carbon::now()->startOfWeek();
+            return Carbon::now($timezone)->startOfWeek();
         }
 
         // Parse ISO week format: 2026-W06
@@ -203,13 +205,12 @@ class TeacherScheduleService
             $year = (int) $matches[1];
             $weekNum = (int) $matches[2];
             
-            return Carbon::now()
+            return Carbon::now($timezone)
                 ->setISODate($year, $weekNum)
                 ->startOfWeek();
         }
 
-        // Fallback to current week
-        return Carbon::now()->startOfWeek();
+        return Carbon::now($timezone)->startOfWeek();
     }
 
     /**

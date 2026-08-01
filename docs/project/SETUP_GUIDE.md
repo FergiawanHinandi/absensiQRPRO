@@ -2,7 +2,7 @@
 
 ## ✅ STATUS PERBAIKAN YANG TELAH DILAKUKAN
 
-### Backend (Laravel 12) - ✅ SELESAI
+### Backend (Laravel 11) - ✅ SELESAI
 - ✅ Dependencies berhasil diinstall (dengan ignore GD extension)
 - ✅ Database PostgreSQL terkonfigurasi
 - ✅ Migrasi dan seeder berhasil dijalankan

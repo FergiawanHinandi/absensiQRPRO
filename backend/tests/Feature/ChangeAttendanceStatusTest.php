@@ -71,7 +71,7 @@ class ChangeAttendanceStatusTest extends TestCase
         ]);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_changes_attendance_status_successfully()
     {
         Event::fake();
@@ -103,7 +103,7 @@ class ChangeAttendanceStatusTest extends TestCase
         Event::assertDispatched(\App\Domain\Attendance\Events\AttendanceStatusChanged::class);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_command_data()
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -115,7 +115,7 @@ class ChangeAttendanceStatusTest extends TestCase
         );
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_invalid_status()
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -128,7 +128,7 @@ class ChangeAttendanceStatusTest extends TestCase
         );
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_changing_to_same_status()
     {
         $this->expectException(\Exception::class);
@@ -146,7 +146,7 @@ class ChangeAttendanceStatusTest extends TestCase
         $handler->handle($command);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_changing_old_attendance()
     {
         // Create old attendance (8 days ago)
@@ -175,7 +175,7 @@ class ChangeAttendanceStatusTest extends TestCase
         $handler->handle($command);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_cross_school_access()
     {
         // Create another school
@@ -200,7 +200,7 @@ class ChangeAttendanceStatusTest extends TestCase
         $handler->handle($command);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_creates_detailed_audit_log()
     {
         $reason = 'Student had medical appointment';
@@ -238,7 +238,7 @@ class ChangeAttendanceStatusTest extends TestCase
         $this->assertEquals($reason, $metadata['reason']);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_multiple_status_changes()
     {
         Event::fake();
@@ -283,7 +283,7 @@ class ChangeAttendanceStatusTest extends TestCase
         );
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_database_transaction()
     {
         // Force an error after status update but before audit log
@@ -315,7 +315,7 @@ class ChangeAttendanceStatusTest extends TestCase
         }
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function principal_can_change_any_attendance()
     {
         $command = new ChangeAttendanceStatusCommand(
@@ -332,7 +332,7 @@ class ChangeAttendanceStatusTest extends TestCase
         $this->assertEquals('late', $result->status);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_can_change_attendance_in_their_school()
     {
         $command = new ChangeAttendanceStatusCommand(

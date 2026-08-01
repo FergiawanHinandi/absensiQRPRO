@@ -1,374 +1,415 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import * as adminService from '../../../services/adminService';
-import showToast from '../../../utils/toast';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import * as adminService from "../../../services/adminService";
+import showToast from "../../../utils/toast";
 
 /**
- * React Query Hooks for School Admin Operations
- * Provides data fetching, caching, and mutations with optimistic updates
+ * React Query Mutation Hooks for School Admin Operations
+ * Query hooks are in ./index.ts
  */
 
 // ================================================
-// 1️⃣ DASHBOARD & REPORTS
-// ================================================
-
-export const useRiskOverview = () => {
-    return useQuery({
-        queryKey: ['admin', 'risk-overview'],
-        queryFn: adminService.getRiskOverview,
-        refetchInterval: 60000, // Refresh every minute
-        staleTime: 30000,
-    });
-};
-
-export const useDailyReport = (date?: string) => {
-    return useQuery({
-        queryKey: ['admin', 'daily-report', date],
-        queryFn: () => adminService.getDailyReport(date),
-        enabled: !!date,
-        refetchInterval: 60000, // Refresh every minute
-        staleTime: 30000,
-    });
-};
-
-export const useMonthlyReport = (month?: string, year?: string) => {
-    return useQuery({
-        queryKey: ['admin', 'monthly-report', month, year],
-        queryFn: () => adminService.getMonthlyReport(month, year),
-        enabled: !!month && !!year,
-    });
-};
-
-// ================================================
-// 2️⃣ SUBJECT MANAGEMENT
+// SUBJECT MANAGEMENT
 // ================================================
 
 export const useCreateSubject = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.createSubject,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['adminSubjects'] });
-            showToast.success('Mata pelajaran berhasil ditambahkan');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal menambahkan mata pelajaran');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.createSubject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminSubjects"] });
+      showToast.success("Mata pelajaran berhasil ditambahkan");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal menambahkan mata pelajaran",
+      );
+    },
+  });
 };
 
 export const useUpdateSubject = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: any }) =>
-            adminService.updateSubject(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['adminSubjects'] });
-            showToast.success('Mata pelajaran berhasil diperbarui');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal memperbarui mata pelajaran');
-        },
-    });
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      adminService.updateSubject(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminSubjects"] });
+      showToast.success("Mata pelajaran berhasil diperbarui");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal memperbarui mata pelajaran",
+      );
+    },
+  });
 };
 
 export const useDeleteSubject = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.deleteSubject,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['adminSubjects'] });
-            showToast.success('Mata pelajaran berhasil dihapus');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal menghapus mata pelajaran');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.deleteSubject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminSubjects"] });
+      showToast.success("Mata pelajaran berhasil dihapus");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal menghapus mata pelajaran",
+      );
+    },
+  });
 };
 
 // ================================================
-// 3️⃣ TEACHER-SUBJECT ASSIGNMENT
+// TEACHER-SUBJECT ASSIGNMENT
 // ================================================
 
 export const useTeacherSubjects = () => {
-    return useQuery({
-        queryKey: ['admin', 'teacher-subjects'],
-        queryFn: adminService.getTeacherSubjects,
-        refetchInterval: 120000,
-    });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: adminService.createTeacherSubject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminTeacherAssignments"] });
+      showToast.success("Penugasan guru berhasil ditambahkan");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal menambahkan penugasan guru",
+      );
+    },
+  });
 };
 
 export const useCreateTeacherSubject = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.createTeacherSubject,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'teacher-subjects'] });
-            showToast.success('Penugasan guru berhasil ditambahkan');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal menambahkan penugasan guru');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.createTeacherSubject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminTeacherAssignments"] });
+      showToast.success("Penugasan guru berhasil ditambahkan");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal menambahkan penugasan guru",
+      );
+    },
+  });
 };
 
 export const useDeleteTeacherSubject = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.deleteTeacherSubject,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'teacher-subjects'] });
-            showToast.success('Penugasan guru berhasil dihapus');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal menghapus penugasan guru');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.deleteTeacherSubject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminTeacherAssignments"] });
+      showToast.success("Penugasan guru berhasil dihapus");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal menghapus penugasan guru",
+      );
+    },
+  });
 };
 
 // ================================================
-// 4️⃣ SCHEDULE MANAGEMENT
+// SCHEDULE MANAGEMENT
 // ================================================
 
 export const useWeeklyScheduleByClass = (classId?: number) => {
-    return useQuery({
-        queryKey: ['admin', 'weekly-schedule', 'class', classId],
-        queryFn: () => adminService.getWeeklyScheduleByClass(classId!),
-        enabled: !!classId,
-    });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => adminService.getWeeklyScheduleByClass(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminSchedules"] });
+    },
+  });
 };
 
 export const useWeeklyScheduleByTeacher = (teacherId?: number) => {
-    return useQuery({
-        queryKey: ['admin', 'weekly-schedule', 'teacher', teacherId],
-        queryFn: () => adminService.getWeeklyScheduleByTeacher(teacherId!),
-        enabled: !!teacherId,
-    });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => adminService.getWeeklyScheduleByTeacher(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminSchedules"] });
+    },
+  });
 };
 
 export const useCreateSchedule = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.createSchedule,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['adminSchedules'] });
-            queryClient.invalidateQueries({ queryKey: ['admin', 'weekly-schedule'] });
-            showToast.success('Jadwal berhasil ditambahkan');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal menambahkan jadwal');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.createSchedule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminSchedules"] });
+      showToast.success("Jadwal berhasil ditambahkan");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal menambahkan jadwal",
+      );
+    },
+  });
 };
 
 export const useUpdateSchedule = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: any }) =>
-            adminService.updateSchedule(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['adminSchedules'] });
-            queryClient.invalidateQueries({ queryKey: ['admin', 'weekly-schedule'] });
-            showToast.success('Jadwal berhasil diperbarui');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal memperbarui jadwal');
-        },
-    });
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      adminService.updateSchedule(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminSchedules"] });
+      showToast.success("Jadwal berhasil diperbarui");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal memperbarui jadwal",
+      );
+    },
+  });
 };
 
 export const useDeleteSchedule = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.deleteSchedule,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['adminSchedules'] });
-            queryClient.invalidateQueries({ queryKey: ['admin', 'weekly-schedule'] });
-            showToast.success('Jadwal berhasil dihapus');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal menghapus jadwal');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.deleteSchedule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminSchedules"] });
+      showToast.success("Jadwal berhasil dihapus");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal menghapus jadwal",
+      );
+    },
+  });
 };
 
 export const useImportSchedules = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.importSchedules,
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['adminSchedules'] });
-            showToast.success(`Berhasil mengimpor ${data?.imported || 0} jadwal`);
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal mengimpor jadwal');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.importSchedules,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["adminSchedules"] });
+      showToast.success(`Berhasil mengimpor ${data?.imported || 0} jadwal`);
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal mengimpor jadwal",
+      );
+    },
+  });
 };
 
 // ================================================
-// 5️⃣ ATTENDANCE SETTINGS
+// ATTENDANCE SETTINGS
 // ================================================
-
-export const useAttendanceSettings = () => {
-    return useQuery({
-        queryKey: ['admin', 'attendance-settings'],
-        queryFn: adminService.getAttendanceSettings,
-    });
-};
 
 export const useUpdateAttendanceSettings = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.updateAttendanceSettings,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'attendance-settings'] });
-            showToast.success('Pengaturan absensi berhasil diperbarui');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal memperbarui pengaturan');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.updateAttendanceSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminAttendanceSettings"] });
+      showToast.success("Pengaturan absensi berhasil diperbarui");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal memperbarui pengaturan",
+      );
+    },
+  });
 };
 
 // ================================================
-// 6️⃣ STUDENT CARD MANAGEMENT
+// STUDENT CARD MANAGEMENT
 // ================================================
-
-export const useStudentCardProgress = () => {
-    return useQuery({
-        queryKey: ['admin', 'student-card-progress'],
-        queryFn: adminService.getStudentCardProgress,
-        refetchInterval: 60000,
-    });
-};
 
 export const useGenerateStudentCard = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.generateStudentCard,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'student-card-progress'] });
-            showToast.success('Kartu siswa berhasil dibuat');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal membuat kartu siswa');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.generateStudentCard,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminStudentCards"] });
+      showToast.success("Kartu siswa berhasil dibuat");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal membuat kartu siswa",
+      );
+    },
+  });
 };
 
 export const useBulkGenerateStudentCards = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.bulkGenerateStudentCards,
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'student-card-progress'] });
-            showToast.success(`Berhasil membuat ${data?.generated || 0} kartu siswa`);
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal membuat kartu siswa massal');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.bulkGenerateStudentCards,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["adminStudentCards"] });
+      showToast.success(`Berhasil membuat ${data?.generated || 0} kartu siswa`);
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal membuat kartu siswa massal",
+      );
+    },
+  });
 };
 
 // ================================================
-// 7️⃣ PHOTO REVIEW
+// PHOTO REVIEW
 // ================================================
-
-export const usePendingPhotos = () => {
-    return useQuery({
-        queryKey: ['admin', 'pending-photos'],
-        queryFn: adminService.getPendingPhotos,
-        refetchInterval: 120000,
-    });
-};
 
 export const useApprovePhoto = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: adminService.approveStudentPhoto,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'pending-photos'] });
-            showToast.success('Foto berhasil disetujui');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal menyetujui foto');
-        },
-    });
+  return useMutation({
+    mutationFn: adminService.approveStudentPhoto,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminPendingPhotos"] });
+      showToast.success("Foto berhasil disetujui");
+    },
+    onError: (error: any) => {
+      showToast.error(
+        error?.response?.data?.message || "Gagal menyetujui foto",
+      );
+    },
+  });
 };
 
 export const useRejectPhoto = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: ({ studentId, reason }: { studentId: number; reason?: string }) =>
-            adminService.rejectStudentPhoto(studentId, reason),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'pending-photos'] });
-            showToast.success('Foto berhasil ditolak');
-        },
-        onError: (error: any) => {
-            showToast.error(error?.response?.data?.message || 'Gagal menolak foto');
-        },
-    });
+  return useMutation({
+    mutationFn: ({
+      studentId,
+      reason,
+    }: {
+      studentId: number;
+      reason?: string;
+    }) => adminService.rejectStudentPhoto(studentId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminPendingPhotos"] });
+      showToast.success("Foto berhasil ditolak");
+    },
+    onError: (error: any) => {
+      showToast.error(error?.response?.data?.message || "Gagal menolak foto");
+    },
+  });
 };
 
 // ================================================
-// 8️⃣ NOTIFICATIONS & RISK LOGS
+// DASHBOARD & REPORTS (Mutations)
+// ================================================
+
+export const useRiskOverview = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: adminService.getRiskOverview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminRiskOverview"] });
+    },
+  });
+};
+
+export const useDailyReport = (date?: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => adminService.getDailyReport(date),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminDailyReport"] });
+    },
+  });
+};
+
+export const useMonthlyReport = (month?: string, year?: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => adminService.getMonthlyReport(month, year),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminMonthlyReport"] });
+    },
+  });
+};
+
+// ================================================
+// NOTIFICATIONS & RISK LOGS
 // ================================================
 
 export const useNotificationLogs = (page = 1, limit = 20) => {
-    return useQuery({
-        queryKey: ['admin', 'notification-logs', page, limit],
-        queryFn: () => adminService.getNotificationLogs(page, limit),
-        refetchInterval: 60000,
-    });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => adminService.getNotificationLogs(page, limit),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminNotificationLogs"] });
+    },
+  });
 };
 
 export const useRiskChanges = (days = 7) => {
-    return useQuery({
-        queryKey: ['admin', 'risk-changes', days],
-        queryFn: () => adminService.getRiskChanges(days),
-        refetchInterval: 120000,
-    });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => adminService.getRiskChanges(days),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminRiskChanges"] });
+    },
+  });
 };
 
 // ================================================
-// 🔟 ADDITIONAL HELPERS
+// CLASSES & TEACHERS (Additional)
 // ================================================
 
 export const useAdminClasses = () => {
-    return useQuery({
-        queryKey: ['adminClasses'],
-        queryFn: adminService.getClasses,
-        refetchInterval: 120000,
-    });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: adminService.getClasses,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminClasses"] });
+    },
+  });
 };
 
 export const useAdminTeachers = () => {
-    return useQuery({
-        queryKey: ['adminTeachers'],
-        queryFn: adminService.getTeachers,
-        refetchInterval: 120000,
-    });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: adminService.getTeachers,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminTeachers"] });
+    },
+  });
 };
 
 export const useAdminStudents = () => {
-    return useQuery({
-        queryKey: ['adminStudents'],
-        queryFn: adminService.getStudents,
-        refetchInterval: 120000,
-    });
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: adminService.getStudents,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adminStudents"] });
+    },
+  });
 };

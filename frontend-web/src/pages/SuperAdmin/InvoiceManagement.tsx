@@ -185,7 +185,7 @@ export const InvoiceManagement: React.FC = () => {
     const handlePrint = useReactToPrint({
         contentRef: printComponentRef,
         documentTitle: `Invoice-${selectedInvoice?.transaction_id || 'Document'}`,
-        onAfterPrint: () => console.log('Print finished'),
+        onAfterPrint: () => {},
     });
 
     useEffect(() => {
@@ -202,15 +202,17 @@ export const InvoiceManagement: React.FC = () => {
     const fetchInvoices = async () => {
         try {
             setLoading(true);
+            // FE-03 FIX: interceptor sudah auto-unwrap response, tidak perlu .data.data.data
             const response = await apiClient.get('/super-admin/billing/payments', {
                 params: {
                     search: search || undefined,
                     status: filterStatus === 'all' ? undefined : filterStatus,
                 },
             });
-            if (response.data.success) {
-                setInvoices(response.data.data.data);
-            }
+            // response.data sekarang = payload data sebenarnya (sudah di-unwrap)
+            const payload = response.data as any;
+            const items = payload?.data ?? payload ?? [];
+            setInvoices(Array.isArray(items) ? items : []);
         } catch (error) {
             console.error('Failed to fetch invoices:', error);
         } finally {
@@ -220,10 +222,11 @@ export const InvoiceManagement: React.FC = () => {
 
     const fetchSchools = async () => {
         try {
-            const response = await apiClient.get('/super-admin/schools'); // Assuming this endpoint exists and lists schools
-            if (response.data.success) {
-                setSchools(response.data.data.data); // Adjust based on pagination structure
-            }
+            // FE-03 FIX: response.data sudah di-unwrap oleh interceptor
+            const response = await apiClient.get('/super-admin/schools');
+            const payload = response.data as any;
+            const items = payload?.data ?? payload ?? [];
+            setSchools(Array.isArray(items) ? items : []);
         } catch (error) {
             console.error('Failed to fetch schools options');
         }
@@ -231,10 +234,10 @@ export const InvoiceManagement: React.FC = () => {
 
     const fetchPackages = async () => {
         try {
+            // FE-03 FIX: response.data sudah di-unwrap oleh interceptor
             const response = await apiClient.get('/super-admin/billing/packages');
-            if (response.data.success) {
-                setPackages(response.data.data);
-            }
+            const payload = response.data as any;
+            setPackages(Array.isArray(payload) ? payload : payload?.data ?? []);
         } catch (error) {
             console.error('Failed to fetch packages');
         }

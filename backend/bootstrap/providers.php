@@ -2,8 +2,5 @@
 
 return [
     App\Providers\AppServiceProvider::class,
-    App\Providers\EventServiceProvider::class,
-    App\Providers\RepositoryServiceProvider::class,
-    App\Providers\ObservabilityServiceProvider::class,
-    App\Providers\CircuitBreakerServiceProvider::class,
+    App\Providers\Filament\AdminPanelProvider::class,
 ];

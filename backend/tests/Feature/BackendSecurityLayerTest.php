@@ -122,7 +122,7 @@ class BackendSecurityLayerTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthenticated_request_is_rejected()
     {
         // Simulate: Attacker bypass frontend dan panggil API tanpa token
@@ -132,7 +132,7 @@ class BackendSecurityLayerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_access_admin_endpoint_even_if_frontend_allows()
     {
         // Simulate: Student manipulate frontend untuk show admin menu
@@ -145,7 +145,7 @@ class BackendSecurityLayerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_cannot_access_super_admin_endpoint()
     {
         // Simulate: Teacher bypass frontend guard
@@ -157,7 +157,7 @@ class BackendSecurityLayerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_from_school_a_cannot_access_school_b_data()
     {
         // Simulate: Admin A manipulate request untuk akses data School B
@@ -173,7 +173,7 @@ class BackendSecurityLayerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function inactive_user_cannot_access_api()
     {
         // Create inactive user
@@ -195,7 +195,7 @@ class BackendSecurityLayerTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function expired_token_is_rejected()
     {
         // Create token
@@ -214,7 +214,7 @@ class BackendSecurityLayerTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cross_school_update_is_blocked()
     {
         // Simulate: Admin A tries to update student from School B
@@ -231,7 +231,7 @@ class BackendSecurityLayerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cross_school_delete_is_blocked()
     {
         // Simulate: Admin A tries to delete student from School B
@@ -246,7 +246,7 @@ class BackendSecurityLayerTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_access_other_student_data()
     {
         // Simulate: Student A tries to access Student B's attendance
@@ -277,7 +277,7 @@ class BackendSecurityLayerTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limiting_blocks_excessive_requests()
     {
         Sanctum::actingAs($this->studentA, ['*']);
@@ -300,7 +300,7 @@ class BackendSecurityLayerTest extends TestCase
         $this->assertTrue($rateLimited, 'Rate limiting should block excessive requests');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tampered_payload_is_rejected()
     {
         Sanctum::actingAs($this->adminA, ['*']);
@@ -322,7 +322,7 @@ class BackendSecurityLayerTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_access_all_schools()
     {
         // Super admin should have access to all schools
@@ -334,7 +334,7 @@ class BackendSecurityLayerTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_only_see_own_school_students()
     {
         Sanctum::actingAs($this->adminA, ['*']);
@@ -357,7 +357,7 @@ class BackendSecurityLayerTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_headers_are_present()
     {
         Sanctum::actingAs($this->adminA, ['*']);
@@ -370,7 +370,7 @@ class BackendSecurityLayerTest extends TestCase
         $response->assertHeader('X-XSS-Protection', '1; mode=block');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cors_is_properly_configured()
     {
         // Test CORS preflight
@@ -382,7 +382,7 @@ class BackendSecurityLayerTest extends TestCase
         $response->assertHeader('Access-Control-Allow-Origin');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function sql_injection_is_prevented()
     {
         Sanctum::actingAs($this->adminA, ['*']);
@@ -401,7 +401,7 @@ class BackendSecurityLayerTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function xss_payload_is_escaped()
     {
         Sanctum::actingAs($this->adminA, ['*']);

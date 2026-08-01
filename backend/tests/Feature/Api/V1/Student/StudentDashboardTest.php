@@ -74,7 +74,7 @@ class StudentDashboardTest extends TestCase
     // TEST: Dashboard Access
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_can_access_own_dashboard()
     {
         Sanctum::actingAs($this->student);
@@ -93,7 +93,7 @@ class StudentDashboardTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guest_cannot_access_student_dashboard()
     {
         $response = $this->getJson('/api/v1/student/dashboard');
@@ -101,7 +101,7 @@ class StudentDashboardTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function non_student_cannot_access_student_dashboard()
     {
         $teacher = User::factory()->create([
@@ -116,7 +116,7 @@ class StudentDashboardTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function dashboard_shows_today_status()
     {
         Sanctum::actingAs($this->student);
@@ -146,7 +146,7 @@ class StudentDashboardTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function dashboard_shows_not_checked_in_when_no_attendance_today()
     {
         Sanctum::actingAs($this->student);
@@ -165,7 +165,7 @@ class StudentDashboardTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function dashboard_includes_student_streak_information()
     {
         Sanctum::actingAs($this->student);
@@ -196,7 +196,7 @@ class StudentDashboardTest extends TestCase
     // TEST: Attendance History
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_can_view_attendance_history()
     {
         Sanctum::actingAs($this->student);
@@ -214,7 +214,7 @@ class StudentDashboardTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function history_returns_last_30_days_only()
     {
         Sanctum::actingAs($this->student);
@@ -263,7 +263,7 @@ class StudentDashboardTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_view_other_student_history()
     {
         // Create attendance for other student
@@ -290,7 +290,7 @@ class StudentDashboardTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function history_includes_attendance_summary()
     {
         Sanctum::actingAs($this->student);
@@ -345,7 +345,7 @@ class StudentDashboardTest extends TestCase
     // TEST: Schedule
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_can_view_schedule()
     {
         Sanctum::actingAs($this->student);
@@ -362,7 +362,7 @@ class StudentDashboardTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function schedule_returns_only_today_classes()
     {
         Sanctum::actingAs($this->student);
@@ -414,7 +414,7 @@ class StudentDashboardTest extends TestCase
         $this->assertEquals('08:00:00', $schedules[0]['start_time']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function schedule_returns_empty_array_when_no_classes_today()
     {
         Sanctum::actingAs($this->student);
@@ -447,7 +447,7 @@ class StudentDashboardTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_view_other_class_schedule()
     {
         Sanctum::actingAs($this->student);
@@ -503,7 +503,7 @@ class StudentDashboardTest extends TestCase
     // TEST: Profile
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_can_view_own_profile()
     {
         Sanctum::actingAs($this->student);
@@ -531,7 +531,7 @@ class StudentDashboardTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_access_other_student_profile_directly()
     {
         Sanctum::actingAs($this->student);
@@ -543,7 +543,7 @@ class StudentDashboardTest extends TestCase
         $this->assertContains($response->status(), [403, 404]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function profile_includes_class_information()
     {
         Sanctum::actingAs($this->student);
@@ -569,7 +569,7 @@ class StudentDashboardTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function profile_includes_school_information()
     {
         Sanctum::actingAs($this->student);
@@ -591,7 +591,7 @@ class StudentDashboardTest extends TestCase
     // TEST: Data Isolation & Security
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_only_sees_own_school_data()
     {
         // Create another school with student
@@ -630,7 +630,7 @@ class StudentDashboardTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function inactive_student_cannot_access_dashboard()
     {
         $this->student->update(['is_active' => false]);

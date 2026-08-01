@@ -12,16 +12,14 @@ use Tests\TestCase;
 
 /**
  * Data Manipulation & Injection Test
- * 
  * Menguji ketahanan terhadap:
  * 1. Business Logic Bypass (Status Manipulation)
  * 2. Mass Assignment Vulnerability (School ID Injection)
  * 3. Injection Attacks (SQL Injection)
  * 4. Cross-Tenant Access (IDOR)
- * 
- * @group security
- * @group manipulation
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('manipulation')]
 class DataManipulationTest extends TestCase
 {
     use RefreshDatabase;

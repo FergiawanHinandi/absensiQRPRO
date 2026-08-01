@@ -107,7 +107,7 @@ class HomeroomTeacherTest extends TestCase
     // TEST: Class Summary Access
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function only_assigned_homeroom_teacher_can_access_class_summary()
     {
         Sanctum::actingAs($this->homeroomTeacher);
@@ -125,7 +125,7 @@ class HomeroomTeacherTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function regular_teacher_cannot_access_homeroom_endpoints()
     {
         $regularTeacher = User::factory()->create([
@@ -140,7 +140,7 @@ class HomeroomTeacherTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_cannot_access_homeroom_endpoints()
     {
         Sanctum::actingAs($this->student);
@@ -150,7 +150,7 @@ class HomeroomTeacherTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function guest_cannot_access_homeroom_endpoints()
     {
         $response = $this->getJson('/api/v1/teacher/homeroom/class-summary');
@@ -158,7 +158,7 @@ class HomeroomTeacherTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function class_summary_shows_only_assigned_class_data()
     {
         Sanctum::actingAs($this->homeroomTeacher);
@@ -182,7 +182,7 @@ class HomeroomTeacherTest extends TestCase
     // TEST: Student Notes - Read
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function homeroom_teacher_can_view_student_notes()
     {
         Sanctum::actingAs($this->homeroomTeacher);
@@ -198,7 +198,7 @@ class HomeroomTeacherTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_notes_only_show_own_class_students()
     {
         // Create note for student in teacher's class
@@ -252,7 +252,7 @@ class HomeroomTeacherTest extends TestCase
     // TEST: Student Notes - Create
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function homeroom_teacher_can_create_student_note()
     {
         Sanctum::actingAs($this->homeroomTeacher);
@@ -282,7 +282,7 @@ class HomeroomTeacherTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function notes_stored_correctly_with_all_required_fields()
     {
         Sanctum::actingAs($this->homeroomTeacher);
@@ -308,7 +308,7 @@ class HomeroomTeacherTest extends TestCase
         $this->assertEquals('Needs improvement in discipline', $note->content);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cannot_create_note_without_required_fields()
     {
         Sanctum::actingAs($this->homeroomTeacher);
@@ -332,7 +332,7 @@ class HomeroomTeacherTest extends TestCase
             ->assertJsonValidationErrors(['content']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cannot_write_notes_for_students_in_other_classes()
     {
         // Create student in OTHER class
@@ -369,7 +369,7 @@ class HomeroomTeacherTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cannot_write_notes_for_students_from_other_schools()
     {
         // Create another school with student
@@ -398,7 +398,7 @@ class HomeroomTeacherTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function note_type_must_be_valid()
     {
         Sanctum::actingAs($this->homeroomTeacher);
@@ -415,7 +415,7 @@ class HomeroomTeacherTest extends TestCase
             ->assertJsonValidationErrors(['note_type']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function valid_note_types_are_accepted()
     {
         Sanctum::actingAs($this->homeroomTeacher);
@@ -442,7 +442,7 @@ class HomeroomTeacherTest extends TestCase
     // TEST: Multi-tenant Isolation
     // =========================================================================
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function homeroom_teacher_only_sees_own_school_data()
     {
         // Create another school with its own teacher and student
@@ -491,7 +491,7 @@ class HomeroomTeacherTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function inactive_homeroom_teacher_cannot_access_endpoints()
     {
         $this->homeroomTeacher->update(['is_active' => false]);

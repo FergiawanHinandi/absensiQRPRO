@@ -25,7 +25,7 @@ The codebase is currently in a "hybrid" state. While significant progress has be
 | **AR-01** | **Leaky Abstractions (Service Layer)** | `App\Services` | **High** | Services are doing "too much". They contain infrastructure concerns (managing explicit DB transactions, Redis locks) mixed directly with core business rules (time windows, geofencing). |
 | **AR-02** | **Hybrid Domain State** | `App\Models\Attendance` | **Medium** | The model uses a mix of old `status` fields and a new State Machine trait. While `syncLegacyStatus` exists, having two sources of truth for state is fragile. |
 | **AR-03** | **Transaction Script Pattern** | `AttendanceCheckInService` | **Medium** | Although there are Domain Events, the primary logic is still a procedural script (`validate A`, `validate B`, `save`, `fire event`). True DDD would push invariants into the Aggregate Root. |
-| **AR-04** | **Project Structure Ambiguity** | Root Directory | **Medium** | Presence of both `mobile_flutter` (Flutter) and `AbsensiQRMobile` (React Native) folders creates confusion for new developers/CI execution about which is the "real" mobile app. |
+| **AR-04** | ~~**Project Structure Ambiguity**~~ | Root Directory | ~~Medium~~ **Resolved** | ~~Presence of both `mobile_flutter` and `AbsensiQRMobile` folders~~ — **Resolved**: Flutter prototype archived to `_archived/mobile_flutter/`. React Native (`AbsensiQRMobile/`) is the single mobile platform. |
 
 ### C. Testing Coverage Gaps
 | ID | Item | Location | Severity | Description |
@@ -46,8 +46,8 @@ The codebase is currently in a "hybrid" state. While significant progress has be
 ### Phase 1: Stabilization & Structure (Month 1)
 *Goal: Remove ambiguity and stop the bleeding in the God Class.*
 
-1.  **Resolve Mobile Project Ambiguity (Week 1)**
-    *   Archive the deprecated project (likely `mobile_flutter` if React Native is the current direction, or vice versa based on USER confirmation). Move it to an `_archive` folder or delete it.
+1.  ~~**Resolve Mobile Project Ambiguity (Week 1)**~~ ✅ **Done**
+    *   Flutter prototype archived to `_archived/mobile_flutter/`. React Native is confirmed as the single mobile platform.
 2.  **Introduce DTOs (Week 2)**
     *   Create `CheckInRequestDTO` and `ScanDataDTO`.
     *   Refactor `AttendanceController` to hydrate DTOs and pass *only* DTOs to services.

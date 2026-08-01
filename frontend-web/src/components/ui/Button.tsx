@@ -24,8 +24,6 @@ export const Button: React.FC<ButtonProps> = ({
         danger: "text-white bg-red-600 hover:bg-red-700 focus:ring-red-500"
     };
 
-    console.log('[BUTTON] Rendered with type:', type);
-
     return (
         <button
             disabled={disabled || isLoading}

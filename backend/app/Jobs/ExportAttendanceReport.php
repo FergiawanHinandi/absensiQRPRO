@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Exports\AttendanceReportExport;
+use App\Helpers\TimezoneHelper;
+use App\Models\ExportProgress;
 use App\Models\User;
 use App\Notifications\ReportExportCompleted;
 use Carbon\Carbon;
@@ -40,8 +42,9 @@ class ExportAttendanceReport extends TenantAwareJob
 
     /**
      * The number of seconds the job can run before timing out.
+     * Uses configurable timeout from exports config.
      */
-    public $timeout = 300; // 5 minutes
+    public $timeout = 600; // Default 10 minutes
 
     /**
      * Job parameters
@@ -49,6 +52,7 @@ class ExportAttendanceReport extends TenantAwareJob
     protected $userId;
     protected $reportType;
     protected $params;
+    protected $exportProgressId;
 
     /**
      * Create a new job instance.
@@ -57,14 +61,19 @@ class ExportAttendanceReport extends TenantAwareJob
      * @param int $schoolId School ID for tenant context (REQUIRED for tenant safety)
      * @param string $reportType Type of report (daily, monthly, student, school)
      * @param array $params Report parameters (date, class_id, etc.)
+     * @param int|null $exportProgressId Optional export progress tracking ID
      */
-    public function __construct(int $userId, int $schoolId, string $reportType, array $params)
+    public function __construct(int $userId, int $schoolId, string $reportType, array $params, ?int $exportProgressId = null)
     {
         parent::__construct($schoolId);
         
         $this->userId = $userId;
         $this->reportType = $reportType;
         $this->params = $params;
+        $this->exportProgressId = $exportProgressId;
+        
+        // Set timeout from config
+        $this->timeout = config('exports.timeout', 600);
     }
 
     /**
@@ -73,13 +82,17 @@ class ExportAttendanceReport extends TenantAwareJob
     public function handle(): void
     {
         $startTime = microtime(true);
+        $memoryStart = memory_get_usage(true);
         
         Log::info('Export job started', [
             'user_id' => $this->userId,
             'school_id' => $this->schoolId,
             'type' => $this->reportType,
             'params' => $this->params,
+            'memory_start' => round($memoryStart / 1024 / 1024, 2) . 'MB',
         ]);
+
+        $exportProgress = null;
 
         try {
             // Get user
@@ -91,28 +104,65 @@ class ExportAttendanceReport extends TenantAwareJob
             // ✅ TENANT SAFETY: Force school_id filter in params
             $this->params['school_id'] = $this->schoolId;
 
+            // Get or create export progress tracker
+            if ($this->exportProgressId) {
+                $exportProgress = ExportProgress::find($this->exportProgressId);
+            }
+
+            if (!$exportProgress && config('exports.enable_progress_tracking', true)) {
+                $exportProgress = ExportProgress::create([
+                    'user_id' => $this->userId,
+                    'school_id' => $this->schoolId,
+                    'export_type' => $this->reportType,
+                    'status' => ExportProgress::STATUS_PENDING,
+                ]);
+            }
+
+            // Count total records for progress tracking
+            $totalRecords = $this->countRecords();
+            
+            if ($exportProgress) {
+                $exportProgress->markAsProcessing($totalRecords);
+            }
+
+            Log::info('Export processing started', [
+                'user_id' => $this->userId,
+                'school_id' => $this->schoolId,
+                'total_records' => $totalRecords,
+                'chunk_size' => config('exports.chunk_size', 1000),
+            ]);
+
             // Generate filename
             $filename = $this->generateFilename();
             $filePath = "exports/attendance/{$filename}";
 
-            // Create export instance
-            $export = new AttendanceReportExport($this->reportType, $this->params);
+            // Create export instance with progress tracking
+            $export = new AttendanceReportExport($this->reportType, $this->params, $exportProgress);
 
-            // Store to disk (not download)
+            // Store to disk using chunked processing
             Excel::store($export, $filePath, 'public');
 
             // Get file URL
             $fileUrl = Storage::disk('public')->url($filePath);
 
             $executionTime = round(microtime(true) - $startTime, 2);
+            $memoryPeak = memory_get_peak_usage(true);
+            $memoryUsed = round($memoryPeak / 1024 / 1024, 2);
 
             Log::info('Export job completed', [
                 'user_id' => $this->userId,
                 'school_id' => $this->schoolId,
                 'type' => $this->reportType,
                 'filename' => $filename,
+                'total_records' => $totalRecords,
                 'execution_time' => $executionTime . 's',
+                'memory_peak' => $memoryUsed . 'MB',
             ]);
+
+            // Mark as completed
+            if ($exportProgress) {
+                $exportProgress->markAsCompleted($filename, $filePath);
+            }
 
             // Notify user
             $user->notify(new ReportExportCompleted([
@@ -120,6 +170,8 @@ class ExportAttendanceReport extends TenantAwareJob
                 'filename' => $filename,
                 'download_url' => $fileUrl,
                 'execution_time' => $executionTime,
+                'total_records' => $totalRecords,
+                'memory_used' => $memoryUsed,
             ]));
 
             // Audit log
@@ -135,6 +187,8 @@ class ExportAttendanceReport extends TenantAwareJob
                 'metadata' => json_encode([
                     'filename' => $filename,
                     'execution_time' => $executionTime,
+                    'total_records' => $totalRecords,
+                    'memory_used' => $memoryUsed,
                 ]),
             ]);
 
@@ -146,6 +200,11 @@ class ExportAttendanceReport extends TenantAwareJob
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            // Mark as failed
+            if ($exportProgress) {
+                $exportProgress->markAsFailed($e->getMessage());
+            }
 
             // Re-throw to trigger retry
             throw $e;
@@ -186,7 +245,7 @@ class ExportAttendanceReport extends TenantAwareJob
      */
     protected function generateFilename(): string
     {
-        $timestamp = Carbon::now()->format('Y-m-d_His');
+        $timestamp = TimezoneHelper::now()->format('Y-m-d_His');
         $type = $this->reportType;
         $userId = $this->userId;
 
@@ -199,6 +258,56 @@ class ExportAttendanceReport extends TenantAwareJob
         }
 
         return "attendance_{$type}{$identifier}_{$timestamp}_user{$userId}.xlsx";
+    }
+
+    /**
+     * Count total records for progress tracking.
+     * Uses the same query logic as the export.
+     */
+    protected function countRecords(): int
+    {
+        $query = \App\Models\Attendance::query()
+            ->where('school_id', $this->schoolId);
+
+        // Apply same filters as export
+        switch ($this->reportType) {
+            case 'daily':
+                if (isset($this->params['date'])) {
+                    $query->whereDate('attendance_date', $this->params['date']);
+                }
+                if (isset($this->params['class_id'])) {
+                    $query->whereHas('student', function ($q) {
+                        $q->where('class_id', $this->params['class_id']);
+                    });
+                }
+                break;
+
+            case 'monthly':
+                if (isset($this->params['month']) && isset($this->params['year'])) {
+                    $query->whereYear('attendance_date', $this->params['year'])
+                          ->whereMonth('attendance_date', $this->params['month']);
+                }
+                if (isset($this->params['class_id'])) {
+                    $query->whereHas('student', function ($q) {
+                        $q->where('class_id', $this->params['class_id']);
+                    });
+                }
+                break;
+
+            case 'student':
+                if (isset($this->params['student_id'])) {
+                    $query->where('student_id', $this->params['student_id']);
+                }
+                if (isset($this->params['start_date']) && isset($this->params['end_date'])) {
+                    $query->whereBetween('attendance_date', [
+                        $this->params['start_date'],
+                        $this->params['end_date']
+                    ]);
+                }
+                break;
+        }
+
+        return $query->count();
     }
 
     /**

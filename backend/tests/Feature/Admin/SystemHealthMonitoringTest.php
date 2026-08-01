@@ -61,7 +61,7 @@ class SystemHealthMonitoringTest extends TestCase
         $this->teacher->assignRole('teacher');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_access_system_health_endpoint()
     {
         $response = $this->actingAs($this->admin, 'sanctum')
@@ -84,7 +84,7 @@ class SystemHealthMonitoringTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_without_system_monitor_permission_cannot_access()
     {
         // Create admin without system:monitor permission
@@ -105,7 +105,7 @@ class SystemHealthMonitoringTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function token_with_only_wildcard_but_no_explicit_system_monitor_is_denied()
     {
         // Create a user with wildcard permission but NOT system:monitor
@@ -130,7 +130,7 @@ class SystemHealthMonitoringTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_cannot_access_system_health_endpoint()
     {
         $response = $this->actingAs($this->teacher, 'sanctum')
@@ -139,7 +139,7 @@ class SystemHealthMonitoringTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthenticated_user_cannot_access_system_health()
     {
         $response = $this->getJson('/api/v1/admin/system/health');
@@ -147,7 +147,7 @@ class SystemHealthMonitoringTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function system_health_returns_correct_queue_metrics()
     {
         // Create some failed jobs
@@ -197,7 +197,7 @@ class SystemHealthMonitoringTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function system_health_calculates_health_status_correctly()
     {
         // Test healthy status (no issues)
@@ -237,7 +237,7 @@ class SystemHealthMonitoringTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function system_health_generates_alerts_for_high_failures()
     {
         // Create 15 failed jobs (should trigger warning alert)
@@ -260,7 +260,7 @@ class SystemHealthMonitoringTest extends TestCase
             ->assertJsonPath('data.alerts.0.category', 'queue');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function queue_health_endpoint_returns_detailed_metrics()
     {
         $response = $this->actingAs($this->admin, 'sanctum')
@@ -279,7 +279,7 @@ class SystemHealthMonitoringTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_health_endpoint_returns_security_metrics()
     {
         $response = $this->actingAs($this->admin, 'sanctum')
@@ -298,7 +298,7 @@ class SystemHealthMonitoringTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function system_health_handles_missing_activity_log_table_gracefully()
     {
         // This test ensures the endpoint doesn't crash if activity_log table doesn't exist
@@ -319,7 +319,7 @@ class SystemHealthMonitoringTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function system_health_caches_metrics_correctly()
     {
         // First request - should hit database
@@ -367,7 +367,7 @@ class SystemHealthMonitoringTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function queue_health_calculates_lag_correctly()
     {
         // Create an old pending job (10 minutes ago)
@@ -392,7 +392,7 @@ class SystemHealthMonitoringTest extends TestCase
         $this->assertLessThan(610, $queueLag);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_access_system_health()
     {
         $superAdmin = User::factory()->create([
@@ -414,7 +414,7 @@ class SystemHealthMonitoringTest extends TestCase
         $this->assertTrue($superAdmin->hasPermissionTo('system:monitor'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_can_access_system_health()
     {
         $schoolAdmin = User::factory()->create([
@@ -430,7 +430,7 @@ class SystemHealthMonitoringTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function system_health_returns_timestamp_in_iso8601_format()
     {
         $response = $this->actingAs($this->admin, 'sanctum')

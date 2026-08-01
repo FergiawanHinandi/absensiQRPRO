@@ -12,15 +12,13 @@ use Tests\TestCase;
 
 /**
  * Automated Security Test Suite
- *
  * Covers:
  * 1. Timing Attack Prevention (Response Time Analysis)
  * 2. Rate Limiting (Brute Force Protection)
  * 3. Idempotency (Replay Attack Protection)
- *
- * @group security
- * @group automated
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('automated')]
 class AutomatedSecurityTest extends TestCase
 {
     use RefreshDatabase;

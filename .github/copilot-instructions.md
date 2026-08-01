@@ -2,7 +2,7 @@
 
 ## Architecture Overview
 Monorepo with three apps sharing a common REST API:
-- **backend/** — Laravel 12 API (PHP 8.2+), PostgreSQL, Laravel Sanctum auth, Reverb WebSocket
+- **backend/** — Laravel 11 API (PHP 8.2+), PostgreSQL, Laravel Sanctum auth, Reverb WebSocket
 - **frontend-web/** — React 19 + Vite + TailwindCSS admin dashboard
 - **AbsensiQRMobile/** — React Native teacher/student mobile app
 

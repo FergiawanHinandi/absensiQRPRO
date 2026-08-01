@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Payment;
 use App\Http\Controllers\Controller;
 use App\Models\ProcessedWebhook;
 use App\Models\Subscription;
+use App\Services\WebhookMonitoringService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -50,13 +51,45 @@ class MidtransWebhookController extends Controller
         // 2. Redis Mutex Lock (300s TTL)
         // Ensures only ONE process handles this specific order_id concurrently.
         $lockKey = "webhook_lock:{$orderId}";
-        $lock = Cache::lock($lockKey, 300);
+        $lockTimeout = config('webhook.lock_timeout', 300);
+        
+        // Track lock acquisition start time
+        $lockStartTime = microtime(true) * 1000;
+        
+        $lock = Cache::lock($lockKey, $lockTimeout);
 
         if (!$lock->get()) {
+            // Track lock contention
+            WebhookMonitoringService::trackLockContention($orderId, 'already_locked');
+            
             // Already being processed by another worker
             Log::info('webhook_duplicate_lock', ['order_id' => $orderId]);
+            
+            // Check if already processed and return cached response
+            if (ProcessedWebhook::isAlreadyProcessed($orderId)) {
+                $cachedResponse = ProcessedWebhook::getCachedResponse($orderId);
+                if ($cachedResponse) {
+                    return response()->json($cachedResponse);
+                }
+            }
+            
+            // Check if currently processing
+            if (ProcessedWebhook::isProcessing($orderId)) {
+                $processingResponse = ProcessedWebhook::getProcessingResponse($orderId);
+                if ($processingResponse) {
+                    return response()->json($processingResponse);
+                }
+            }
+            
             return response()->json(['message' => 'Processing'], 200); // 200 to satisfy Midtrans retry logic
         }
+
+        // Track successful lock acquisition
+        $lockAcquisitionTime = (microtime(true) * 1000) - $lockStartTime;
+        WebhookMonitoringService::trackLockAcquisition($orderId, $lockAcquisitionTime);
+
+        // Start processing timer
+        $processingStartTime = WebhookMonitoringService::startProcessing($orderId);
 
         try {
             // 3. Database Transaction & Idempotency Check
@@ -126,10 +159,17 @@ class MidtransWebhookController extends Controller
                 ]);
 
                 Log::info('webhook_processed_success', ['order_id' => $orderId, 'status' => $transactionStatus]);
+                
+                // Track processing end
+                WebhookMonitoringService::endProcessing($orderId, $processingStartTime, 'success');
             });
 
         } catch (\Exception $e) {
             Log::error('webhook_processing_failed', ['order_id' => $orderId, 'error' => $e->getMessage()]);
+            
+            // Track processing end
+            WebhookMonitoringService::endProcessing($orderId, $processingStartTime, 'failed');
+            
             // If DB Transaction fails, we return 500 so Midtrans retries later.
             // The Redis lock will expire in 10s allowing retry.
             return response()->json(['message' => 'Error processing webhook'], 500);

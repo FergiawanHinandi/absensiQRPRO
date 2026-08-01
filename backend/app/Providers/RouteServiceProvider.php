@@ -1,11 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -58,48 +57,15 @@ class RouteServiceProvider extends ServiceProvider
 
     /**
      * Configure the rate limiters for the application.
+     *
+     * NOTE: Rate limiters are defined in AppServiceProvider to avoid duplication.
+     * This method is kept for backward compatibility but does not register
+     * duplicate rate limiters.
      */
     protected function configureRateLimiting(): void
     {
-        // Default API rate limit
-        RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
-        });
-
-        // Login rate limit (brute force protection)
-        RateLimiter::for('login', function (Request $request) {
-            $key = $request->input('username', $request->ip());
-
-            return Limit::perMinute(5)->by($key)->response(function () {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Terlalu banyak percobaan login. Silakan coba lagi dalam 1 menit.',
-                ], 429);
-            });
-        });
-
-        // Scan rate limit (per user + IP)
-        RateLimiter::for('scan', function (Request $request) {
-            $key = ($request->user()?->id ?? 'guest').'|'.$request->ip();
-
-            return Limit::perMinute(30)->by($key);
-        });
-
-        // Global rate limit (for public endpoints)
-        RateLimiter::for('global', function (Request $request) {
-            return Limit::perMinute(100)->by($request->ip());
-        });
-
-        // Export rate limit (heavy operations)
-        RateLimiter::for('export', function (Request $request) {
-            return Limit::perHour(10)->by($request->user()?->id ?? $request->ip());
-        });
-
-        // School-scoped rate limit
-        RateLimiter::for('school', function (Request $request) {
-            $schoolId = $request->user()?->school_id ?? 0;
-
-            return Limit::perMinute(100)->by('school:'.$schoolId);
-        });
+        // Rate limiters are now centralized in AppServiceProvider::boot()
+        // to prevent duplication and ensure consistent configuration.
+        // See: app/Providers/AppServiceProvider.php
     }
 }

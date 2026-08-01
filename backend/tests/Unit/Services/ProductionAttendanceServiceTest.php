@@ -28,7 +28,7 @@ class ProductionAttendanceServiceTest extends TestCase
         Redis::flushdb();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_successfully_records_attendance()
     {
         $student = User::factory()->student()->create();
@@ -56,7 +56,7 @@ class ProductionAttendanceServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_attendance_with_redis_lock()
     {
         $student = User::factory()->student()->create();
@@ -86,7 +86,7 @@ class ProductionAttendanceServiceTest extends TestCase
         $this->assertEquals(1, Attendance::count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_concurrent_scans_atomically()
     {
         $student = User::factory()->student()->create();
@@ -119,7 +119,7 @@ class ProductionAttendanceServiceTest extends TestCase
         $this->assertGreaterThan(0, $successCount);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_expired_qr_token()
     {
         $student = User::factory()->student()->create();
@@ -140,7 +140,7 @@ class ProductionAttendanceServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_invalid_qr_signature()
     {
         $student = User::factory()->student()->create();
@@ -161,7 +161,7 @@ class ProductionAttendanceServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_school_mismatch()
     {
         $student = User::factory()->student()->create();
@@ -182,7 +182,7 @@ class ProductionAttendanceServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_gps_coordinates()
     {
         $school = School::factory()->create([
@@ -212,7 +212,7 @@ class ProductionAttendanceServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_generates_qr_code_successfully()
     {
         $teacher = User::factory()->teacher()->create();
@@ -233,7 +233,7 @@ class ProductionAttendanceServiceTest extends TestCase
         $this->assertTrue(Redis::exists($redisKey));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_existing_qr_if_still_valid()
     {
         $teacher = User::factory()->teacher()->create();
@@ -252,7 +252,7 @@ class ProductionAttendanceServiceTest extends TestCase
         $this->assertEquals($qr1['payload']['nonce'], $qr2['payload']['nonce']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_multiple_active_qr_codes()
     {
         $teacher = User::factory()->teacher()->create();
@@ -272,7 +272,7 @@ class ProductionAttendanceServiceTest extends TestCase
         $this->assertCount(1, $tokens);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_unauthorized_teacher()
     {
         $teacher = User::factory()->teacher()->create();
@@ -289,7 +289,7 @@ class ProductionAttendanceServiceTest extends TestCase
         $this->service->generateQR($schedule->id, $teacher, 60);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_successful_attendance()
     {
         Log::shouldReceive('channel')
@@ -314,7 +314,7 @@ class ProductionAttendanceServiceTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_duplicate_attempts()
     {
         $student = User::factory()->student()->create();

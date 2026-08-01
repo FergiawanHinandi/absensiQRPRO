@@ -7,8 +7,11 @@ use App\Http\Controllers\Api\V1\RegionController;
 
 Route::get('/health', [HealthController::class, 'check']);
 
-// Redis-specific health check endpoint
+// Individual service health checks
+Route::get('/health/database', [HealthController::class, 'database']);
 Route::get('/health/redis', [HealthController::class, 'redis']);
+Route::get('/health/storage', [HealthController::class, 'storage']);
+Route::get('/health/queue', [HealthController::class, 'queue']);
 
 // Deep health check for self-healing infrastructure (internal use only)
 Route::get('/health/deep', [\App\Http\Controllers\HealthCheckController::class, 'deep'])
@@ -39,3 +42,17 @@ Route::prefix('region')->group(function () {
 });
 
 // Xendit payment callback handled by WebhookController (see webhook routes)
+
+// FCM Device Token Registration (mobile app push notifications)
+Route::post('/device-token', [\App\Http\Controllers\Api\V1\DeviceTokenController::class, 'update'])
+    ->middleware(['auth:sanctum']);
+Route::delete('/device-token', [\App\Http\Controllers\Api\V1\DeviceTokenController::class, 'destroy'])
+    ->middleware(['auth:sanctum']);
+
+// General Notifications (for all authenticated users - teachers, parents, students, admins)
+Route::prefix('notifications')->middleware(['auth:sanctum'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\Api\V1\NotificationController::class, 'index']);
+    Route::post('/{id}/read', [\App\Http\Controllers\Api\V1\NotificationController::class, 'markRead']);
+    Route::post('/read-all', [\App\Http\Controllers\Api\V1\NotificationController::class, 'markAllRead']);
+    Route::get('/unread-count', [\App\Http\Controllers\Api\V1\NotificationController::class, 'unreadCount']);
+});

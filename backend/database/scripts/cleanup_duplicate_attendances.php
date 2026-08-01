@@ -1,49 +1,39 @@
-#!/usr/bin/env php
 <?php
 
 /**
  * Cleanup Duplicate Attendance Records
  * 
- * This standalone script identifies and removes duplicate attendance records.
- * Strategy: Keep oldest record (lowest ID), soft delete duplicates.
+ * This script removes duplicate attendance records by:
+ * 1. Keeping the oldest record (first created_at)
+ * 2. Soft deleting all newer duplicates
+ * 3. Logging all cleanup actions for audit trail
  * 
- * Usage:
- *   php database/scripts/cleanup_duplicate_attendances.php [--dry-run] [--export]
+ * Usage: php database/scripts/cleanup_duplicate_attendances.php [--dry-run]
  * 
  * Options:
- *   --dry-run    Preview changes without executing
- *   --export     Export cleanup report to JSON file
+ *   --dry-run    Show what would be deleted without actually deleting
  */
 
-// Load Laravel bootstrap
 require __DIR__ . '/../../vendor/autoload.php';
 
 $app = require_once __DIR__ . '/../../bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use App\Helpers\TimezoneHelper;
 
-// Parse command line arguments
-$isDryRun = in_array('--dry-run', $argv);
-$shouldExport = in_array('--export', $argv);
+// Check for dry-run mode
+$dryRun = in_array('--dry-run', $argv);
 
-echo "===========================================\n";
-echo "Duplicate Attendance Cleanup Script\n";
-echo "===========================================\n\n";
-
-if ($isDryRun) {
-    echo "🔍 DRY RUN MODE - No changes will be made\n\n";
+echo "=================================================================\n";
+echo "Duplicate Attendance Records Cleanup\n";
+echo "=================================================================\n";
+if ($dryRun) {
+    echo "🔍 DRY RUN MODE - No changes will be made\n";
 }
+echo "\n";
 
-// Step 1: Find duplicates
-echo "Step 1: Identifying duplicate records...\n";
-
-$driver = DB::connection()->getDriverName();
-$groupConcat = $driver === 'pgsql' 
-    ? "STRING_AGG(CAST(id AS TEXT), ',' ORDER BY id)" 
-    : "GROUP_CONCAT(id ORDER BY id)";
-
+// Find duplicate records
 $duplicates = DB::select("
     SELECT 
         student_id,
@@ -51,15 +41,12 @@ $duplicates = DB::select("
         attendance_date,
         school_id,
         COUNT(*) as duplicate_count,
-        {$groupConcat} as attendance_ids,
-        MIN(id) as keep_id,
-        MIN(created_at) as first_created,
-        MAX(created_at) as last_created
+        GROUP_CONCAT(id ORDER BY created_at ASC) as attendance_ids
     FROM attendances
     WHERE deleted_at IS NULL
     GROUP BY student_id, schedule_id, attendance_date, school_id
     HAVING COUNT(*) > 1
-    ORDER BY duplicate_count DESC, school_id, attendance_date DESC
+    ORDER BY school_id, attendance_date DESC
 ");
 
 if (empty($duplicates)) {
@@ -68,171 +55,137 @@ if (empty($duplicates)) {
     exit(0);
 }
 
-$totalSets = count($duplicates);
-$totalRecordsToRemove = 0;
-$duplicatesBySchool = [];
+echo "Found " . count($duplicates) . " sets of duplicate records\n\n";
 
-foreach ($duplicates as $duplicate) {
-    $extraRecords = (int) $duplicate->duplicate_count - 1;
-    $totalRecordsToRemove += $extraRecords;
-    
-    if (!isset($duplicatesBySchool[$duplicate->school_id])) {
-        $duplicatesBySchool[$duplicate->school_id] = 0;
-    }
-    $duplicatesBySchool[$duplicate->school_id] += $extraRecords;
-}
+$totalToDelete = 0;
+$deletedRecords = [];
+$errors = [];
 
-echo "⚠️  Found {$totalSets} sets of duplicate records\n";
-echo "⚠️  Total records to be removed: {$totalRecordsToRemove}\n\n";
+// Create audit log table if not exists
+DB::statement("
+    CREATE TABLE IF NOT EXISTS attendance_cleanup_log (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        attendance_id BIGINT UNSIGNED NOT NULL,
+        student_id BIGINT UNSIGNED NOT NULL,
+        schedule_id BIGINT UNSIGNED NOT NULL,
+        attendance_date DATE NOT NULL,
+        school_id BIGINT UNSIGNED NOT NULL,
+        state VARCHAR(50),
+        status VARCHAR(50),
+        created_at TIMESTAMP,
+        deleted_at TIMESTAMP,
+        cleanup_reason VARCHAR(255),
+        cleanup_performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_cleanup_school (school_id),
+        INDEX idx_cleanup_date (attendance_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+");
 
-// Display summary table
-echo str_pad("Set #", 8) . str_pad("School", 10) . str_pad("Student", 12) . 
-     str_pad("Schedule", 12) . str_pad("Date", 14) . str_pad("Count", 8) . 
-     str_pad("Keep ID", 10) . str_pad("Remove", 8) . "\n";
-echo str_repeat("-", 82) . "\n";
+echo "Processing duplicates...\n";
+echo "-------------------------------------------------------------------\n";
 
-foreach ($duplicates as $index => $duplicate) {
-    $duplicateCount = (int) $duplicate->duplicate_count;
-    $extraRecords = $duplicateCount - 1;
-    
-    echo str_pad($index + 1, 8) . 
-         str_pad($duplicate->school_id, 10) . 
-         str_pad($duplicate->student_id, 12) . 
-         str_pad($duplicate->schedule_id, 12) . 
-         str_pad($duplicate->attendance_date, 14) . 
-         str_pad($duplicateCount, 8) . 
-         str_pad($duplicate->keep_id, 10) . 
-         str_pad($extraRecords, 8) . "\n";
-}
+DB::beginTransaction();
 
-echo "\n";
-
-// Step 2: Confirmation (unless dry-run)
-if (!$isDryRun) {
-    echo "⚠️  WARNING: This will soft delete duplicate records!\n";
-    echo "Strategy: Keep oldest record (lowest ID), soft delete others\n\n";
-    echo "Do you want to proceed with cleanup? (yes/no): ";
-    
-    $handle = fopen("php://stdin", "r");
-    $line = fgets($handle);
-    $confirmation = trim(strtolower($line));
-    fclose($handle);
-    
-    if ($confirmation !== 'yes' && $confirmation !== 'y') {
-        echo "Cleanup cancelled by user.\n";
-        exit(0);
-    }
-}
-
-// Step 3: Cleanup duplicates
-echo "\nStep 2: Cleaning up duplicates...\n";
-
-$removedCount = 0;
-$keptCount = 0;
-$bySchool = [];
-$removedIds = [];
-$keptIds = [];
-
-foreach ($duplicates as $duplicate) {
-    $ids = explode(',', $duplicate->attendance_ids);
-    $keepId = (int) $duplicate->keep_id;
-    
-    // IDs to remove (all except the oldest)
-    $idsToRemove = array_filter($ids, fn($id) => (int) $id !== $keepId);
-    
-    if (!$isDryRun) {
+try {
+    foreach ($duplicates as $i => $duplicate) {
+        $ids = explode(',', $duplicate->attendance_ids);
+        $keepId = $ids[0]; // Keep the oldest (first in list)
+        $deleteIds = array_slice($ids, 1); // Delete the rest
+        
+        echo sprintf(
+            "%d. Student %d, Schedule %d, Date %s, School %d\n",
+            $i + 1,
+            $duplicate->student_id,
+            $duplicate->schedule_id,
+            $duplicate->attendance_date,
+            $duplicate->school_id
+        );
+        echo "   Keeping ID: {$keepId}\n";
+        echo "   Deleting IDs: " . implode(', ', $deleteIds) . "\n";
+        
+        // Get details of records to delete for audit log
+        $recordsToDelete = DB::table('attendances')
+            ->whereIn('id', $deleteIds)
+            ->get();
+        
+        foreach ($recordsToDelete as $record) {
+            // Log to audit table
+            if (!$dryRun) {
+                DB::table('attendance_cleanup_log')->insert([
+                    'attendance_id' => $record->id,
+                    'student_id' => $record->student_id,
+                    'schedule_id' => $record->schedule_id,
+                    'attendance_date' => $record->attendance_date,
+                    'school_id' => $record->school_id,
+                    'state' => $record->state,
+                    'status' => $record->status,
+                    'created_at' => $record->created_at,
+                    'deleted_at' => TimezoneHelper::now(),
+                    'cleanup_reason' => 'Duplicate record - keeping oldest (ID: ' . $keepId . ')',
+                    'cleanup_performed_at' => TimezoneHelper::now(),
+                ]);
+            }
+            
+            $deletedRecords[] = $record->id;
+            $totalToDelete++;
+        }
+        
         // Soft delete duplicates
-        DB::table('attendances')
-            ->whereIn('id', $idsToRemove)
-            ->update([
-                'deleted_at' => now(),
-                'updated_at' => now(),
-            ]);
+        if (!$dryRun) {
+            DB::table('attendances')
+                ->whereIn('id', $deleteIds)
+                ->update([
+                    'deleted_at' => TimezoneHelper::now(),
+                ]);
+        }
     }
     
-    $removedCount += count($idsToRemove);
-    $keptCount++;
-    
-    // Track by school
-    if (!isset($bySchool[$duplicate->school_id])) {
-        $bySchool[$duplicate->school_id] = 0;
+    if ($dryRun) {
+        echo "\n";
+        echo "🔍 DRY RUN COMPLETE - No changes were made\n";
+        echo "Total records that would be deleted: {$totalToDelete}\n";
+        DB::rollBack();
+    } else {
+        DB::commit();
+        echo "\n";
+        echo "✅ CLEANUP COMPLETE\n";
+        echo "Total records soft deleted: {$totalToDelete}\n";
+        echo "Audit log entries created: {$totalToDelete}\n";
     }
-    $bySchool[$duplicate->school_id] += count($idsToRemove);
     
-    // Track IDs for report
-    $removedIds = array_merge($removedIds, array_map('intval', $idsToRemove));
-    $keptIds[] = $keepId;
-    
-    echo ".";
+} catch (\Exception $e) {
+    DB::rollBack();
+    echo "\n";
+    echo "❌ ERROR during cleanup: " . $e->getMessage() . "\n";
+    echo "Transaction rolled back. No changes were made.\n";
+    exit(1);
 }
 
-echo "\n\n";
-
-// Step 4: Display results
-echo "===========================================\n";
-echo "Cleanup Results:\n";
-echo "===========================================\n";
-
-if ($isDryRun) {
-    echo "Would remove: {$removedCount} records\n";
-} else {
-    echo "✅ Successfully removed: {$removedCount} records\n";
-    echo "✅ Kept: {$keptCount} records\n";
-}
-
-echo "\nCleanup by School:\n";
-foreach ($bySchool as $schoolId => $count) {
-    echo "  School ID {$schoolId}: {$count} record(s) removed\n";
-}
 echo "\n";
+echo "=================================================================\n";
+echo "Cleanup Summary:\n";
+echo "=================================================================\n";
+echo "Duplicate sets processed: " . count($duplicates) . "\n";
+echo "Records soft deleted: {$totalToDelete}\n";
 
-// Step 5: Export report
-if ($shouldExport) {
-    $report = [
-        'removed_count' => $removedCount,
-        'kept_count' => $keptCount,
-        'by_school' => $bySchool,
-        'removed_ids' => $removedIds,
-        'kept_ids' => $keptIds,
-        'timestamp' => now()->toDateTimeString(),
-    ];
+if (!$dryRun) {
+    echo "\n";
+    echo "📋 Audit Log:\n";
+    echo "All deleted records have been logged in 'attendance_cleanup_log' table\n";
+    echo "You can review the cleanup with:\n";
+    echo "  SELECT * FROM attendance_cleanup_log ORDER BY cleanup_performed_at DESC;\n";
     
-    $prefix = $isDryRun ? 'dry_run_' : '';
-    $exportPath = storage_path("app/logs/{$prefix}duplicate_cleanup_" . date('Y-m-d_His') . '.json');
-    
-    if (!is_dir(dirname($exportPath))) {
-        mkdir(dirname($exportPath), 0755, true);
-    }
-    
-    file_put_contents($exportPath, json_encode($report, JSON_PRETTY_PRINT));
-    echo "📄 Cleanup report exported to: {$exportPath}\n\n";
+    echo "\n";
+    echo "🔄 Rollback Instructions (if needed):\n";
+    echo "To restore deleted records:\n";
+    echo "  UPDATE attendances SET deleted_at = NULL WHERE id IN (\n";
+    echo "    SELECT attendance_id FROM attendance_cleanup_log\n";
+    echo "    WHERE cleanup_performed_at >= '" . TimezoneHelper::now()->subHours(1)->toDateTimeString() . "'\n";
+    echo "  );\n";
 }
 
-// Step 6: Log to application log
-if (!$isDryRun) {
-    Log::info('Duplicate attendance cleanup completed', [
-        'removed_count' => $removedCount,
-        'kept_count' => $keptCount,
-        'by_school' => $bySchool,
-        'timestamp' => now()->toDateTimeString(),
-    ]);
-}
-
-// Step 7: Next steps
-echo "===========================================\n";
-echo "Next Steps:\n";
-echo "===========================================\n";
-
-if ($isDryRun) {
-    echo "1. Review the changes above\n";
-    echo "2. Run without --dry-run to apply changes:\n";
-    echo "   php database/scripts/cleanup_duplicate_attendances.php\n";
-} else {
-    echo "1. ✅ Duplicates cleaned up\n";
-    echo "2. Run: php artisan migrate (to apply unique constraint)\n";
-    echo "3. Update application code to use firstOrCreate()\n";
-    echo "4. Run: php artisan test --filter=AttendanceTest\n";
-}
 echo "\n";
+echo "✅ Next Step: Run the migration to add unique constraint\n";
+echo "   php artisan migrate\n\n";
 
 exit(0);

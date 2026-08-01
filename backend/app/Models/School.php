@@ -52,7 +52,27 @@ class School extends Model
      */
     public function classes(): HasMany
     {
-        return $this->hasMany(SchoolClass::class);
+        return $this->hasMany(ClassModel::class);
+    }
+
+    /**
+     * Get the student users for the school.
+     * Used by withCount('students').
+     */
+    public function students(): HasMany
+    {
+        return $this->hasMany(User::class)->where('role_type', 'student')->where('is_active', true);
+    }
+
+    /**
+     * Get the teacher users for the school.
+     * Used by withCount('teachers').
+     */
+    public function teachers(): HasMany
+    {
+        return $this->hasMany(User::class)
+            ->whereIn('role_type', ['teacher', 'homeroom_teacher'])
+            ->where('is_active', true);
     }
 
     /**

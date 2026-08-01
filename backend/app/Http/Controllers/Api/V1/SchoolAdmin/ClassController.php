@@ -108,6 +108,52 @@ class ClassController extends Controller
     }
 
     /**
+     * Show Class Detail
+     */
+    public function show(Request $request, int $classId)
+    {
+        $user = $request->user();
+        $schoolId = $user->school_id;
+
+        $class = \App\Models\ClassModel::where('school_id', $schoolId)
+            ->where('id', $classId)
+            ->first();
+
+        if (!$class) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kelas tidak ditemukan',
+            ], 404);
+        }
+
+        // Load related data
+        $studentCount = DB::table('class_students')
+            ->where('class_id', $classId)
+            ->where('status', 'active')
+            ->count();
+
+        $homeroomTeacher = $class->homeroom_teacher_id
+            ? DB::table('users')->where('id', $class->homeroom_teacher_id)->select('id', 'name', 'email')->first()
+            : null;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $class->id,
+                'name' => $class->name,
+                'grade_level' => $class->grade_level,
+                'academic_year_id' => $class->academic_year_id,
+                'max_students' => $class->max_students,
+                'classroom' => $class->classroom,
+                'is_active' => (bool) $class->is_active,
+                'homeroom_teacher_id' => $class->homeroom_teacher_id,
+                'homeroom_teacher' => $homeroomTeacher,
+                'total_students' => $studentCount,
+            ],
+        ]);
+    }
+
+    /**
      * Update Class
      */
     public function update(UpdateClassRequest $request, int $classId)

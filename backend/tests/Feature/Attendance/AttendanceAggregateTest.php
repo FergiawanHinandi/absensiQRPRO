@@ -17,18 +17,16 @@ use Tests\TestCase;
 
 /**
  * AttendanceAggregateTest
- *
  * Comprehensive feature test suite for Attendance Aggregate Root.
  * Covers:
  * 1. State Transitions (Valid & Invalid)
  * 2. Concurrency Requests (Simulated)
  * 3. Idempotency & Replay Protection
  * 4. Tenant Isolation
- *
- * @group aggregate
- * @group attendance
- * @group critical
  */
+#[\PHPUnit\Framework\Attributes\Group('aggregate')]
+#[\PHPUnit\Framework\Attributes\Group('attendance')]
+#[\PHPUnit\Framework\Attributes\Group('critical')]
 class AttendanceAggregateTest extends TestCase
 {
     use RefreshDatabase;

@@ -106,8 +106,11 @@ trait HasAttendanceStateMachine
             
             $this->save();
 
-            // Log the transition
+            // Log the transition to attendance_logs table
             $this->logStateTransition($currentState, $newState, $actor, $reason);
+
+            // Log to spatie activity log for audit trail
+            $this->logActivityTransition($currentState, $newState, $actor, $reason);
 
             Log::info('Attendance state transition', [
                 'attendance_id' => $this->id,
@@ -326,6 +329,43 @@ trait HasAttendanceStateMachine
         } catch (\Illuminate\Database\QueryException $e) {
             // Log error but don't fail the transaction
             Log::error('Failed to create attendance audit log', [
+                'attendance_id' => $this->id,
+                'from' => $from->value,
+                'to' => $to->value,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Log state transition to spatie activity log
+     */
+    protected function logActivityTransition(
+        AttendanceState $from,
+        AttendanceState $to,
+        ?User $actor,
+        ?string $reason
+    ): void {
+        try {
+            activity('attendance_state_machine')
+                ->performedOn($this)
+                ->causedBy($actor)
+                ->withProperties([
+                    'from_state' => $from->value,
+                    'to_state' => $to->value,
+                    'from_label' => $from->label(),
+                    'to_label' => $to->label(),
+                    'reason' => $reason,
+                    'student_id' => $this->student_id,
+                    'schedule_id' => $this->schedule_id,
+                    'attendance_date' => $this->attendance_date,
+                    'school_id' => $this->school_id,
+                    'timestamp' => now()->toIso8601String(),
+                ])
+                ->log("State transition: {$from->label()} → {$to->label()}");
+        } catch (\Exception $e) {
+            // Log error but don't fail the transaction
+            Log::error('Failed to create spatie activity log', [
                 'attendance_id' => $this->id,
                 'from' => $from->value,
                 'to' => $to->value,

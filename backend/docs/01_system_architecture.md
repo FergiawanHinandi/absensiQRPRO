@@ -18,7 +18,7 @@ graph TB
         AUTH[Authentication Middleware]
     end
     
-    subgraph "Application Layer - Laravel 12"
+    subgraph "Application Layer - Laravel 11"
         API[REST API Controllers]
         SVC[Service Layer]
         REPO[Repository Pattern]
@@ -68,7 +68,7 @@ graph TB
 ### 1.2 Technology Stack
 
 #### Backend (API)
-- **Framework**: Laravel 12 (PHP 8.3+)
+- **Framework**: Laravel 11 (PHP 8.2+)
 - **Database**: PostgreSQL 15+ (ACID compliance, JSON support)
 - **Cache**: Redis 7+
 - **Queue**: Laravel Queue with Redis driver
@@ -428,7 +428,7 @@ Lihat `api_specification.md` untuk detail lengkap.
 
 1. Review arsitektur ini dengan stakeholder
 2. Finalize database schema (lihat `database_schema.md`)
-3. Setup Laravel 12 project structure
+3. Setup Laravel 11 project structure
 4. Implement authentication & RBAC
 5. Develop QR Service & Attendance Service
 6. Build Mobile App (Flutter/React Native)

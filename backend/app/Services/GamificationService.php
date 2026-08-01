@@ -181,13 +181,13 @@ class GamificationService
         }
 
         // Check if student already has this badge
-        $hasBadge = \Illuminate\Support\Facades\DB::table('student_badges')
-            ->where('student_id', $student->id)
+        $hasBadge = \App\Models\StudentBadge::where('student_id', $student->id)
             ->where('badge_id', $badge->id)
             ->exists();
 
         if (! $hasBadge) {
-            \Illuminate\Support\Facades\DB::table('student_badges')->insert([
+            \App\Models\StudentBadge::create([
+                'school_id' => $student->school_id,
                 'student_id' => $student->id,
                 'badge_id' => $badge->id,
                 'awarded_at' => now(),
@@ -428,7 +428,7 @@ class GamificationService
         //  - present_count
         //  - total_points (tie-breaker)
 
-        $candidates = \Illuminate\Support\Facades\DB::table('attendances')
+        $candidates = \App\Models\Attendance::query()
             ->select('student_id',
                 \Illuminate\Support\Facades\DB::raw("COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent_count"),
                 \Illuminate\Support\Facades\DB::raw("COUNT(CASE WHEN status = 'late' THEN 1 END) as late_count"),

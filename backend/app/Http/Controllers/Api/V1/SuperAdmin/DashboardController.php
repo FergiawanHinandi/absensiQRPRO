@@ -123,11 +123,38 @@ class DashboardController extends Controller
             $dbStatus = 'down';
         }
 
+        // ARCH-02 FIX: Storage status dihitung dari tes writability nyata,
+        // bukan placeholder hardcoded.
+        $storageStatus = 'operational';
+        try {
+            $testFile = storage_path('app/health-check-'.time().'.tmp');
+            if (false === @file_put_contents($testFile, 'ok')) {
+                $storageStatus = 'degraded';
+            } else {
+                @unlink($testFile);
+            }
+        } catch (\Exception $e) {
+            $storageStatus = 'down';
+        }
+
+        // ARCH-02 FIX: Queue Worker status dihitung dari heartbeat worker + jumlah
+        // job antrean, bukan placeholder hardcoded.
+        $queueStatus = 'operational';
+        try {
+            $heartbeat = \Illuminate\Support\Facades\Cache::get('queue_worker:heartbeat');
+            $pendingJobs = \Illuminate\Support\Facades\DB::table('jobs')->count();
+            if ($pendingJobs > 0 && ! $heartbeat) {
+                $queueStatus = 'degraded'; // Ada antrean tapi tidak ada heartbeat worker
+            }
+        } catch (\Exception $e) {
+            $queueStatus = 'unknown';
+        }
+
         $systemStatus = [
             ['service' => 'API Server', 'status' => 'operational', 'uptime' => '99.98%'],
             ['service' => 'Database', 'status' => $dbStatus, 'uptime' => '99.95%'],
-            ['service' => 'Storage', 'status' => 'operational', 'uptime' => '100%'], // Placeholder logic
-            ['service' => 'Queue Worker', 'status' => 'operational', 'uptime' => '99.92%'], // Placeholder logic
+            ['service' => 'Storage', 'status' => $storageStatus, 'uptime' => '100%'],
+            ['service' => 'Queue Worker', 'status' => $queueStatus, 'uptime' => '99.92%'],
         ];
 
         // 10. Audit Logs (Recent Activities)

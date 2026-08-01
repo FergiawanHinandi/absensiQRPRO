@@ -2,7 +2,7 @@
 
 > Sistem absensi berbasis QR Code untuk SD/SMP/SMA/SMK dengan multi-tenant support
 
-[![Laravel](https://img.shields.io/badge/Laravel-12-red.svg)](https://laravel.com)
+[![Laravel](https://img.shields.io/badge/Laravel-11-red.svg)](https://laravel.com)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-blue.svg)](https://php.net)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -22,7 +22,7 @@
 - ✅ **Manual Input** - Guru bisa input manual untuk siswa yang tidak scan
 - ✅ **Comprehensive Reports** - Daily, weekly, monthly reports dengan export PDF/Excel
 - ✅ **Audit Trail** - Semua aktivitas tercatat dengan GPS & device info
-- ✅ **RESTful API** - Backend API menggunakan Laravel 12
+- ✅ **RESTful API** - Backend API menggunakan Laravel 11
 - ✅ **Mobile Ready** - Support untuk Flutter/React Native app
 
 ---
@@ -44,7 +44,7 @@
          │
          ▼
 ┌─────────────────┐
-│  Laravel 12 API │  ← YOU ARE HERE
+│  Laravel 11 API │  ← YOU ARE HERE
 │  (REST API)     │
 └────────┬────────┘
          │

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\HealthCheckController;
+use App\Helpers\TimezoneHelper;
 
 /**
  * ENHANCED HEALTH CHECK ENDPOINT
@@ -73,7 +74,7 @@ Route::get('/health', function () {
     // CHECK 3: Cache Functionality
     // ============================================================
     try {
-        $cacheKey = 'health_check_' . time();
+        $cacheKey = 'health_check_' . TimezoneHelper::now()->timestamp;
         $cacheValue = 'test_' . rand(1000, 9999);
         
         // Test write
@@ -116,7 +117,7 @@ Route::get('/health', function () {
     // CHECK 5: Storage Accessibility
     // ============================================================
     try {
-        $testFile = 'health_check_' . time() . '.txt';
+        $testFile = 'health_check_' . TimezoneHelper::now()->timestamp . '.txt';
         Storage::disk('local')->put($testFile, 'health check');
         $exists = Storage::disk('local')->exists($testFile);
         Storage::disk('local')->delete($testFile);
@@ -163,3 +164,10 @@ Route::get('/health', function () {
 // Detailed health checks requiring controller logic
 Route::get('/health/detailed', [HealthCheckController::class, 'detailedHealth']);
 Route::get('/health/load-balancer', [HealthCheckController::class, 'loadBalancerHealth']);
+
+// Session storage health endpoints
+Route::prefix('health/session')->group(function () {
+    Route::get('/status', [\App\Http\Controllers\Api\SessionHealthController::class, 'status']);
+    Route::get('/metrics', [\App\Http\Controllers\Api\SessionHealthController::class, 'metrics']);
+    Route::get('/check', [\App\Http\Controllers\Api\SessionHealthController::class, 'check']);
+});

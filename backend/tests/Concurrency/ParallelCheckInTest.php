@@ -15,17 +15,15 @@ use Tests\TestCase;
 
 /**
  * Concurrency Test: Parallel Check-In
- * 
  * Tests system behavior under concurrent load:
  * - 100+ parallel requests
  * - Race conditions
  * - Deadlock prevention
  * - Duplicate prevention
  * - Proper error responses
- * 
- * @group concurrency
- * @group slow
  */
+#[\PHPUnit\Framework\Attributes\Group('concurrency')]
+#[\PHPUnit\Framework\Attributes\Group('slow')]
 class ParallelCheckInTest extends TestCase
 {
     use RefreshDatabase;
@@ -45,11 +43,9 @@ class ParallelCheckInTest extends TestCase
 
     /**
      * CT-001: 100 concurrent check-ins (same student)
-     * 
      * Expected: Only 1 attendance record created, others get 409 Conflict
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_attendance_under_concurrent_load(): void
     {
         // Arrange
@@ -94,11 +90,9 @@ class ParallelCheckInTest extends TestCase
 
     /**
      * CT-002: 100 concurrent check-ins (different students)
-     * 
      * Expected: All 100 attendance records created successfully
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_concurrent_check_ins_for_different_students(): void
     {
         // Arrange
@@ -132,9 +126,8 @@ class ParallelCheckInTest extends TestCase
 
     /**
      * CT-003: No database deadlocks
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_database_deadlocks(): void
     {
         // Arrange
@@ -170,9 +163,8 @@ class ParallelCheckInTest extends TestCase
 
     /**
      * CT-004: Race condition in summary update
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_race_condition_in_summary_update(): void
     {
         // Arrange
@@ -212,9 +204,8 @@ class ParallelCheckInTest extends TestCase
 
     /**
      * CT-005: QR nonce replay prevention under load
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_qr_nonce_replay_under_concurrent_load(): void
     {
         // Arrange
@@ -259,9 +250,8 @@ class ParallelCheckInTest extends TestCase
 
     /**
      * CT-006: Idempotency key enforcement
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_enforces_idempotency_key_under_concurrent_requests(): void
     {
         // Arrange
@@ -293,10 +283,9 @@ class ParallelCheckInTest extends TestCase
 
     /**
      * CT-007: Stress test with 1000 students
-     * 
-     * @test
-     * @group slow
      */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('slow')]
     public function it_handles_high_volume_check_ins(): void
     {
         // Arrange
@@ -338,9 +327,8 @@ class ParallelCheckInTest extends TestCase
 
     /**
      * CT-008: Concurrent read/write on same record
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_concurrent_read_write_on_same_record(): void
     {
         // Arrange

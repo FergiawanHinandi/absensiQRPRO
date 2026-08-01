@@ -49,7 +49,7 @@ class QrStudentStatusValidationTest extends TestCase
         $this->qrService = app(StudentQrService::class);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function active_student_with_valid_qr_passes_validation()
     {
         // Generate valid QR token
@@ -69,7 +69,7 @@ class QrStudentStatusValidationTest extends TestCase
         $this->assertTrue($validatedStudent->is_active);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function inactive_student_with_valid_hmac_fails_validation()
     {
         // Deactivate student
@@ -91,7 +91,7 @@ class QrStudentStatusValidationTest extends TestCase
         $this->qrService->validateStudentStatus($payload, $this->school->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function nonexistent_student_with_valid_hmac_fails_validation()
     {
         $fakeStudentId = 99999;
@@ -118,7 +118,7 @@ class QrStudentStatusValidationTest extends TestCase
         $this->qrService->validateStudentStatus($verifiedPayload, $this->school->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_from_different_school_fails_validation()
     {
         // Create second school
@@ -148,7 +148,7 @@ class QrStudentStatusValidationTest extends TestCase
         $this->qrService->validateStudentStatus($payload, $this->school->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_mismatch_between_student_and_qr_fails_validation()
     {
         // Create second school
@@ -178,7 +178,7 @@ class QrStudentStatusValidationTest extends TestCase
         $this->qrService->validateStudentStatus($payload, $school2->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function invalid_student_with_valid_hmac_logs_security_anomaly()
     {
         // Mock the security log channel
@@ -214,7 +214,7 @@ class QrStudentStatusValidationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function nonexistent_student_logs_critical_anomaly()
     {
         // Mock the security log channel
@@ -256,7 +256,7 @@ class QrStudentStatusValidationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cross_school_attempt_logs_critical_severity()
     {
         // Mock the security log channel
@@ -301,7 +301,7 @@ class QrStudentStatusValidationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function audit_log_created_for_security_anomaly()
     {
         // Deactivate student

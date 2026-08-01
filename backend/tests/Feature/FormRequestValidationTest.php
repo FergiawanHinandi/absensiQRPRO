@@ -75,7 +75,7 @@ class FormRequestValidationTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_teacher_request_validates_required_fields()
     {
         $request = new StoreTeacherRequest;
@@ -92,7 +92,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('gender', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_teacher_request_validates_email_format()
     {
         $request = new StoreTeacherRequest;
@@ -113,7 +113,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('email', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_teacher_request_validates_gender_values()
     {
         $request = new StoreTeacherRequest;
@@ -134,7 +134,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('gender', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_student_request_validates_required_fields()
     {
         $request = new StoreStudentRequest;
@@ -153,7 +153,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('password', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_student_request_validates_nis_format()
     {
         $request = new StoreStudentRequest;
@@ -176,7 +176,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('nis', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_class_request_validates_required_fields()
     {
         $request = new StoreClassRequest;
@@ -191,7 +191,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('grade_level', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_class_request_validates_grade_level_range()
     {
         $request = new StoreClassRequest;
@@ -210,7 +210,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('grade_level', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generate_qr_request_validates_required_fields()
     {
         $request = new GenerateQrRequest;
@@ -224,7 +224,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('schedule_id', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function close_qr_request_validates_required_fields()
     {
         $request = new CloseQrRequest;
@@ -238,7 +238,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('qr_code_id', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_permission_request_validates_required_fields()
     {
         $request = new StorePermissionRequest;
@@ -255,7 +255,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('end_date', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function store_permission_request_validates_permission_type()
     {
         $request = new StorePermissionRequest;
@@ -276,7 +276,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('type', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function export_report_request_validates_date_range()
     {
         $request = new ExportReportRequest;
@@ -295,7 +295,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('end_date', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function monthly_summary_request_validates_month_range()
     {
         $request = new MonthlySummaryRequest;
@@ -315,7 +315,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('month', $validator->errors()->toArray());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function form_requests_have_proper_authorization()
     {
         // Test StoreTeacherRequest authorization
@@ -346,7 +346,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertTrue($classRequest->authorize());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function form_requests_have_custom_messages()
     {
         $request = new StoreTeacherRequest;
@@ -360,7 +360,7 @@ class FormRequestValidationTest extends TestCase
         $this->assertArrayHasKey('password.required', $messages);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function form_requests_have_custom_attributes()
     {
         $request = new StoreStudentRequest;

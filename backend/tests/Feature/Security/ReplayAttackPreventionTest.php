@@ -34,7 +34,7 @@ class ReplayAttackPreventionTest extends TestCase
         $this->token = $this->student->createToken('test-token')->plainTextToken;
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_accepts_request_with_valid_idempotency_key()
     {
         $idempotencyKey = (string) Str::uuid();
@@ -53,7 +53,7 @@ class ReplayAttackPreventionTest extends TestCase
         $this->assertNotEquals(400, $response->status());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_request_with_invalid_idempotency_key_format()
     {
         $response = $this->withHeaders([
@@ -70,7 +70,7 @@ class ReplayAttackPreventionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_cached_response_for_duplicate_idempotency_key()
     {
         $idempotencyKey = (string) Str::uuid();
@@ -109,7 +109,7 @@ class ReplayAttackPreventionTest extends TestCase
         $response->assertHeader('X-Idempotent-Replay', 'true');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_stores_idempotency_key_after_successful_request()
     {
         $idempotencyKey = (string) Str::uuid();
@@ -133,7 +133,7 @@ class ReplayAttackPreventionTest extends TestCase
         // If response was error (4xx/5xx), key won't be stored
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_enforces_rate_limiting_on_attendance_endpoint()
     {
         $successCount = 0;
@@ -159,7 +159,7 @@ class ReplayAttackPreventionTest extends TestCase
         $this->assertGreaterThan(0, $rateLimitedCount, 'Rate limiting should trigger');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_includes_rate_limit_headers_in_response()
     {
         $response = $this->withHeaders([
@@ -175,7 +175,7 @@ class ReplayAttackPreventionTest extends TestCase
         $response->assertHeader('X-RateLimit-Reset');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_cleans_up_expired_idempotency_keys()
     {
         // Create expired key
@@ -213,7 +213,7 @@ class ReplayAttackPreventionTest extends TestCase
         $this->assertEquals(1, IdempotencyKey::notExpired()->count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_replay_attack_with_same_key_different_user()
     {
         $idempotencyKey = (string) Str::uuid();
@@ -246,7 +246,7 @@ class ReplayAttackPreventionTest extends TestCase
         $response->assertJsonMissing(['_idempotent_replay' => true]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_request_without_idempotency_key()
     {
         // Request without idempotency key should still be processed

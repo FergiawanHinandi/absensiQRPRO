@@ -78,7 +78,7 @@ Project Root
     │   └── SUPER_ADMIN_INTEGRATION.md    📝 Admin integration
     │
     ├── architecture/                      🏗️ Architecture (6 files)
-    ├── core_design/                       🎨 Core Design (18 files)
+    ├── core_design/                       🎨 Core Design → consolidated into backend/docs/ (18 files)
     └── tasks/                             ✅ Tasks (2 files)
 ```
 
@@ -161,10 +161,10 @@ Project:                    5 files
 Troubleshooting:            2 files
 Archive:                    18 files
 Architecture:               6 files
-Core Design:                18 files
+Core Design:                18 files → consolidated into backend/docs/ (canonical)
 Tasks:                      2 files
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total:                      65 files
+Total:                      47 files (in docs/) + 18 core design in backend/docs/
 ```
 
 ### Documentation Coverage
@@ -180,7 +180,7 @@ Total:                      65 files
 ✅ Troubleshooting Guides (2 files)
 ✅ Historical Archive (18 files)
 ✅ Architecture Docs (6 files)
-✅ Core Design Docs (18 files)
+✅ Core Design Docs (18 files — in backend/docs/, canonical)
 ```
 
 ---
@@ -234,7 +234,7 @@ Total:                      65 files
 |----------|----------|-------|
 | **Archive** | `docs/archive/` | 18 |
 | **Architecture** | `docs/architecture/` | 6 |
-| **Core Design** | `docs/core_design/` | 18 |
+| **Core Design** | `backend/docs/` (canonical) | 18 |
 | **Tasks** | `docs/tasks/` | 2 |
 
 ---

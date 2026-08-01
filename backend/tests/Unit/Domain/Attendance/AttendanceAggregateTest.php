@@ -17,26 +17,23 @@ use Tests\TestCase;
 
 /**
  * Domain Test: Attendance Aggregate
- * 
  * Tests business logic and invariants in the domain layer.
  * These tests ensure that:
  * - State transitions are valid
  * - Business rules are enforced
  * - Domain events are emitted
  * - Invariants are maintained
- * 
- * @group domain
- * @group attendance
  */
+#[\PHPUnit\Framework\Attributes\Group('domain')]
+#[\PHPUnit\Framework\Attributes\Group('attendance')]
 class AttendanceAggregateTest extends TestCase
 {
     use RefreshDatabase;
 
     /**
      * DT-001: Valid state transition: INIT → CHECKED_IN
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_valid_state_transition_from_init_to_checked_in(): void
     {
         // Arrange
@@ -61,9 +58,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-002: Invalid state transition: CHECKED_OUT → INIT
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_invalid_state_transition(): void
     {
         // Arrange
@@ -84,12 +80,10 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-003: Duplicate attendance prevented (same student/date)
-     * 
      * This is handled at the database level with unique constraints,
      * but we test the business logic here.
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_attendance_for_same_student_and_date(): void
     {
         // Arrange
@@ -112,9 +106,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-004: Time window validation enforced
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_enforces_time_window_validation(): void
     {
         // Arrange
@@ -145,9 +138,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-005: Geofence validation enforced
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_enforces_geofence_validation(): void
     {
         // Arrange
@@ -178,9 +170,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-006: Late status calculated correctly
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_calculates_late_status_correctly(): void
     {
         // Arrange
@@ -216,9 +207,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-007: Correction request state transition
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_correction_request_from_checked_in_state(): void
     {
         // Arrange
@@ -240,9 +230,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-008: Approval workflow validation
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_approval_from_pending_state(): void
     {
         // Arrange
@@ -264,9 +253,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-009: Rejection workflow validation
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_rejection_from_pending_state(): void
     {
         // Arrange
@@ -288,9 +276,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-010: Domain events emitted correctly
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_emits_domain_events_on_check_in(): void
     {
         // Arrange
@@ -319,9 +306,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-011: Check-out time must be after check-in time
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_check_out_before_check_in(): void
     {
         // Arrange
@@ -344,9 +330,8 @@ class AttendanceAggregateTest extends TestCase
 
     /**
      * DT-012: Geofence allows check-in within radius
-     * 
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_check_in_within_geofence(): void
     {
         // Arrange

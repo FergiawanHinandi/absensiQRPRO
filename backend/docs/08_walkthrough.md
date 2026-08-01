@@ -1,4 +1,4 @@
-# Walkthrough: Setup Backend Laravel 12 - AbsensiQRPro
+# Walkthrough: Setup Backend Laravel 11 - AbsensiQRPro
 
 ## ✅ Yang Sudah Diselesaikan
 
@@ -15,7 +15,7 @@ Semua dokumentasi sudah **APPROVED** oleh user.
 
 ---
 
-### 2. Laravel 12 Project Setup (Phase 1)
+### 2. Laravel 11 Project Setup (Phase 1)
 
 #### Instalasi Project
 
@@ -158,7 +158,7 @@ backend/
 
 ## ✅ Validation Checklist
 
-- [x] Laravel 12 installed successfully
+- [x] Laravel 11 installed successfully
 - [x] Dependencies installed without errors
 - [x] Config files published
 - [x] `.env` configured for PostgreSQL & Redis

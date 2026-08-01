@@ -104,10 +104,39 @@ class SecurityAlertService
 
     /**
      * Dispatch to external channels (Slack, Email, PagerDuty)
+     *
+     * ARCH-02 FIX: Sebelumnya body kosong (stub). Sekarang membuat
+     * Notification in-app untuk seluruh super_admin agar alert keamanan
+     * terlihat di dashboard. Webhook/email eksternal tetap bisa ditambahkan
+     * melalui queue job di masa depan.
      */
     private function dispatchExternalAlert(array $payload): void
     {
-        // Example: logic to queue email or webhook job
-        // dispatch(new SendSecurityWebhook($payload));
+        try {
+            $admins = \App\Models\User::where('role_type', 'super_admin')
+                ->where('is_active', true)
+                ->get();
+
+            foreach ($admins as $admin) {
+                \App\Models\Notification::create([
+                    'user_id' => $admin->id,
+                    'school_id' => null,
+                    'title' => '🚨 Security Alert: '.ucwords(str_replace('_', ' ', $payload['type'] ?? 'unknown')),
+                    'message' => sprintf(
+                        'Threshold %s dilampaui (%s) — count %d/%d.',
+                        $payload['type'] ?? '?',
+                        $payload['identifier'] ?? '-',
+                        $payload['count'] ?? 0,
+                        $payload['limit'] ?? 0
+                    ),
+                    'type' => 'security',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Jangan pernah melempar exception dari jalur alerting
+            Log::channel('security_json')->warning('dispatchExternalAlert gagal', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

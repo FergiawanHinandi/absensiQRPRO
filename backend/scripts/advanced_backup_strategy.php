@@ -590,7 +590,7 @@ class AdvancedBackupStrategy
     
     private function log(string $message): void
     {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = \App\Helpers\TimezoneHelper::now()->format('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}\n";
         
         echo $logMessage;

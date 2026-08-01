@@ -68,11 +68,14 @@ scrape_configs:
       - source_labels: [__meta_kubernetes_namespace]
         target_label: namespace
 
-    # Static config fallback (for non-K8s deployments)
+    # Static config fallback (for Docker Compose deployments)
+    # IMPORTANT: Update 'host.docker.internal:8000' to your API container address:
+    # - Docker Desktop: host.docker.internal (auto-resolves to host)
+    # - Linux: use --add-host=host.docker.internal:host-gateway in docker run
+    # - Same compose file: 'app:9000' (replace 'app' with your service name)
     static_configs:
       - targets:
-          - 'api-1.internal:9000'
-          - 'api-2.internal:9000'
+          - 'host.docker.internal:8000'
         labels:
           app: 'absensi-api'
           environment: 'production'

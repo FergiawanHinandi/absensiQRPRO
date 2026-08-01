@@ -1,0 +1,48 @@
+Daftar Akun Login
+Default Password: password
+Dari DatabaseSeeder (Auto-generate per level)
+Role	Username	Email	Sekolah
+Super Admin	superadmin	super@admin.com	-
+School Admin	admin_sd	admin.sd@demo.com	SD Harapan Bangsa
+School Admin	admin_smp	admin.smp@demo.com	SMP Harapan Bangsa
+School Admin	admin_sma	admin.sma@demo.com	SMA Harapan Bangsa
+School Admin	admin_smk	admin.smk@demo.com	SMK Harapan Bangsa
+Teacher	guru_sd	guru.sd@demo.com	SD Harapan Bangsa
+Teacher	guru_smp	guru.smp@demo.com	SMP Harapan Bangsa
+Teacher	guru_sma	guru.sma@demo.com	SMA Harapan Bangsa
+Teacher	guru_smk	guru.smk@demo.com	SMK Harapan Bangsa
+Student	siswasd	siswa.sd@demo.com	SD Harapan Bangsa
+Student	siswasmp	siswa.smp@demo.com	SMP Harapan Bangsa
+Student	siswasma	siswa.sma@demo.com	SMA Harapan Bangsa
+Student	siswasmk	siswa.smk@demo.com	SMK Harapan Bangsa
+Parent	ortu_sd	ortu.sd@demo.com	SD Harapan Bangsa
+Parent	ortu_smp	ortu.smp@demo.com	SMP Harapan Bangsa
+Parent	ortu_sma	ortu.sma@demo.com	SMA Harapan Bangsa
+Parent	ortu_smk	ortu.smk@demo.com	SMK Harapan Bangsa
+Dari CompleteUserSeeder (SMP 1)
+Role	Username	Email
+Super Admin	superadmin	superadmin@absensiQR.com
+School Admin	adminsekolah	adminsekolah@smp1.com
+Principal	kepala.sekolah	kepsek@smp1.com
+Teacher	guru.matematika	guru.mtk@smp1.com
+Teacher	guru.ipa	guru.ipa@smp1.com
+Teacher (Wali Kelas)	wali.7a	wali.7a@smp1.com
+Student	siswa001	siswa001@smp1.com
+Student	siswa002	siswa002@smp1.com
+Student	siswa003	siswa003@smp1.com
+Parent	ortu.rizki	ortu.rizki@gmail.com
+Parent	ortu.aisyah	ortu.aisyah@gmail.com
+Dari DemoDataSeeder (SMP 1)
+Role	Username	Email
+School Admin	admin1	admin@smp1.com
+Teacher	guru_mtk	guru.mtk@smp1.com
+Teacher	guru_ipa	guru.ipa@smp1.com
+Teacher	guru_ips	guru.ips@smp1.com
+Teacher	guru_ing	guru.ing@smp1.com
+Parent	ortu1	ortu1@smp1.com
+Parent	ortu2	ortu2@smp1.com
+Student	siswa001 - siswa020	siswa001@smp1.com - siswa020@smp1.com
+Catatan: 
+- Semua akun menggunakan password: password
+- Untuk login, gunakan username (bukan email)
+- Jalankan php artisan db:seed untuk membuat akun-akun di atas

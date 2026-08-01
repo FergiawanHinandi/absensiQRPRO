@@ -1,0 +1,16 @@
+# Environment files with sensitive data
+.env
+
+# Redis data files
+*.rdb
+*.aof
+
+# Sentinel rewritten config files
+sentinel-*.conf.tmp
+
+# Backup files
+backup/
+*.backup
+
+# Log files
+*.log

@@ -68,9 +68,8 @@ class AttendanceUniqueConstraintTest extends TestCase
 
     /**
      * Test 1: Insert duplicate active attendance → MUST FAIL
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_active_check_in(): void
     {
         // Create first attendance (check-in)
@@ -106,9 +105,8 @@ class AttendanceUniqueConstraintTest extends TestCase
 
     /**
      * Test 2: Insert duplicate active check-out → MUST FAIL
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_active_check_out(): void
     {
         // Create check-in first
@@ -157,9 +155,8 @@ class AttendanceUniqueConstraintTest extends TestCase
 
     /**
      * Test 3: Insert after soft delete → MUST SUCCEED
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_insert_after_soft_delete(): void
     {
         // Create first attendance
@@ -217,9 +214,8 @@ class AttendanceUniqueConstraintTest extends TestCase
 
     /**
      * Test 4: Multiple soft-deleted records are allowed
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_multiple_soft_deleted_records(): void
     {
         // Create and soft delete multiple times (simulating multiple corrections)
@@ -258,9 +254,8 @@ class AttendanceUniqueConstraintTest extends TestCase
 
     /**
      * Test 5: Different attendance types are allowed simultaneously
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_different_attendance_types_same_day(): void
     {
         // Create check-in
@@ -296,9 +291,8 @@ class AttendanceUniqueConstraintTest extends TestCase
 
     /**
      * Test 6: Different schedules are allowed same day
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_different_schedules_same_day(): void
     {
         // Create another schedule
@@ -341,9 +335,8 @@ class AttendanceUniqueConstraintTest extends TestCase
 
     /**
      * Test 7: Verify index exists (PostgreSQL/SQLite)
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_has_soft_delete_safe_unique_index(): void
     {
         $driver = DB::connection()->getDriverName();
@@ -379,9 +372,8 @@ class AttendanceUniqueConstraintTest extends TestCase
 
     /**
      * Test 8: Concurrent insert protection (race condition)
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_concurrent_duplicate_inserts(): void
     {
         // Simulate concurrent insert attempts using raw SQL

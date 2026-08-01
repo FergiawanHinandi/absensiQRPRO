@@ -88,7 +88,7 @@ class TokenHardeningService
             $this->checkNewDeviceOrLocation($user, $deviceInfo);
         }
 
-        return DB::transaction(function () use ($user, $deviceInfo, $tokenName, $isAdmin) {
+        return DB::transaction(function () use ($user, $request, $deviceInfo, $tokenName, $isAdmin) {
             // Create short-lived access token
             $expiresAt = now()->addMinutes(self::ACCESS_TOKEN_LIFETIME_MINUTES);
 

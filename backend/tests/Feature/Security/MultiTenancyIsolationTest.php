@@ -15,13 +15,11 @@ use Tests\TestCase;
 
 /**
  * Multi-Tenancy Security Test
- * 
  * Verifies that users from School A cannot access data from School B.
  * Tests isolation for Schedules resource via school-admin endpoints.
- * 
- * @group security
- * @group multi-tenancy
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('multi-tenancy')]
 class MultiTenancyIsolationTest extends TestCase
 {
     use RefreshDatabase;
@@ -123,10 +121,10 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * Test: Admin School A cannot view schedule from School B via update endpoint
      * Note: show() doesn't exist, using update to verify tenant isolation
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_school_a_cannot_view_schedule_from_school_b(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');
@@ -142,9 +140,9 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * Test: Admin School A listing schedules cannot see School B schedules
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_school_a_cannot_list_schedules_from_school_b(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');
@@ -166,9 +164,9 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * Test: Admin School A cannot update schedule from School B
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_school_a_cannot_update_schedule_from_school_b(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');
@@ -184,9 +182,9 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * Test: Admin School A cannot delete schedule from School B
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_school_a_cannot_delete_schedule_from_school_b(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');
@@ -205,9 +203,9 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * Test: Admin School B CAN update their own schedule
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_school_b_can_update_own_schedule(): void
     {
         $this->actingAs($this->adminSchoolB, 'sanctum');
@@ -227,9 +225,9 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * Test: Admin School A cannot delete class from School B
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_school_a_cannot_delete_class_from_school_b(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');
@@ -254,12 +252,11 @@ class MultiTenancyIsolationTest extends TestCase
      */
 
     /**
-     * @test
      * IDOR Test: Admin School A cannot access attendance by ID from School B
-     * 
      * Scenario: Attacker tries /api/v1/attendance/1001, /api/v1/attendance/1002...
      * Expected: 403 or 404 (not 200 with data)
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_school_a_cannot_access_attendance_by_id_from_school_b(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');
@@ -295,9 +292,9 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * IDOR Test: Student from School A cannot access attendance from School B student
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_school_a_cannot_access_attendance_from_school_b_student(): void
     {
         // Create student in School A
@@ -321,9 +318,9 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * IDOR Test: Admin School A cannot modify attendance from School B
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_school_a_cannot_modify_attendance_from_school_b(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');
@@ -357,12 +354,11 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * IDOR Test: Parent School A cannot access children attendance from School B
-     * 
      * Scenario: Parent tries /api/v1/parent/children/1001/attendance
      * where 1001 is a student from School B
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function parent_school_a_cannot_access_child_from_school_b(): void
     {
         // Create parent in School A
@@ -407,17 +403,15 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * IDOR Test: Verify SchoolScope prevents direct model access
-     * 
      * NOTE: In test environment (console), SchoolScope is bypassed by design
      * for artisan commands and queue jobs. The REAL protection happens via:
      * 1. API middleware (tested above - PASS)
      * 2. Policy authorization (tested separately - PASS)
-     * 
      * This test documents the DESIGN DECISION, not a vulnerability.
      * When running in web context (actual API requests), SchoolScope IS applied.
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_scope_prevents_cross_tenant_model_access(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');
@@ -449,12 +443,11 @@ class MultiTenancyIsolationTest extends TestCase
     }
 
     /**
-     * @test
      * IDOR Test: Verify sequential ID enumeration via API doesn't leak data
-     * 
      * Simulates attacker trying GET /api/v1/attendance/1, /api/v1/attendance/2...
      * The protection happens at API layer (middleware + policy), not model query.
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function sequential_id_enumeration_does_not_leak_cross_tenant_data(): void
     {
         $this->actingAs($this->adminSchoolA, 'sanctum');

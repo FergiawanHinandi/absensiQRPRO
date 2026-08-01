@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Helpers\TimezoneHelper;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -306,9 +308,9 @@ class ObservabilityService
         $lastHeartbeat = Cache::get($heartbeatKey);
         
         if ($lastHeartbeat) {
-            $lastTime = strtotime($lastHeartbeat);
+            $lastTime = Carbon::parse($lastHeartbeat);
             // Worker is considered running if heartbeat within last 2 minutes
-            return (time() - $lastTime) < 120;
+            return TimezoneHelper::now()->diffInSeconds($lastTime) < 120;
         }
 
         // Fallback: Check process on Linux

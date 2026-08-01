@@ -60,7 +60,7 @@ class WebhookIdempotencyTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_processes_successfully_first_time()
     {
         $webhookData = [
@@ -88,7 +88,7 @@ class WebhookIdempotencyTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_prevents_duplicate_processing()
     {
         $webhookData = [
@@ -126,7 +126,7 @@ class WebhookIdempotencyTest extends TestCase
         $this->assertEquals(1, ProcessedWebhook::where('order_id', 'TEST_ORDER_123')->count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_prevents_replay_attack_with_different_status()
     {
         // First webhook - success
@@ -163,7 +163,7 @@ class WebhookIdempotencyTest extends TestCase
         $this->assertEquals('paid', $this->payment->status);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_handles_missing_order_id()
     {
         $webhookData = [
@@ -177,7 +177,7 @@ class WebhookIdempotencyTest extends TestCase
             ->assertJson(['message' => 'Missing order_id or transaction_id']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_records_failed_processing()
     {
         $webhookData = [
@@ -198,7 +198,7 @@ class WebhookIdempotencyTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_prevents_package_reapplication()
     {
         $webhookData = [
@@ -225,7 +225,7 @@ class WebhookIdempotencyTest extends TestCase
         $this->assertEquals($initialMaxStudents, $this->school->max_students);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function processed_webhook_model_methods_work_correctly()
     {
         // Test isAlreadyProcessed

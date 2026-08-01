@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\BackupMonitoringController;
 
 // Backup Monitoring API Routes
-Route::prefix('monitoring')->middleware(['auth:sanctum', 'admin'])->group(function () {
+Route::prefix('monitoring')->middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
     
     // Dashboard data
     Route::get('/dashboard', [BackupMonitoringController::class, 'dashboard'])

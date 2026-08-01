@@ -44,7 +44,7 @@ class AttendanceStateMachineTest extends TestCase
     // TEST 1-3: DIRECT STATUS/STATE MODIFICATION BLOCKING
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_status_modification_during_creation()
     {
         $this->expectException(StateViolationException::class);
@@ -59,7 +59,7 @@ class AttendanceStateMachineTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_status_modification_after_creation()
     {
         $attendance = Attendance::create([
@@ -75,7 +75,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->status = 'present'; // ❌ Should throw exception
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_blocks_direct_state_modification_via_mass_assignment()
     {
         $this->expectException(StateViolationException::class);
@@ -94,7 +94,7 @@ class AttendanceStateMachineTest extends TestCase
     // TEST 4-7: STATE MACHINE METHOD FUNCTIONALITY
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_check_in_via_state_machine()
     {
         $attendance = Attendance::create([
@@ -114,7 +114,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals($this->teacher->id, $attendance->recorded_by);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_check_out_via_state_machine()
     {
         $attendance = Attendance::create([
@@ -133,7 +133,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertNotNull($attendance->check_out_time);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_correction_request_via_state_machine()
     {
         $attendance = Attendance::create([
@@ -154,7 +154,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals($this->teacher->id, $attendance->correction_requested_by);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_allows_approval_via_state_machine()
     {
         $attendance = Attendance::create([
@@ -182,7 +182,7 @@ class AttendanceStateMachineTest extends TestCase
     // TEST 8-11: INVALID TRANSITION HANDLING
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_for_invalid_transition_check_out_before_check_in()
     {
         $attendance = Attendance::create([
@@ -199,7 +199,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkOut($this->teacher, -6.200000, 106.816666, 'device-123');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_for_double_check_in()
     {
         $attendance = Attendance::create([
@@ -218,7 +218,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkIn($this->teacher, -6.200000, 106.816666, 'device-123');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_for_check_in_after_check_out()
     {
         $attendance = Attendance::create([
@@ -238,7 +238,7 @@ class AttendanceStateMachineTest extends TestCase
         $attendance->checkIn($this->teacher, -6.200000, 106.816666, 'device-123');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_for_approval_from_non_pending_state()
     {
         $attendance = Attendance::create([
@@ -263,7 +263,7 @@ class AttendanceStateMachineTest extends TestCase
     // TEST 12-13: AUDIT LOGGING VERIFICATION
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_all_state_transitions_to_audit_trail()
     {
         $attendance = Attendance::create([
@@ -298,7 +298,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals($this->teacher->id, $logs[1]->performed_by);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_includes_comprehensive_audit_data_in_logs()
     {
         $attendance = Attendance::create([
@@ -336,7 +336,7 @@ class AttendanceStateMachineTest extends TestCase
     // TEST 14-15: FACTORY COMPLIANCE
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function factory_creates_attendance_in_init_state_by_default()
     {
         $attendance = Attendance::factory()->create([
@@ -349,7 +349,7 @@ class AttendanceStateMachineTest extends TestCase
         $this->assertEquals(AttendanceState::INIT, $attendance->getCurrentState());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function factory_uses_state_machine_for_checked_in_state()
     {
         $attendance = Attendance::factory()

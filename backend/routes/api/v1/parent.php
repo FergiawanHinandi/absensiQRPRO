@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\Parent\ParentDashboardController;
+use App\Http\Controllers\Api\V1\PermissionController;
 
 Route::middleware('role:parent')->prefix('parent')->group(function () {
     Route::get('/my-children', [ParentDashboardController::class, 'index'])
@@ -23,4 +24,10 @@ Route::middleware('role:parent')->prefix('parent')->group(function () {
         ->middleware('ability:parent:view_attendance');
     Route::get('/children/{id}/profile', [ParentDashboardController::class, 'getStudentProfile'])
         ->middleware('ability:parent:view_attendance');
+
+    // Permission / Izin (parent submits leave requests for children)
+    Route::prefix('permissions')->group(function () {
+        Route::get('/', [PermissionController::class, 'index']);
+        Route::post('/', [PermissionController::class, 'store']);
+    });
 });

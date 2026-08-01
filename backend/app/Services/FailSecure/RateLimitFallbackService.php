@@ -2,6 +2,8 @@
 
 namespace App\Services\FailSecure;
 
+use App\Helpers\TimezoneHelper;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -230,7 +232,7 @@ class RateLimitFallbackService
             $timerKey = $cacheKey.':timer';
             $timer = Cache::get($timerKey);
             if ($timer) {
-                $retryAfter = max(0, $timer - time());
+                $retryAfter = max(0, $timer - TimezoneHelper::now()->timestamp);
             }
         }
 
@@ -263,7 +265,7 @@ class RateLimitFallbackService
             $hits = Cache::increment($cacheKey);
         } else {
             Cache::put($cacheKey, 1, $decaySeconds);
-            Cache::put($cacheKey.':timer', time() + $decaySeconds, $decaySeconds);
+            Cache::put($cacheKey.':timer', TimezoneHelper::now()->timestamp + $decaySeconds, $decaySeconds);
             $hits = 1;
         }
 
@@ -274,7 +276,7 @@ class RateLimitFallbackService
             $timerKey = $cacheKey.':timer';
             $timer = Cache::get($timerKey);
             if ($timer) {
-                $retryAfter = max(0, $timer - time());
+                $retryAfter = max(0, $timer - TimezoneHelper::now()->timestamp);
             }
         }
 
@@ -317,8 +319,8 @@ class RateLimitFallbackService
 
             $retryAfter = null;
             if ($hits >= $maxAttempts && $record) {
-                $expiresAt = strtotime($record->expires_at);
-                $retryAfter = max(0, $expiresAt - time());
+                $expiresAt = Carbon::parse($record->expires_at);
+                $retryAfter = max(0, $expiresAt->diffInSeconds(TimezoneHelper::now()));
             }
 
             return [
@@ -470,7 +472,7 @@ class RateLimitFallbackService
     protected function getMinuteWindow(int $decayMinutes): int
     {
         // Group by decay period windows
-        $timestamp = time();
+        $timestamp = TimezoneHelper::now()->timestamp;
         $windowSize = $decayMinutes * 60;
 
         return (int) floor($timestamp / $windowSize);

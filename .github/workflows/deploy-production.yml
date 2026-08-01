@@ -1,0 +1,263 @@
+name: Deploy Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: absensiqrpro_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, ctype, json, bcmath, pdo, pgsql, gd, zip
+          coverage: none
+
+      - name: Copy .env
+        run: cp .env.example .env
+
+      - name: Install Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      - name: Run Migrations
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: absensiqrpro_test
+          DB_USERNAME: test_user
+          DB_PASSWORD: test_password
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+        run: php artisan migrate --force
+
+      - name: Run Tests
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: absensiqrpro_test
+          DB_USERNAME: test_user
+          DB_PASSWORD: test_password
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+        run: php artisan test --parallel --stop-on-failure
+
+      - name: Run PHPStan
+        run: vendor/bin/phpstan analyse --memory-limit=512M || true
+
+      - name: Run Laravel Pint
+        run: vendor/bin/pint --test || true
+
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend-web/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend-web
+        run: npm ci
+
+      - name: Type Check
+        working-directory: frontend-web
+        run: npx tsc --noEmit
+
+      - name: Lint
+        working-directory: frontend-web
+        run: npm run lint || true
+
+      - name: Build Frontend
+        working-directory: frontend-web
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend-web/dist/
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [test, build-frontend]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Download Frontend Build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend-web/dist/
+
+      - name: Deploy to Production Server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'DEPLOY_EOF'
+            set -e
+            
+            echo "🚀 Starting deployment..."
+            
+            cd /var/www/absensiqrpro
+            
+            # 1. Backup current version
+            echo "📦 Creating backup..."
+            git rev-parse HEAD > /tmp/last_deployed_commit
+            
+            # 2. Pull latest code
+            echo "📦 Pulling latest code..."
+            git pull origin main
+            
+            # 3. Install backend dependencies
+            echo "📦 Installing backend dependencies..."
+            composer install --no-dev --optimize-autoloader --no-interaction
+            
+            # 4. Copy frontend build
+            echo "📦 Deploying frontend..."
+            rm -rf public/build
+            cp -r /tmp/frontend-dist/* public/build/ || true
+            
+            # 5. Run migrations
+            echo "🗄️ Running migrations..."
+            php artisan migrate --force --no-interaction
+            
+            # 6. Cache configuration
+            echo "⚙️ Caching configuration..."
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+            php artisan event:cache
+            php artisan optimize
+            
+            # 7. Restart queue workers
+            echo "🔄 Restarting queue workers..."
+            php artisan queue:restart
+            
+            # 8. Restart Horizon
+            echo "🔄 Restarting Horizon..."
+            php artisan horizon:terminate || true
+            
+            # 9. Restart Supervisor
+            echo "🔄 Restarting Supervisor..."
+            sudo supervisorctl reread
+            sudo supervisorctl update
+            sudo supervisorctl restart absensiqrpro-worker:* || true
+            
+            # 10. Health check
+            echo "🏥 Running health check..."
+            sleep 5
+            
+            HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/health || echo "000")
+            
+            if [ "$HEALTH_CHECK" = "200" ]; then
+              echo "✅ Health check passed!"
+              echo "✅ Deployment completed successfully!"
+            else
+              echo "❌ Health check failed with status: $HEALTH_CHECK"
+              echo "🔄 Rolling back..."
+              
+              # Rollback
+              LAST_COMMIT=$(cat /tmp/last_deployed_commit)
+              git reset --hard $LAST_COMMIT
+              composer install --no-dev --optimize-autoloader --no-interaction
+              php artisan migrate:rollback --force
+              php artisan config:cache
+              php artisan route:cache
+              sudo supervisorctl restart absensiqrpro-worker:* || true
+              
+              echo "❌ Deployment failed and rolled back!"
+              exit 1
+            fi
+          DEPLOY_EOF
+
+      - name: Upload Frontend to Server
+        run: |
+          scp -o StrictHostKeyChecking=no -r frontend-web/dist/* ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/frontend-dist/
+
+      - name: Verify Deployment
+        run: |
+          sleep 10
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.DEPLOY_HOST }}/health || echo "000")
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Production health check passed!"
+          else
+            echo "⚠️ Production health check returned: $RESPONSE"
+          fi
+
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    
+    steps:
+      - name: Send Slack Notification
+        if: env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ "${{ needs.deploy.result }}" = "success" ]; then
+            curl -s -X POST "$SLACK_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d '{"text":"✅ Deployment to production successful! Commit: ${{ github.sha }}"}'
+          else
+            curl -s -X POST "$SLACK_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d '{"text":"❌ Deployment to production FAILED! Commit: ${{ github.sha }}"}'
+          fi

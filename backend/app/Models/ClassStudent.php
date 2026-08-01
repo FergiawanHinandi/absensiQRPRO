@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ClassStudent extends Model
 {
@@ -12,4 +13,9 @@ class ClassStudent extends Model
         'status',
         'enrollment_date',
     ];
+
+    public function class(): BelongsTo
+    {
+        return $this->belongsTo(ClassModel::class, 'class_id');
+    }
 }

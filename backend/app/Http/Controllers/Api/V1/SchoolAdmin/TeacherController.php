@@ -31,6 +31,12 @@ class TeacherController extends Controller
 
     /**
      * Get all teachers for the current admin's school
+     *
+     * BE-10 FIX: Gunakan Eloquent User:: bukan DB::table() agar semua proteksi
+     * model aktif (BelongsToSchool trait, SoftDeletes, observers, scopes).
+     *
+     * A3-H3 FIX: Join ke user_profiles agar search NIP berfungsi.
+     * Kolom NIP ada di tabel user_profiles, bukan di tabel users.
      */
     public function index(Request $request)
     {
@@ -39,19 +45,40 @@ class TeacherController extends Controller
         $perPage = $request->input('per_page', 20);
         $search = $request->input('search');
 
-        $query = DB::table('users')
-            ->where('school_id', $schoolId)
-            ->whereIn('role_type', ['teacher', 'homeroom_teacher']);
+        // A3-H3 FIX: Join ke user_profiles untuk mendapatkan NIP
+        $query = User::where('users.school_id', $schoolId)
+            ->whereIn('users.role_type', ['teacher', 'homeroom_teacher'])
+            ->leftJoin('user_profiles', 'users.id', '=', 'user_profiles.user_id')
+            ->select([
+                'users.id',
+                'users.school_id',
+                'users.name',
+                'users.email',
+                'users.username',
+                'users.role_type',
+                'users.is_active',
+                'users.last_login_at',
+                'users.created_at',
+                'user_profiles.nip',         // A3-H3 FIX: ambil NIP dari user_profiles
+                'user_profiles.phone',
+                'user_profiles.address',
+            ])
+            ->with([
+                'teacherDevices:id,teacher_id,device_name,is_active',
+            ]);
 
         if ($search) {
+            // ILIKE adalah operator PostgreSQL (case-insensitive LIKE)
+            // A3-H3 FIX: Tambahkan search berdasarkan user_profiles.nip
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'ILIKE', "%{$search}%")
-                    ->orWhere('email', 'ILIKE', "%{$search}%")
-                    ->orWhere('nip', 'ILIKE', "%{$search}%");
+                $q->where('users.name', 'ILIKE', "%{$search}%")
+                    ->orWhere('users.email', 'ILIKE', "%{$search}%")
+                    ->orWhere('users.username', 'ILIKE', "%{$search}%")
+                    ->orWhere('user_profiles.nip', 'ILIKE', "%{$search}%");  // NIP search
             });
         }
 
-        $teachers = $query->orderBy('created_at', 'desc')->paginate($perPage);
+        $teachers = $query->orderBy('users.created_at', 'desc')->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -78,6 +105,88 @@ class TeacherController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Show teacher details
+     */
+    public function show(Request $request, int $teacherId)
+    {
+        $user = $request->user();
+        $schoolId = $user->school_id;
+
+        $teacher = User::with(['profile:user_id,phone,nip'])->where('id', $teacherId)
+            ->where('school_id', $schoolId)
+            ->whereIn('role_type', ['teacher', 'homeroom_teacher'])
+            ->first();
+
+        if (!$teacher) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Guru tidak ditemukan',
+            ], 404);
+        }
+
+        // Load assignments count
+        $assignmentsCount = TeacherSubject::where('teacher_id', $teacherId)->count();
+
+        // Load homeroom info
+        $homeroomClass = TeacherRole::where('teacher_id', $teacherId)
+            ->where('is_homeroom_teacher', true)
+            ->with('homeroomClass:id,name')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id'               => $teacher->id,
+                'name'             => $teacher->name,
+                'email'            => $teacher->email,
+                'nip'              => $teacher->profile?->nip ?? null,
+                'phone'            => $teacher->profile?->phone ?? null,
+                'role_type'        => $teacher->role_type,
+                'is_active'        => (bool) $teacher->is_active,
+                'assignments_count'=> $assignmentsCount,
+                'homeroom_class'   => $homeroomClass?->homeroomClass?->name,
+                'created_at'       => $teacher->created_at,
+            ],
+        ]);
+    }
+
+    /**
+     * Delete a teacher
+     */
+    public function destroy(Request $request, int $teacherId)
+    {
+        $user = $request->user();
+        $schoolId = $user->school_id;
+
+        $teacher = User::where('id', $teacherId)
+            ->where('school_id', $schoolId)
+            ->whereIn('role_type', ['teacher', 'homeroom_teacher'])
+            ->firstOrFail();
+
+        // Policy-based authorization check
+        $this->authorize('delete', $teacher);
+
+        // Check if teacher has active schedules
+        $activeSchedules = \App\Models\Schedule::where('teacher_id', $teacherId)
+            ->where('is_active', true)
+            ->count();
+
+        if ($activeSchedules > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => "Guru masih memiliki {$activeSchedules} jadwal aktif. Nonaktifkan jadwal terlebih dahulu.",
+            ], 422);
+        }
+
+        $teacher->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Guru berhasil dihapus',
+        ]);
     }
 
     /**
@@ -169,12 +278,12 @@ class TeacherController extends Controller
 
         TeacherRole::updateOrCreate(
             [
-                'class_id' => $validated['class_id'],
-                'role_name' => 'homeroom',
-                'academic_year_id' => $validated['academic_year_id'],
+                'homeroom_class_id' => $validated['class_id'],
+                'academic_year_id'  => $validated['academic_year_id'],
             ],
             [
-                'user_id' => $teacher->id,
+                'teacher_id'          => $teacher->id,
+                'is_homeroom_teacher' => true,
             ]
         );
 

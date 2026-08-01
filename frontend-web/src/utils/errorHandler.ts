@@ -12,10 +12,13 @@
 import type { AxiosError } from 'axios';
 
 // API Error Response Interface (matches backend)
+// Backend may return either flat or nested structure:
+// Flat:   { success: false, message: "...", errors: {...} }
+// Nested: { error: { code: "...", message: "...", details: { errors: {...} } } }
 interface ApiErrorResponse {
-    success: false;
-    message: string;
-    error?: string;
+    success?: false;
+    message?: string;
+    error?: string | { code?: string; message?: string; details?: { errors?: Record<string, string[]> } };
     errors?: Record<string, string[]>;
     details?: {
         reason?: string;
@@ -29,7 +32,7 @@ function isApiErrorResponse(data: unknown): data is ApiErrorResponse {
     return (
         typeof data === 'object' &&
         data !== null &&
-        ('message' in data || 'error' in data)
+        ('message' in data || 'error' in data || 'errors' in data)
     );
 }
 
@@ -66,13 +69,30 @@ export function getErrorMessage(error: unknown): string {
         if (response?.data && isApiErrorResponse(response.data)) {
             const apiError = response.data;
 
-            // Primary: Use message field
+            // Handle nested structure: { error: { code, message, details: { errors } } }
+            if (apiError.error && typeof apiError.error === 'object') {
+                const nested = apiError.error;
+                // Extract validation errors from nested details
+                if (nested.details?.errors && Object.keys(nested.details.errors).length > 0) {
+                    const firstField = Object.keys(nested.details.errors)[0];
+                    const firstError = nested.details.errors[firstField]?.[0];
+                    if (firstError) {
+                        return firstError;
+                    }
+                }
+                // Use nested message
+                if (nested.message) {
+                    return nested.message;
+                }
+            }
+
+            // Primary: Use top-level message field
             if (apiError.message) {
                 return apiError.message;
             }
 
-            // Alternative: Use error field
-            if (apiError.error) {
+            // Alternative: Use error field (string)
+            if (apiError.error && typeof apiError.error === 'string') {
                 return apiError.error;
             }
 
@@ -103,11 +123,14 @@ export function getErrorMessage(error: unknown): string {
         }
     }
 
-    // Handle standard Error objects
+    // Handle standard Error objects (e.g. re-thrown from authService)
     if (error instanceof Error) {
-        // Don't expose technical error messages to users
         if (error.message.includes('Network Error')) {
             return TECHNICAL_FALLBACKS[0];
+        }
+        // Return the error message if it was explicitly set (not a raw stack trace)
+        if (error.message && !error.message.includes('at ') && error.message.length < 200) {
+            return error.message;
         }
     }
 

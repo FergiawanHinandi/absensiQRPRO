@@ -33,9 +33,14 @@ return [
     |--------------------------------------------------------------------------
     | Horizon Redis Connection
     |--------------------------------------------------------------------------
+    |
+    | Horizon will use this Redis connection for storing job data.
+    | When using Sentinel, this should point to a connection configured
+    | with Sentinel support in config/database.php
+    |
     */
 
-    'use' => 'default',
+    'use' => env('HORIZON_REDIS_CONNECTION', 'default'),
 
     /*
     |--------------------------------------------------------------------------
@@ -76,6 +81,21 @@ return [
         'redis:low' => 300,             // Low priority - more relaxed
         'redis:notifications' => 60,
         'redis:attendance' => 30,       // Attendance processing should be fast
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Job Priority Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure job priority preservation during failover.
+    | Jobs will maintain their priority when recovered after Redis failover.
+    |
+    */
+
+    'priority' => [
+        'preserve_on_failover' => env('HORIZON_PRESERVE_PRIORITY', true),
+        'default_priority' => 0,
     ],
 
     /*

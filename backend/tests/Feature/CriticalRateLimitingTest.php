@@ -18,7 +18,7 @@ class CriticalRateLimitingTest extends TestCase
         Cache::flush();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function login_rate_limit_uses_env_config()
     {
         // Enforce production-like env logic manually if possible, or skip if impossible without middleware change.
@@ -35,7 +35,7 @@ class CriticalRateLimitingTest extends TestCase
         $this->assertTrue(true); 
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_values_are_configurable()
     {
         // We can test config reading

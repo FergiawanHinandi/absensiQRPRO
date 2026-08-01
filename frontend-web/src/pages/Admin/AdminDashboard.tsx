@@ -23,6 +23,10 @@ import {
 } from '../../modules/admin/hooks';
 import { useRiskOverview } from '../../modules/admin/hooks/useAdminService';
 import { AnnouncementWidget } from '../../components/AnnouncementWidget';
+import { AttendanceTrendChart } from '../../components/dashboard/AttendanceTrendChart';
+import { LiveAttendanceCounter } from '../../components/dashboard/LiveAttendanceCounter';
+import { RealTimeDashboardStats } from '../../components/dashboard/RealTimeDashboardStats';
+import { ExportTrendButton } from '../../components/dashboard/ExportTrendButton';
 import Loading from '../../components/common/Loading';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import { getErrorMessage } from '../../utils/errorHandler';
@@ -44,6 +48,7 @@ const AdminDashboard: React.FC = () => {
     const navigate = useNavigate();
     const selectedDate = new Date().toISOString().split('T')[0];
     const [loading, setLoading] = useState(true);
+    const [chartPeriod, setChartPeriod] = useState<'7d' | '30d' | '90d'>('7d');
 
     // Fetch Data Hooks
     const { data: stats, isLoading: statsLoading, error, refetch } = useDailyReport(selectedDate);
@@ -207,8 +212,36 @@ const AdminDashboard: React.FC = () => {
                 </div>
             </motion.div>
 
-            {/* 3. Main Charts Section */}
+            {/* 3. Live Counter + Real-time Stats Row */}
             <motion.div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8" variants={itemVariants}>
+                {/* Real-time Attendance Counter */}
+                <div className="lg:col-span-1">
+                    <LiveAttendanceCounter title="Absensi Real-time" compact={false} />
+                </div>
+
+                {/* Real-time Dashboard Stats */}
+                <div className="lg:col-span-2">
+                    <RealTimeDashboardStats />
+                </div>
+            </motion.div>
+
+            {/* 4. Main Charts Section */}
+            <motion.div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8" variants={itemVariants}>
+                {/* Attendance Trend Chart - Full Width */}
+                <div className="lg:col-span-3">
+                    <div className="relative">
+                        <AttendanceTrendChart
+                            title="Tren Kehadiran Sekolah"
+                            showComparison={true}
+                            period={chartPeriod}
+                            onPeriodChange={setChartPeriod}
+                        />
+                        <div className="absolute top-5 right-5 z-10">
+                            <ExportTrendButton period={chartPeriod} variant="icon" />
+                        </div>
+                    </div>
+                </div>
+
                 {/* Class Performance Chart */}
                 <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-100 shadow-lg shadow-slate-200/50">
                     <div className="flex items-center justify-between mb-6">
@@ -279,7 +312,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
             </motion.div>
 
-            {/* 4. Critical Alerts Section */}
+            {/* 5. Critical Alerts Section */}
             <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6" variants={itemVariants}>
                 {/* Teacher Absence - Critical */}
                 <div className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden group hover:shadow-md transition-all">

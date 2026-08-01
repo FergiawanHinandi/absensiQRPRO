@@ -2,17 +2,17 @@
 
 ## Goal
 
-Membangun sistem absensi berbasis QR Code untuk SD-SMK menggunakan Laravel 12 sebagai REST API backend dan Mobile App (Flutter) sebagai client. Sistem ini harus scalable, aman, dan mendukung multi-tenant (sekolah).
+Membangun sistem absensi berbasis QR Code untuk SD-SMK menggunakan Laravel 11 sebagai REST API backend dan Mobile App (Flutter) sebagai client. Sistem ini harus scalable, aman, dan mendukung multi-tenant (sekolah).
 
 ## Proposed Changes
 
 ### Phase 1: Backend API Setup
 
-#### [NEW] Laravel 12 Project Structure
+#### [NEW] Laravel 11 Project Structure
 
 **Location:** `d:/Project/absensiQRPro/backend`
 
-- Inisialisasi Laravel 12 project
+- Inisialisasi Laravel 11 project
 - Setup PostgreSQL database connection
 - Install dependencies:
   - `spatie/laravel-permission` (RBAC)
@@ -566,7 +566,7 @@ WHERE tablename IN ('attendances', 'qr_codes', 'users');
 
 ## Next Steps After Approval
 
-1. Initialize Laravel 12 project
+1. Initialize Laravel 11 project
 2. Setup database & run migrations
 3. Implement core services (QR, Attendance, Location)
 4. Build API controllers & routes

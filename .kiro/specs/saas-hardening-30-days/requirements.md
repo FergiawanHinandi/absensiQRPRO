@@ -55,12 +55,12 @@
 5. Tests verify timezone consistency
 
 **Tasks**:
-- [ ] Audit all files for `date()`, `time()`, `strtotime()`
-- [ ] Create `TimezoneHelper` utility class
-- [ ] Replace all raw date functions
-- [ ] Add timezone to school settings
-- [ ] Write timezone consistency tests
-- [ ] Document timezone best practices
+- [-] Audit all files for `date()`, `time()`, `strtotime()`
+- [-] Create `TimezoneHelper` utility class
+- [-] Replace all raw date functions
+- [-] Add timezone to school settings
+- [-] Write timezone consistency tests
+- [x] Document timezone best practices
 
 **Risk Reduction**: 🔴 HIGH (8/10) - Prevents date mismatch bugs  
 **Effort**: 6 hours  
@@ -80,11 +80,11 @@
 5. Error messages user-friendly
 
 **Tasks**:
-- [ ] Identify existing duplicate records
-- [ ] Create cleanup script for duplicates
-- [ ] Create migration with unique constraint
-- [ ] Update all attendance creation code
-- [ ] Add constraint violation handling
+- [-] Identify existing duplicate records
+- [-] Create cleanup script for duplicates
+- [x] Create migration with unique constraint
+- [x] Update all attendance creation code
+- [x] Add constraint violation handling
 - [ ] Write duplicate prevention tests
 
 **Risk Reduction**: 🔴 CRITICAL (10/10) - Eliminates duplicate attendance  

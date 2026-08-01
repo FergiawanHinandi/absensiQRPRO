@@ -29,7 +29,7 @@ class TokenAbilityRestrictionTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_token_cannot_access_teacher_dashboard()
     {
         // Create student user
@@ -61,7 +61,7 @@ class TokenAbilityRestrictionTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_token_can_access_own_attendance_history()
     {
         // Create student user
@@ -90,7 +90,7 @@ class TokenAbilityRestrictionTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_token_cannot_access_admin_management()
     {
         // Create teacher user
@@ -122,7 +122,7 @@ class TokenAbilityRestrictionTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_token_can_generate_qr_codes()
     {
         // Create teacher user
@@ -155,7 +155,7 @@ class TokenAbilityRestrictionTest extends TestCase
         $this->assertNotEquals(403, $response->status());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_token_can_access_teacher_management()
     {
         // Create admin user
@@ -184,7 +184,7 @@ class TokenAbilityRestrictionTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_token_cannot_access_super_admin_routes()
     {
         // Create admin user
@@ -213,7 +213,7 @@ class TokenAbilityRestrictionTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_token_has_wildcard_access()
     {
         // Create super admin user
@@ -241,7 +241,7 @@ class TokenAbilityRestrictionTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_token_cannot_generate_qr_codes()
     {
         // Create student user
@@ -275,7 +275,7 @@ class TokenAbilityRestrictionTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_token_cannot_access_parent_routes()
     {
         // Create teacher user
@@ -304,7 +304,7 @@ class TokenAbilityRestrictionTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function token_abilities_match_user_role()
     {
         // Create users of different roles

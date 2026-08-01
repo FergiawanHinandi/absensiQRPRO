@@ -29,6 +29,9 @@ class AttendanceSettingsController extends Controller
             'qr_expiry_seconds' => $settings['qr_expiry_seconds'] ?? $defaults['qr_expiry_seconds'],
             'school_start_time' => $school->start_time,
             'school_end_time' => $school->end_time,
+            'latitude' => $school->latitude,
+            'longitude' => $school->longitude,
+            'radius_meters' => $school->radius_meters,
         ]);
     }
 
@@ -45,12 +48,18 @@ class AttendanceSettingsController extends Controller
             'qr_expiry_seconds' => 'required|integer|min:10',
             'school_start_time' => 'required|date_format:H:i:s',
             'school_end_time' => 'required|date_format:H:i:s|after:school_start_time',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+            'radius_meters' => 'required|integer|min:50|max:5000',
         ]);
 
         DB::transaction(function () use ($school, $validated, $user) {
             // Update main columns
             $school->start_time = $validated['school_start_time'];
             $school->end_time = $validated['school_end_time'];
+            $school->latitude = $validated['latitude'] ?? null;
+            $school->longitude = $validated['longitude'] ?? null;
+            $school->radius_meters = $validated['radius_meters'];
 
             // Update JSON settings
             $settings = $school->settings ?? [];

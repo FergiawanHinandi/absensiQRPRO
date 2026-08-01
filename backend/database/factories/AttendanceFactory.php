@@ -60,4 +60,111 @@ class AttendanceFactory extends Factory
             );
         });
     }
+    
+    /**
+     * Create attendance with pending approval state
+     */
+    public function pendingApproval(): static
+    {
+        return $this->afterCreating(function (\App\Models\Attendance $attendance) {
+            $recordedBy = \App\Models\User::find(1) ?? \App\Models\User::factory()->create();
+            $attendance->checkIn(
+                recordedBy: $recordedBy,
+                latitude: -6.2088,
+                longitude: 106.8456,
+                deviceId: 'factory-device'
+            );
+            $attendance->checkOut(
+                recordedBy: $recordedBy,
+                latitude: -6.2088,
+                longitude: 106.8456,
+                deviceId: 'factory-device'
+            );
+            $attendance->requestCorrection(
+                requestedBy: $recordedBy,
+                reason: 'Factory test correction request'
+            );
+        });
+    }
+    
+    /**
+     * Create attendance with approved state
+     */
+    public function approved(): static
+    {
+        return $this->afterCreating(function (\App\Models\Attendance $attendance) {
+            $recordedBy = \App\Models\User::find(1) ?? \App\Models\User::factory()->create();
+            $approver = \App\Models\User::find(2) ?? \App\Models\User::factory()->create();
+            
+            $attendance->checkIn(
+                recordedBy: $recordedBy,
+                latitude: -6.2088,
+                longitude: 106.8456,
+                deviceId: 'factory-device'
+            );
+            $attendance->checkOut(
+                recordedBy: $recordedBy,
+                latitude: -6.2088,
+                longitude: 106.8456,
+                deviceId: 'factory-device'
+            );
+            $attendance->requestCorrection(
+                requestedBy: $recordedBy,
+                reason: 'Factory test correction request'
+            );
+            $attendance->approve(
+                approver: $approver,
+                notes: 'Factory test approval'
+            );
+        });
+    }
+    
+    /**
+     * Create attendance with rejected state
+     */
+    public function rejected(): static
+    {
+        return $this->afterCreating(function (\App\Models\Attendance $attendance) {
+            $recordedBy = \App\Models\User::find(1) ?? \App\Models\User::factory()->create();
+            $rejector = \App\Models\User::find(2) ?? \App\Models\User::factory()->create();
+            
+            $attendance->checkIn(
+                recordedBy: $recordedBy,
+                latitude: -6.2088,
+                longitude: 106.8456,
+                deviceId: 'factory-device'
+            );
+            $attendance->checkOut(
+                recordedBy: $recordedBy,
+                latitude: -6.2088,
+                longitude: 106.8456,
+                deviceId: 'factory-device'
+            );
+            $attendance->requestCorrection(
+                requestedBy: $recordedBy,
+                reason: 'Factory test correction request'
+            );
+            $attendance->reject(
+                rejector: $rejector,
+                reason: 'Factory test rejection'
+            );
+        });
+    }
+    
+    /**
+     * TESTING ONLY: Set state directly (bypasses state machine)
+     * This should ONLY be used in tests that specifically test state machine enforcement
+     * 
+     * @param \App\Enums\AttendanceState|string $state
+     */
+    public function inState($state): static
+    {
+        return $this->afterCreating(function (\App\Models\Attendance $attendance) use ($state) {
+            // Use internal method to bypass state machine for testing
+            $stateEnum = $state instanceof \App\Enums\AttendanceState ? $state : \App\Enums\AttendanceState::from($state);
+            $attendance->setStateInternal($stateEnum);
+            $attendance->syncLegacyStatus();
+            $attendance->save();
+        });
+    }
 }

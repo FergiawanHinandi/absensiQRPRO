@@ -30,9 +30,3 @@ class StudentFaceEmbedding extends Model
         return $this->belongsTo(School::class);
     }
 }
-
-    public function student()
-    {
-        return $this->belongsTo(User::class, 'student_id');
-    }
-}

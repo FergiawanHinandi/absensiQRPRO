@@ -146,6 +146,34 @@ class AnnouncementController extends Controller
     }
 
     /**
+     * Get active announcements for authenticated user (broadcasts endpoint)
+     */
+    public function getActive(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $roleType = $user->role_type ?? 'all';
+
+        $query = Announcement::active()
+            ->forRole($roleType)
+            ->with('creator:id,name')
+            ->orderByDesc('created_at');
+
+        // Scope to user's school if applicable
+        if ($user->school_id) {
+            $query->forSchool($user->school_id);
+        } else {
+            $query->global();
+        }
+
+        $announcements = $query->limit($request->input('limit', 10))->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $announcements,
+        ]);
+    }
+
+    /**
      * Toggle announcement active status.
      */
     public function toggleActive(int $id): JsonResponse

@@ -21,7 +21,8 @@ Schedule::command('tokens:cleanup')->dailyAt('03:00');
 Schedule::command('behavior:analyze-daily')->dailyAt('01:00');
 
 // Student Attendance Risk Calculation - runs daily at 01:00 AM
-Schedule::job(new CalculateAttendanceRisk)->dailyAt('01:00');
+// Note: This should be dispatched per school in a command instead
+// Schedule::job(new CalculateAttendanceRisk)->dailyAt('01:00');
 
 // ============================================================
 // IMMUTABLE AUDIT LOG INTEGRITY & BACKUP
@@ -113,6 +114,30 @@ Schedule::command('queue:autoscale --os=linux')->everyMinute()->withoutOverlappi
 
 // 🚨 System Health Monitoring (Alerting)
 Schedule::command('monitor:system')->everyMinute()->runInBackground();
+
+// ============================================================
+// QUEUE MONITORING & ALERTING
+// ============================================================
+
+// Queue size monitoring - runs every minute
+Schedule::command('queue:monitor')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->onFailure(function () {
+        \Illuminate\Support\Facades\Log::channel('system')
+            ->error('Queue monitoring command failed');
+    });
+
+// Failed jobs monitoring - runs hourly
+Schedule::command('queue:monitor --check-failed')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground()
+    ->onFailure(function () {
+        \Illuminate\Support\Facades\Log::channel('system')
+            ->error('Failed jobs monitoring command failed');
+    });
 
 // ============================================================
 // OBSERVABILITY & LOG MAINTENANCE

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import Loading from '../../components/common/Loading';
+import { SkeletonDashboard } from '../../components/ui/LoadingStates';
 import ErrorMessage from '../../components/common/ErrorMessage';
 import {
     Calendar as CalendarIcon,
@@ -19,6 +19,7 @@ import {
 } from '../../modules/teacher/hooks';
 import { AnnouncementWidget } from '../../components/AnnouncementWidget';
 import { LiveAttendanceFeed } from '../../components/dashboard/LiveAttendanceFeed';
+import { AttendanceTrendChart } from '../../components/dashboard/AttendanceTrendChart';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -95,19 +96,55 @@ const TeacherDashboard: React.FC = () => {
     const { data: scheduleData, isLoading: scheduleLoading, error: scheduleError, refetch: refetchSchedule } = useTeacherSchedule(selectedDate);
     const { data: homeroomStats } = useHomeroomStats();
 
-    // Logic to find "Next Class"
+    // Logic to find "Next Class" based on current time
     const nextClass = useMemo(() => {
-        if (!scheduleData?.schedules) return null;
+        if (!scheduleData?.schedules || scheduleData.schedules.length === 0) return null;
 
-        // Simple logic: return the first schedule item for simplicity in MVP
-        // In a real app, compare with current time
-        return scheduleData.schedules.length > 0 ? scheduleData.schedules[0] : null;
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        // Find the next class that hasn't ended yet
+        for (const schedule of scheduleData.schedules) {
+            const [endHour, endMin] = schedule.end_time.split(':').map(Number);
+            const endMinutes = endHour * 60 + endMin;
+            if (endMinutes > currentMinutes) {
+                return schedule;
+            }
+        }
+        // All classes have ended - return last class
+        return scheduleData.schedules[scheduleData.schedules.length - 1];
+    }, [scheduleData]);
+
+    // Determine which classes are past and which is next
+    const scheduleStatus = useMemo(() => {
+        if (!scheduleData?.schedules) return { pastIndices: new Set<number>(), nextIndex: -1 };
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const pastIndices = new Set<number>();
+        let nextIndex = -1;
+
+        scheduleData.schedules.forEach((schedule: ScheduleSession, index: number) => {
+            const [endHour, endMin] = schedule.end_time.split(':').map(Number);
+            const endMinutes = endHour * 60 + endMin;
+            if (endMinutes <= currentMinutes) {
+                pastIndices.add(index);
+            } else if (nextIndex === -1) {
+                nextIndex = index;
+            }
+        });
+
+        return { pastIndices, nextIndex };
     }, [scheduleData]);
 
     const formattedDate = format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: id });
 
     // Handle Loading State
-    if (scheduleLoading && !scheduleData) return <Loading text="Menyiapkan Jadwal Mengajar..." />;
+    if (scheduleLoading && !scheduleData) return (
+        <div className="p-6 max-w-6xl mx-auto">
+            <SkeletonDashboard />
+        </div>
+    );
 
     // Handle Error State
     if (scheduleError) {
@@ -256,7 +293,10 @@ const TeacherDashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* 2. Main Content: Schedule Timeline & Quick Tools */}
+                {/* 2. Attendance Trend Chart */}
+                <AttendanceTrendChart title="Tren Kehadiran Saya" className="mb-6" />
+
+                {/* 3. Main Content: Schedule Timeline & Quick Tools */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Left: Schedule Timeline */}
                     <div className="lg:col-span-2">
@@ -269,8 +309,8 @@ const TeacherDashboard: React.FC = () => {
                             <div className="mt-2 pl-2">
                                 {scheduleData?.schedules && scheduleData.schedules.length > 0 ? (
                                     scheduleData.schedules.map((session: ScheduleSession, index: number) => {
-                                        const isNext = index === 0;
-                                        const isPast = false;
+                                        const isNext = index === scheduleStatus.nextIndex;
+                                        const isPast = scheduleStatus.pastIndices.has(index);
                                         return (
                                             <ScheduleTimelineItem
                                                 key={index}
@@ -308,7 +348,7 @@ const TeacherDashboard: React.FC = () => {
                         </div>
 
 
-                        {/* Live Attendance Feed - NEW ADDITION */}
+                        {/* Live Attendance Feed */}
                         <div className="h-[400px]">
                             <LiveAttendanceFeed />
                         </div>

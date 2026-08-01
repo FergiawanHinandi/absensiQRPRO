@@ -223,4 +223,32 @@ class TeacherAttendanceController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Remove a teacher's registered device
+     *
+     * DELETE /api/v1/teacher/attendance/devices/{id}
+     */
+    public function removeDevice(Request $request, int $id): JsonResponse
+    {
+        $teacher = $request->user();
+
+        $device = TeacherDevice::where('id', $id)
+            ->where('teacher_id', $teacher->id)
+            ->first();
+
+        if (! $device) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Perangkat tidak ditemukan.',
+            ], 404);
+        }
+
+        $device->delete();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Perangkat berhasil dihapus.',
+        ]);
+    }
 }

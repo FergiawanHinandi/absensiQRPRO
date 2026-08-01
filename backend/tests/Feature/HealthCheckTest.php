@@ -11,7 +11,7 @@ class HealthCheckTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function health_check_endpoint_returns_comprehensive_status()
     {
         $response = $this->getJson('/api/v1/health');
@@ -140,7 +140,7 @@ class HealthCheckTest extends TestCase
         $this->assertNotEmpty($data['uptime']['started_at']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function health_check_returns_unhealthy_when_database_fails()
     {
         // Mock database failure
@@ -156,7 +156,7 @@ class HealthCheckTest extends TestCase
         $this->assertStringContainsString('Database connection failed', $data['checks']['database']['message']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function health_check_returns_unhealthy_when_cache_fails()
     {
         // Mock cache failure
@@ -172,7 +172,7 @@ class HealthCheckTest extends TestCase
         $this->assertStringContainsString('Cache connection failed', $data['checks']['cache']['message']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function health_check_shows_warning_for_high_queue_jobs()
     {
         // Change queue connection to database for this test
@@ -198,7 +198,7 @@ class HealthCheckTest extends TestCase
         $this->assertStringContainsString('High number of pending jobs', $data['checks']['queue_jobs']['message']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function health_check_shows_error_for_high_failed_jobs()
     {
         // Change queue connection to database for this test
@@ -224,7 +224,7 @@ class HealthCheckTest extends TestCase
         $this->assertStringContainsString('High number of failed jobs', $data['checks']['queue_jobs']['message']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function health_check_includes_app_version_from_config()
     {
         config(['app.version' => '2.1.0']);
@@ -237,7 +237,7 @@ class HealthCheckTest extends TestCase
         $this->assertEquals('2.1.0', $data['version']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function health_check_redis_shows_warning_when_extension_not_loaded()
     {
         // This test would need to mock the extension_loaded function

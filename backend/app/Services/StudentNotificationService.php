@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\AttendanceCheckedIn;
 use App\Models\Attendance;
 use App\Models\User;
 use Carbon\Carbon;
@@ -13,20 +14,32 @@ class StudentNotificationService
     /**
      * Send Check-in Notification
      * Triggered when student successfully scans QR
+     * Dispatches AttendanceCheckedIn event for FCM push to parents
      */
     public function sendCheckInNotification(Attendance $attendance, User $student)
     {
-        $title = 'Check-in Successful';
-        $body = 'You have successfully checked in for '.($attendance->schedule->subject->name ?? 'class').' at '.Carbon::parse($attendance->check_in_time)->format('H:i');
+        // Dispatch event for push notifications to parents
+        try {
+            event(new AttendanceCheckedIn($attendance, $student));
+        } catch (\Exception $e) {
+            Log::error('Failed to dispatch AttendanceCheckedIn event', [
+                'attendance_id' => $attendance->id,
+                'student_id' => $student->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
-        $this->sendTostudent($student, 'check_in', $title, $body, [
+        // Send in-app notification to student
+        $title = 'Check-in Berhasil';
+        $body = 'Anda telah check-in untuk '.($attendance->schedule->subject->name ?? 'kelas').' pukul '.Carbon::parse($attendance->check_in_time)->format('H:i');
+
+        $this->sendToUser($student, 'check_in', $title, $body, [
             'attendance_id' => $attendance->id,
             'status' => $attendance->status,
             'time' => $attendance->check_in_time,
         ]);
 
-        // Check for rate drop after this event (unlikely on success unless late counts against rate in a specific way, but usually absent does)
-        // If status is LATE, we might want to check rate?
+        // Check for rate drop after this event
         if ($attendance->status === 'late') {
             $this->sendLateNotification($attendance, $student);
             $this->checkAttendanceRate($student);
@@ -44,7 +57,7 @@ class StudentNotificationService
         $title = 'Late Arrival Recorded';
         $body = 'You are marked late for '.($attendance->schedule->subject->name ?? 'class')." ({$minutesLate} min).";
 
-        $this->sendTostudent($student, 'late_arrival', $title, $body, [
+        $this->sendToUser($student, 'late_arrival', $title, $body, [
             'attendance_id' => $attendance->id,
             'minutes_late' => $minutesLate,
         ]);
@@ -59,7 +72,7 @@ class StudentNotificationService
         $title = 'Marked Absent';
         $body = 'You are marked absent for '.($attendance->schedule->subject->name ?? 'class').'. Please contact your teacher if this is a mistake.';
 
-        $this->sendTostudent($student, 'absent_recorded', $title, $body, [
+        $this->sendToUser($student, 'absent_recorded', $title, $body, [
             'attendance_id' => $attendance->id,
             'date' => $attendance->attendance_date,
         ]);
@@ -72,8 +85,8 @@ class StudentNotificationService
      */
     public function checkAttendanceRate(User $student)
     {
-        $startOfMonth = Carbon::now()->startOfMonth();
-        $today = Carbon::now();
+        $startOfMonth = Carbon::now(\school_timezone())->startOfMonth();
+        $today = Carbon::now(\school_timezone());
 
         $stats = Attendance::where('student_id', $student->id)
             ->whereBetween('attendance_date', [$startOfMonth, $today])
@@ -96,27 +109,24 @@ class StudentNotificationService
     }
 
     /**
-     * Internal Sender (Mock or FCM wrapper)
+     * Internal Sender - Sends in-app notification to user
+     * Uses database channel for in-app notification display.
+     * Parent FCM push notifications are handled via AttendanceCheckedIn event listener.
      */
-    private function sendToStudent(User $user, string $type, string $title, string $body, array $data = [])
+    private function sendToUser(User $user, string $type, string $title, string $body, array $data = [])
     {
-        // In a real app, this would use FCM or OneSignal
-        Log::channel('single')->info("[Notification] To: {$user->id} | Type: {$type} | {$title} - {$body}", $data);
-
-        // Example Payload Structure
-        /*
-        {
-            "to": "device_token_abc123",
-            "notification": {
-                "title": "Check-in Successful",
-                "body": "You have successfully checked in..."
-            },
-            "data": {
-                "type": "check_in",
-                "attendance_id": 105,
-                "click_action": "FLUTTER_NOTIFICATION_CLICK"
-            }
+        try {
+            // Send in-app notification via database channel
+            $user->notify(new \App\Notifications\InAppNotification($type, $title, $body, $data));
+        } catch (\Exception $e) {
+            Log::warning('Failed to send in-app notification', [
+                'user_id' => $user->id,
+                'type' => $type,
+                'error' => $e->getMessage(),
+            ]);
         }
-        */
+
+        // Always log for audit trail
+        Log::channel('single')->info("[Notification] To: {$user->id} | Type: {$type} | {$title} - {$body}", $data);
     }
 }

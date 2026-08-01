@@ -13,9 +13,12 @@ return [
     | framework. This connection is utilized if another isn't explicitly
     | specified when running a cache operation inside the application.
     |
+    | Using 'failover' provides automatic fallback from Redis -> Database -> Array
+    | ensuring the application continues to function even when Redis is unavailable.
+    |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    'default' => env('CACHE_STORE', 'failover'),
 
     /*
     |--------------------------------------------------------------------------

@@ -58,21 +58,25 @@ class StudentController extends Controller
         $search = $request->input('search');
         $classId = $request->input('class_id');
 
-        // OPTIMIZATION: Add field selection to reduce memory usage
+        // OPTIMIZATION: Add field selection and eager load class relationship to prevent N+1
         $query = User::where('school_id', $schoolId)
             ->where('role_type', 'student')
-            ->with(['studentClass:id,student_id,class_id,status']);
+            ->with([
+                'classStudents:id,student_id,class_id,status',
+                'classStudents.class:id,name',  // Prevent N+1 when accessing class name
+            ]);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ILIKE', "%{$search}%")
-                    ->orWhere('nis', 'ILIKE', "%{$search}%")
-                    ->orWhere('nisn', 'ILIKE', "%{$search}%");
+                    ->orWhere('username', 'ILIKE', "%{$search}%");
             });
         }
 
         if ($classId) {
-            $query->where('class_id', $classId);
+            $query->whereHas('classStudents', function ($q) use ($classId) {
+                $q->where('class_id', $classId)->where('status', 'active');
+            });
         }
 
         $students = $query->orderBy('name')->paginate($perPage);
@@ -182,6 +186,32 @@ class StudentController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Delete Student
+     */
+    public function destroy(Request $request, int $studentId)
+    {
+        $user = $request->user();
+        $schoolId = $user->school_id;
+
+        $student = User::where('id', $studentId)
+            ->where('school_id', $schoolId)
+            ->where('role_type', 'student')
+            ->firstOrFail();
+
+        // Policy-based authorization check
+        $this->authorize('delete', $student);
+
+        $student->delete();
+
+        \App\Events\StudentUpdated::dispatch(null, $schoolId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Siswa berhasil dihapus',
+        ]);
     }
 
     /**

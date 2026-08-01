@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\AttendanceException;
+use App\Helpers\TimezoneHelper;
 use App\Models\Attendance;
 use App\Models\Schedule;
 use App\Models\User;
@@ -114,8 +115,8 @@ class SecureAttendanceService
             throw new AttendanceException('QR Code tidak valid: timestamp tidak ditemukan.');
         }
 
-        $expiresAt = Carbon::parse($payload['data']['expires_at']);
-        $now = Carbon::now();
+        $expiresAt = TimezoneHelper::parse($payload['data']['expires_at']);
+        $now = TimezoneHelper::now();
 
         // Check if expired (60 second window)
         if ($now->greaterThan($expiresAt)) {
@@ -131,7 +132,7 @@ class SecureAttendanceService
         if ($expiresAt->greaterThan($now->addMinutes(2))) {
             $this->logSecurityEvent('future_timestamp', [
                 'expires_at' => $expiresAt->toIso8601String(),
-                'now' => Carbon::now()->toIso8601String(),
+                'now' => TimezoneHelper::now()->toIso8601String(),
             ]);
             throw new AttendanceException('QR Code tidak valid: timestamp tidak wajar.');
         }
@@ -209,7 +210,10 @@ class SecureAttendanceService
     {
         $scheduleId = $qrPayload['data']['schedule_id'];
         $schoolId = $student->school_id;
-        $attendanceDate = Carbon::now()->toDateString();
+        
+        // Get school for timezone-aware date
+        $school = $student->school;
+        $attendanceDate = TimezoneHelper::today($school);
 
         // Validate schedule exists and belongs to school
         $schedule = Schedule::where('id', $scheduleId)
@@ -235,7 +239,7 @@ class SecureAttendanceService
             ],
             [
                 'status' => $status,
-                'check_in_time' => Carbon::now()->format('H:i:s'),
+                'check_in_time' => TimezoneHelper::schoolNow($school)->format('H:i:s'),
                 'is_manual' => false,
                 'attendance_type' => 'qr_scan',
                 'device_id' => $scanData['device_id'] ?? null,
@@ -257,7 +261,7 @@ class SecureAttendanceService
             'schedule_id' => $scheduleId,
             'school_id' => $schoolId,
             'status' => $status,
-            'timestamp' => Carbon::now()->toIso8601String(),
+            'timestamp' => TimezoneHelper::now()->toIso8601String(),
         ]);
 
         return $attendance->load(['schedule.subject', 'schedule.class']);
@@ -271,11 +275,12 @@ class SecureAttendanceService
      */
     protected function determineAttendanceStatus(Schedule $schedule): string
     {
-        $now = Carbon::now();
-        $startTime = Carbon::parse($schedule->start_time);
+        $school = $schedule->school;
+        $now = TimezoneHelper::schoolNow($school);
+        $startTime = TimezoneHelper::timeFromString($schedule->start_time, $school);
         
         // Get late tolerance from school settings (default: 15 minutes)
-        $lateTolerance = $schedule->school->settings['late_tolerance_minutes'] ?? 15;
+        $lateTolerance = $school->settings['late_tolerance_minutes'] ?? 15;
         $lateThreshold = $startTime->copy()->addMinutes($lateTolerance);
 
         return $now->greaterThan($lateThreshold) ? 'late' : 'present';
@@ -363,7 +368,7 @@ class SecureAttendanceService
         Log::channel('security')->warning("qr_security_event: {$event}", array_merge($context, [
             'ip' => request()->ip(),
             'user_agent' => request()->userAgent(),
-            'timestamp' => Carbon::now()->toIso8601String(),
+            'timestamp' => TimezoneHelper::now()->toIso8601String(),
         ]));
 
         // Also log to activity_logs table

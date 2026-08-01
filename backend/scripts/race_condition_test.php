@@ -31,7 +31,7 @@ for ($i = 0; $i < $concurrentRequests; $i++) {
     $payload = [
         'student_id' => $studentId,
         'schedule_id' => $scheduleId,
-        'attendance_date' => date('Y-m-d'),
+        'attendance_date' => \App\Helpers\TimezoneHelper::now()->toDateString(),
         'status' => 'present',
         'notes' => "Race test request #$i"
     ];

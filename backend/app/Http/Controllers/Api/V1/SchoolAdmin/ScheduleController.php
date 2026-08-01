@@ -95,6 +95,22 @@ class ScheduleController extends Controller
     }
 
     /**
+     * Show Schedule Detail
+     */
+    public function show(Request $request, Schedule $schedule)
+    {
+        $schoolId = $request->user()->school_id;
+
+        if ($schedule->school_id !== $schoolId) {
+            abort(403, 'Unauthorized');
+        }
+
+        $schedule->load(['class:id,name', 'subject:id,name,code', 'teacher:id,name,email']);
+
+        return response()->success($schedule);
+    }
+
+    /**
      * Update Schedule
      */
     public function update(Request $request, Schedule $schedule)

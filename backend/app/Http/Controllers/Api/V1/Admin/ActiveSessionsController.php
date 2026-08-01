@@ -423,7 +423,7 @@ class ActiveSessionsController extends Controller
 
             return [
                 'id' => $token->id,
-                'device' => $this->parseDeviceInfo($token->device_fingerprint),
+                'device' => $this->parseDeviceInfo($token->device_fingerprint, $token->platform),
                 'platform' => $token->platform,
                 'ip_address' => $this->maskIpAddress($token->initial_ip),
                 'location' => $location,
@@ -506,16 +506,43 @@ class ActiveSessionsController extends Controller
 
     /**
      * Parse device info from fingerprint (for display purposes).
+     *
+     * ARCH-02 FIX: Sebelumnya selalu mengembalikan type 'unknown' (placeholder).
+     * Sekarang memetakan platform yang tersimpan pada token ke tipe perangkat
+     * yang dapat ditampilkan di UI keamanan.
      */
-    private function parseDeviceInfo(?string $fingerprint): array
+    private function parseDeviceInfo(?string $fingerprint, ?string $platform = null): array
     {
-        // The fingerprint is a hash, so we can't decode it.
-        // We could store UA separately, but for now return placeholder.
-        // In production, consider storing parsed UA data alongside fingerprint.
+        $type = 'unknown';
+        $label = 'Perangkat tidak dikenal';
+
+        if ($platform) {
+            $normalized = strtolower($platform);
+            if (str_contains($normalized, 'android')) {
+                $type = 'android';
+                $label = 'Android';
+            } elseif (str_contains($normalized, 'ios')) {
+                $type = 'ios';
+                $label = 'iOS';
+            } elseif (str_contains($normalized, 'windows')) {
+                $type = 'windows';
+                $label = 'Windows';
+            } elseif (str_contains($normalized, 'mac')) {
+                $type = 'macos';
+                $label = 'macOS';
+            } elseif (str_contains($normalized, 'linux')) {
+                $type = 'linux';
+                $label = 'Linux';
+            } elseif (str_contains($normalized, 'web') || str_contains($normalized, 'browser')) {
+                $type = 'web';
+                $label = 'Browser';
+            }
+        }
 
         return [
             'fingerprint_short' => $fingerprint ? substr($fingerprint, 0, 12).'...' : 'Unknown',
-            'type' => 'unknown', // Would need to store UA separately
+            'type' => $type,
+            'label' => $label,
         ];
     }
 

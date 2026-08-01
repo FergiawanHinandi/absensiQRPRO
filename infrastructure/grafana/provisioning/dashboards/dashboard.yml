@@ -1,0 +1,14 @@
+# Grafana Dashboard Provisioning - Auto-import JSON dashboards
+apiVersion: 1
+
+providers:
+  - name: "AbsensiQRPro"
+    orgId: 1
+    folder: "AbsensiQR Pro"
+    folderUid: "absensi"
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false

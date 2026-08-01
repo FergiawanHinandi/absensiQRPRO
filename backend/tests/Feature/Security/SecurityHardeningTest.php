@@ -14,14 +14,12 @@ use Tests\TestCase;
 
 /**
  * Security Hardening Tests
- *
  * Tests for:
  * 1. Timing Attack Prevention (Login)
  * 2. Replay Attack Prevention (Idempotency)
  * 3. Brute Force Protection (Rate Limiting)
- *
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
 class SecurityHardeningTest extends TestCase
 {
     use RefreshDatabase;
@@ -61,10 +59,8 @@ class SecurityHardeningTest extends TestCase
     // TIMING ATTACK PREVENTION TESTS
     // ========================================
 
-    /**
-     * @test
-     * @group timing-attack
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('timing-attack')]
     public function login_response_time_is_consistent_for_valid_and_invalid_users(): void
     {
         // Test with valid user + wrong password
@@ -99,10 +95,8 @@ class SecurityHardeningTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * @group timing-attack
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('timing-attack')]
     public function login_returns_generic_error_message_for_both_invalid_user_and_password(): void
     {
         // Wrong password for valid user
@@ -136,10 +130,8 @@ class SecurityHardeningTest extends TestCase
     // BRUTE FORCE PROTECTION TESTS
     // ========================================
 
-    /**
-     * @test
-     * @group brute-force
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('brute-force')]
     public function login_is_rate_limited_after_5_failed_attempts(): void
     {
         // Make 5 failed login attempts
@@ -165,10 +157,8 @@ class SecurityHardeningTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * @group brute-force
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('brute-force')]
     public function account_is_locked_after_10_failed_attempts(): void
     {
         // Make 10 failed login attempts (need to bypass rate limiter)
@@ -198,10 +188,8 @@ class SecurityHardeningTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     * @group brute-force
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('brute-force')]
     public function successful_login_clears_failed_attempts(): void
     {
         // Make some failed attempts
@@ -229,10 +217,8 @@ class SecurityHardeningTest extends TestCase
     // REPLAY ATTACK PREVENTION TESTS
     // ========================================
 
-    /**
-     * @test
-     * @group replay-attack
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('replay-attack')]
     public function attendance_endpoint_requires_idempotency_key(): void
     {
         $this->actingAs($this->validUser, 'sanctum');
@@ -249,10 +235,8 @@ class SecurityHardeningTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     * @group replay-attack
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('replay-attack')]
     public function attendance_endpoint_validates_uuid_format(): void
     {
         $this->actingAs($this->validUser, 'sanctum');
@@ -271,10 +255,8 @@ class SecurityHardeningTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     * @group replay-attack
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('replay-attack')]
     public function duplicate_request_returns_409_conflict(): void
     {
         $this->actingAs($this->validUser, 'sanctum');
@@ -307,10 +289,8 @@ class SecurityHardeningTest extends TestCase
         $response->assertHeader('X-Duplicate-Request', 'true');
     }
 
-    /**
-     * @test
-     * @group replay-attack
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('replay-attack')]
     public function expired_idempotency_key_allows_new_request(): void
     {
         $this->actingAs($this->validUser, 'sanctum');
@@ -339,10 +319,8 @@ class SecurityHardeningTest extends TestCase
         $this->assertNotEquals(409, $response->status());
     }
 
-    /**
-     * @test
-     * @group replay-attack
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('replay-attack')]
     public function idempotency_key_is_scoped_to_user(): void
     {
         $idempotencyKey = (string) Str::uuid();
@@ -382,10 +360,8 @@ class SecurityHardeningTest extends TestCase
     // REQUEST ID LOGGING TESTS
     // ========================================
 
-    /**
-     * @test
-     * @group logging
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('logging')]
     public function response_includes_request_id_header(): void
     {
         $response = $this->getJson('/api/v1/health');
@@ -397,10 +373,8 @@ class SecurityHardeningTest extends TestCase
         $this->assertMatchesRegularExpression('/^[a-f0-9]{16}-\d{4}$/', $requestId);
     }
 
-    /**
-     * @test
-     * @group logging
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('logging')]
     public function error_response_includes_request_id(): void
     {
         $response = $this->postJson('/api/v1/auth/login', [
@@ -415,10 +389,8 @@ class SecurityHardeningTest extends TestCase
         $this->assertArrayHasKey('request_id', $response->json());
     }
 
-    /**
-     * @test
-     * @group logging
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('logging')]
     public function exception_response_includes_request_id(): void
     {
         // Try to access protected endpoint without auth

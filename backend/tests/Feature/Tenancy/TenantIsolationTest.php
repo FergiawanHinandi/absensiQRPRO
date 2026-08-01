@@ -13,19 +13,16 @@ use Tests\TestCase;
 
 /**
  * TenantIsolationTest
- *
  * Comprehensive test suite for multi-tenant school isolation.
- *
  * COVERAGE:
  * - School data isolation
  * - Super admin bypass
  * - Unauthorized access prevention
  * - Audit logging
  * - Cross-tenant access attempts
- *
- * @group tenancy
- * @group security
  */
+#[\PHPUnit\Framework\Attributes\Group('tenancy')]
+#[\PHPUnit\Framework\Attributes\Group('security')]
 class TenantIsolationTest extends TestCase
 {
     use RefreshDatabase;
@@ -86,7 +83,7 @@ class TenantIsolationTest extends TestCase
     // SCHOOL ISOLATION TESTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_can_only_see_own_school_data()
     {
         $this->actingAs($this->adminA);
@@ -99,7 +96,7 @@ class TenantIsolationTest extends TestCase
         $this->assertEquals($this->schoolA->id, $attendances->first()->school_id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_cannot_see_other_school_data()
     {
         $this->actingAs($this->adminA);
@@ -110,7 +107,7 @@ class TenantIsolationTest extends TestCase
         $this->assertFalse($attendances->contains('id', $this->attendanceB->id));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_cannot_find_other_school_record_by_id()
     {
         $this->actingAs($this->adminA);
@@ -122,7 +119,7 @@ class TenantIsolationTest extends TestCase
         $this->assertNull($attendance);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_cannot_query_other_school_data()
     {
         $this->actingAs($this->adminA);
@@ -134,7 +131,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(0, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function different_school_admins_see_different_data()
     {
         // Admin A sees only school A data
@@ -157,7 +154,7 @@ class TenantIsolationTest extends TestCase
     // SUPER ADMIN BYPASS TESTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_see_all_schools_data()
     {
         $this->actingAs($this->superAdmin);
@@ -170,7 +167,7 @@ class TenantIsolationTest extends TestCase
         $this->assertTrue($attendances->contains('id', $this->attendanceB->id));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_bypass_is_logged()
     {
         Log::shouldReceive('channel')
@@ -190,7 +187,7 @@ class TenantIsolationTest extends TestCase
         Attendance::all();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_use_allTenants_method()
     {
         $this->actingAs($this->superAdmin);
@@ -201,7 +198,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(2, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_use_queryAllTenants_method()
     {
         $this->actingAs($this->superAdmin);
@@ -213,7 +210,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(2, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_use_findAnyTenant_method()
     {
         $this->actingAs($this->superAdmin);
@@ -230,7 +227,7 @@ class TenantIsolationTest extends TestCase
     // UNAUTHORIZED BYPASS ATTEMPTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_cannot_use_allTenants_method()
     {
         $this->actingAs($this->adminA);
@@ -241,7 +238,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(0, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_cannot_use_queryAllTenants_method()
     {
         $this->actingAs($this->adminA);
@@ -253,7 +250,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(0, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_cannot_use_findAnyTenant_method()
     {
         $this->actingAs($this->adminA);
@@ -265,7 +262,7 @@ class TenantIsolationTest extends TestCase
         $this->assertNull($attendance);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthorized_bypass_attempt_is_logged()
     {
         Log::shouldReceive('channel')
@@ -289,7 +286,7 @@ class TenantIsolationTest extends TestCase
     // EXPLICIT SCHOOL CONTEXT TESTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function can_set_explicit_school_context()
     {
         $this->actingAs($this->superAdmin);
@@ -305,7 +302,7 @@ class TenantIsolationTest extends TestCase
         SchoolScope::clearSchool();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function can_use_withSchool_callback()
     {
         $this->actingAs($this->superAdmin);
@@ -325,7 +322,7 @@ class TenantIsolationTest extends TestCase
     // USER WITHOUT SCHOOL_ID TESTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_without_school_id_gets_empty_result()
     {
         $userWithoutSchool = User::factory()->create([
@@ -341,7 +338,7 @@ class TenantIsolationTest extends TestCase
         $this->assertCount(0, $attendances);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_without_school_id_is_logged()
     {
         Log::shouldReceive('channel')
@@ -368,7 +365,7 @@ class TenantIsolationTest extends TestCase
     // API ENDPOINT TESTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function api_endpoint_respects_tenant_isolation()
     {
         $this->actingAs($this->adminA);
@@ -383,7 +380,7 @@ class TenantIsolationTest extends TestCase
         $this->assertEquals($this->schoolA->id, $data[0]['school_id']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function api_endpoint_prevents_cross_tenant_access()
     {
         $this->actingAs($this->adminA);
@@ -395,7 +392,7 @@ class TenantIsolationTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_api_can_access_all_schools()
     {
         $this->actingAs($this->superAdmin);
@@ -413,7 +410,7 @@ class TenantIsolationTest extends TestCase
     // QUERY BUILDER TESTS
     // ─────────────────────────────────────────────────────────────────────
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function scope_applies_to_where_queries()
     {
         $this->actingAs($this->adminA);
@@ -426,7 +423,7 @@ class TenantIsolationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function scope_applies_to_join_queries()
     {
         $this->actingAs($this->adminA);
@@ -441,7 +438,7 @@ class TenantIsolationTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function scope_applies_to_count_queries()
     {
         $this->actingAs($this->adminA);
@@ -452,7 +449,7 @@ class TenantIsolationTest extends TestCase
         $this->assertEquals(1, $count);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function scope_applies_to_aggregate_queries()
     {
         $this->actingAs($this->adminA);

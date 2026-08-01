@@ -43,7 +43,7 @@ class BackupSystem
     
     public function createFullBackup()
     {
-        $timestamp = date('Y-m-d_H-i-s');
+        $timestamp = \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s');
         $backupDir = $this->backupPath . '/full_backup_' . $timestamp;
         
         $this->log("=== FULL BACKUP STARTED ===");
@@ -105,7 +105,7 @@ class BackupSystem
     private function createDatabaseBackup($backupDir)
     {
         $dbConfig = config('database.connections.' . config('database.default'));
-        $timestamp = date('Y-m-d_H-i-s');
+        $timestamp = \App\Helpers\TimezoneHelper::now()->format('Y-m-d_H-i-s');
         
         if (config('database.default') === 'sqlite') {
             // SQLite backup
@@ -149,7 +149,7 @@ class BackupSystem
             if (!$this->isProductionEnvironment()) {
                 $this->log("Creating simulated database backup for development...");
                 $backupContent = "-- PostgreSQL Database Backup Simulation\n";
-                $backupContent .= "-- Created: " . date('Y-m-d H:i:s') . "\n";
+                $backupContent .= "-- Created: " . \App\Helpers\TimezoneHelper::now()->format('Y-m-d H:i:s') . "\n";
                 $backupContent .= "-- Database: " . $dbConfig['database'] . "\n";
                 $backupContent .= "-- Host: " . $dbConfig['host'] . "\n\n";
                 
@@ -430,7 +430,7 @@ class BackupSystem
     
     private function log($message)
     {
-        $timestamp = date('Y-m-d H:i:s');
+        $timestamp = \App\Helpers\TimezoneHelper::now()->format('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}\n";
         
         echo $logMessage;

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Teacher;
 
+use App\Helpers\TimezoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Services\QRCodeGeneratorService;
@@ -116,7 +117,8 @@ class QRGeneratorController extends Controller
     public function activeSession(Request $request)
     {
         $teacher = $request->user();
-        $now = now();
+        $school = $teacher->school;
+        $now = TimezoneHelper::schoolNow($school);
 
         // Get current schedule for teacher
         $schedule = Schedule::with(['subject', 'class'])
@@ -142,7 +144,7 @@ class QRGeneratorController extends Controller
         // Get attendance count for this session
         $attendanceCount = \App\Models\Attendance::where('schedule_id', $schedule->id)
             ->where('school_id', $teacher->school_id)
-            ->whereDate('attendance_date', $now->toDateString())
+            ->whereDate('attendance_date', TimezoneHelper::today($school))
             ->count();
 
         $totalStudents = $schedule->class->students()->count();
@@ -182,7 +184,8 @@ class QRGeneratorController extends Controller
     public function liveAttendance(Request $request, int $scheduleId)
     {
         $teacher = $request->user();
-        $today = now()->toDateString();
+        $school = $teacher->school;
+        $today = TimezoneHelper::today($school);
 
         // Validate schedule belongs to teacher's school
         $schedule = Schedule::where('id', $scheduleId)
@@ -194,7 +197,7 @@ class QRGeneratorController extends Controller
             ->where('schedule_id', $scheduleId)
             ->where('school_id', $teacher->school_id)
             ->whereDate('attendance_date', $today)
-            ->where('created_at', '>=', now()->subMinutes(5))
+            ->where('created_at', '>=', TimezoneHelper::schoolNow($school)->subMinutes(5))
             ->orderBy('created_at', 'desc')
             ->limit(10)
             ->get();
@@ -219,7 +222,7 @@ class QRGeneratorController extends Controller
                     'present' => (int) ($allAttendances->present ?? 0),
                     'late' => (int) ($allAttendances->late ?? 0),
                 ],
-                'timestamp' => now()->toIso8601String(),
+                'timestamp' => TimezoneHelper::now()->toIso8601String(),
             ],
         ]);
     }
@@ -234,8 +237,8 @@ class QRGeneratorController extends Controller
      */
     protected function validateScheduleTime(Schedule $schedule): array
     {
-        $timezone = $schedule->school->timezone ?? config('app.timezone');
-        $now = now($timezone);
+        $school = $schedule->school;
+        $now = TimezoneHelper::schoolNow($school);
         $tolerance = config('attendance.qr_time_tolerance', 15);
 
         // Validate day
@@ -251,20 +254,14 @@ class QRGeneratorController extends Controller
             ];
         }
 
-        // Build full datetime with today's date
-        $start = \Carbon\Carbon::createFromFormat(
-            'Y-m-d H:i:s',
-            $now->format('Y-m-d') . ' ' . $schedule->start_time,
-            $timezone
-        )->subMinutes($tolerance);
+        // Build full datetime with today's date using TimezoneHelper
+        $start = TimezoneHelper::timeFromString($schedule->start_time, $school)
+            ->subMinutes($tolerance);
 
-        $end = \Carbon\Carbon::createFromFormat(
-            'Y-m-d H:i:s',
-            $now->format('Y-m-d') . ' ' . $schedule->end_time,
-            $timezone
-        )->addMinutes($tolerance);
+        $end = TimezoneHelper::timeFromString($schedule->end_time, $school)
+            ->addMinutes($tolerance);
 
-        if (!$now->betweenIncluded($start, $end)) {
+        if (!TimezoneHelper::isBetween($now, $start, $end)) {
             return [
                 'valid' => false,
                 'message' => 'QR code hanya dapat dibuat dalam rentang waktu jadwal mengajar.',

@@ -9,7 +9,9 @@ use App\Http\Controllers\Api\V1\Teacher\HomeroomController;
 use App\Http\Controllers\Api\V1\TeacherProfileController;
 use App\Http\Controllers\Api\V1\PermissionController;
 
-Route::middleware('role:teacher')->prefix('teacher')->group(function () {
+// A3-C2 FIX: Tambahkan 'homeroom_teacher' agar wali kelas bisa akses semua endpoint teacher.
+// Sebelumnya hanya 'role:teacher' — homeroom_teacher mendapat 403 di semua endpoint.
+Route::middleware('role:teacher,homeroom_teacher')->prefix('teacher')->group(function () {
     Route::get('/dashboard', [TeacherDashboardController::class, 'index'])
         ->middleware('ability:teacher:view_dashboard');
 
@@ -38,6 +40,7 @@ Route::middleware('role:teacher')->prefix('teacher')->group(function () {
         Route::get('/history', [TeacherAttendanceController::class, 'history']);
         Route::get('/summary', [TeacherAttendanceController::class, 'summary']);
         Route::get('/devices', [TeacherAttendanceController::class, 'devices']);
+        Route::delete('/devices/{id}', [TeacherAttendanceController::class, 'removeDevice']);
         
         // Student Attendance Management (Manual Entry)
         Route::get('/today-sessions', [TeacherStudentAttendanceController::class, 'todaySessions']);

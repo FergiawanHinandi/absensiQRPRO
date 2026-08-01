@@ -11,6 +11,24 @@ use Illuminate\Support\Facades\DB;
 class SchoolController extends Controller
 {
     /**
+     * Show school details (apiResource 'show' method)
+     * Aliases to profile()
+     */
+    public function show(Request $request, $id = null)
+    {
+        return $this->profile($request);
+    }
+
+    /**
+     * Update school details (apiResource 'update' method)
+     * Aliases to updateProfile()
+     */
+    public function update(Request $request, $id = null)
+    {
+        return $this->updateProfile($request);
+    }
+
+    /**
      * Get School Profile
      */
     public function profile(Request $request)

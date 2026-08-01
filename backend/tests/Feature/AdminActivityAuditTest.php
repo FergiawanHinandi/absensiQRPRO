@@ -43,7 +43,7 @@ class AdminActivityAuditTest extends TestCase
         $this->auditService = app(AdminAuditService::class);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_creates_activity_log_record()
     {
         $this->actingAs($this->schoolAdmin);
@@ -66,7 +66,7 @@ class AdminActivityAuditTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_identifies_high_risk_actions()
     {
         $this->actingAs($this->schoolAdmin);
@@ -90,7 +90,7 @@ class AdminActivityAuditTest extends TestCase
         $this->assertFalse($normalLog->isHighRisk());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_update_on_model()
     {
         $this->actingAs($this->schoolAdmin);
@@ -108,7 +108,7 @@ class AdminActivityAuditTest extends TestCase
         $log->update(['description' => 'Modified']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_delete_on_model()
     {
         $this->actingAs($this->schoolAdmin);
@@ -126,7 +126,7 @@ class AdminActivityAuditTest extends TestCase
         $log->delete();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_login_action()
     {
         $log = $this->auditService->logLogin($this->schoolAdmin);
@@ -136,7 +136,7 @@ class AdminActivityAuditTest extends TestCase
         $this->assertEquals($this->schoolAdmin->id, $log->admin_user_id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_device_reset_action()
     {
         $this->actingAs($this->schoolAdmin);
@@ -154,7 +154,7 @@ class AdminActivityAuditTest extends TestCase
         $this->assertTrue($log->isHighRisk());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_list_all_activity()
     {
         // Create some activity as school admin
@@ -192,7 +192,7 @@ class AdminActivityAuditTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $response->json('meta.total'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_only_sees_own_school_activity()
     {
         // Create another school and admin
@@ -226,7 +226,7 @@ class AdminActivityAuditTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_filters_by_action_type()
     {
         $this->actingAs($this->schoolAdmin);
@@ -244,7 +244,7 @@ class AdminActivityAuditTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_filters_high_risk_actions()
     {
         $this->actingAs($this->schoolAdmin);
@@ -262,7 +262,7 @@ class AdminActivityAuditTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_activity_summary()
     {
         $this->actingAs($this->schoolAdmin);
@@ -288,7 +288,7 @@ class AdminActivityAuditTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_action_types()
     {
         $response = $this->actingAs($this->superAdmin)
@@ -310,7 +310,7 @@ class AdminActivityAuditTest extends TestCase
         $this->assertNotEmpty($response->json('data'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_my_activity()
     {
         $this->actingAs($this->schoolAdmin);
@@ -333,7 +333,7 @@ class AdminActivityAuditTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_activity_for_target()
     {
         $this->actingAs($this->schoolAdmin);
@@ -355,7 +355,7 @@ class AdminActivityAuditTest extends TestCase
         $this->assertEquals(123, $response->json('meta.target_id'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function query_scopes_work_correctly()
     {
         $this->actingAs($this->schoolAdmin);

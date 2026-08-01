@@ -9,7 +9,7 @@ import {
     Key,
     FileSpreadsheet
 } from 'lucide-react';
-// import { apiClient } from '../../lib/api';
+import { apiClient } from '../../lib/api';
 import showToast from '../../utils/toast';
 
 type AccountType = 'teacher' | 'student' | 'parent';
@@ -36,71 +36,85 @@ export const AdminAccountGenerator: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState(initialSearch);
     // const [generatedCount, setGeneratedCount] = useState(0);
 
-    // Mock data fetching (Replace with actual API calls)
     useEffect(() => {
         fetchData();
-        // If parameters change, we might want to update state, but usually initial load is enough.
-        // However, if user navigates while on page, we might want to sync.
-        // For simplicity, let's keep it controlled by local state, but initialize from URL.
     }, [activeTab]);
 
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            // In a real implementation, you would call:
-            // const response = await apiClient.get(`/admin/${activeTab}s`);
-            // For now, we simulate data for demonstration purposes as per request
-
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            const mockData: UserAccount[] = Array.from({ length: 20 }).map((_, i) => ({
-                id: i + 1,
-                name: activeTab === 'student' ? `Siswa ${i + 1}` : activeTab === 'teacher' ? `Guru ${i + 1}` : `Orang Tua ${i + 1}`,
-                identifier: activeTab === 'student' ? `2024${1000 + i}` : `1985${2000 + i}`,
-                class_name: activeTab === 'student' ? (i % 2 === 0 ? 'X-A' : 'XI-B') : undefined,
-                username: activeTab === 'student' ? `siswa${1000 + i}` : `guru${2000 + i}`,
-                has_account: i % 3 !== 0, // Some don't have accounts
-                status: i % 10 === 0 ? 'inactive' : 'active',
+            const response = await apiClient.get(`/admin/${activeTab}s`);
+            const items: UserAccount[] = (response.data?.data ?? response.data ?? []).map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                identifier: item.nip || item.nis || item.identifier || '',
+                class_name: item.class_name,
+                username: item.username || '',
+                has_account: !!item.has_account,
+                status: item.status || 'active',
             }));
-
-            setData(mockData);
-        } catch (error) {
-            console.error("Error fetching data", error);
+            setData(items);
+        } catch (error: any) {
+            console.error('Error fetching data', error);
+            showToast.error(error?.response?.data?.message || 'Gagal memuat data');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleGenerateValues = () => {
-        if (!window.confirm(`Apakah Anda yakin ingin men-generate akun untuk ${data.filter(u => !u.has_account).length} data yang belum memiliki akun?`)) return;
-
-        setIsLoading(true);
-        setTimeout(() => {
-            const newData = data.map(item => {
-                if (!item.has_account) {
-                    // Generate simple password
-                    const randomPass = Math.random().toString(36).slice(-8);
-                    return {
-                        ...item,
-                        has_account: true,
-                        generated_password: randomPass
-                    };
-                }
-                return item;
-            });
-            setData(newData);
-            // setGeneratedCount(prev => prev + 1);
-            setIsLoading(false);
-            showToast.success('Berhasil generate akun!');
-        }, 1500);
+    const generateSecurePassword = (length = 12): string => {
+        const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+        const values = new Uint32Array(length);
+        crypto.getRandomValues(values);
+        return Array.from(values, (v) => charset[v % charset.length]).join('');
     };
 
-    const handleResetPassword = (id: number) => {
-        const newPass = Math.random().toString(36).slice(-8);
-        setData(prev => prev.map(item =>
-            item.id === id ? { ...item, generated_password: newPass } : item
-        ));
+    const handleGenerateValues = async () => {
+        const pendingUsers = data.filter(u => !u.has_account);
+        if (pendingUsers.length === 0) {
+            showToast.warning('Semua akun sudah di-generate');
+            return;
+        }
+        if (!window.confirm(`Apakah Anda yakin ingin men-generate akun untuk ${pendingUsers.length} data yang belum memiliki akun?`)) return;
+
+        setIsLoading(true);
+        try {
+            const payload = pendingUsers.map(u => ({
+                id: u.id,
+                type: activeTab,
+                password: generateSecurePassword(),
+            }));
+            const response = await apiClient.post('/admin/accounts/generate', { accounts: payload, type: activeTab });
+            const generated = response.data?.data ?? response.data ?? [];
+
+            setData(prev => prev.map(item => {
+                const gen = generated.find((g: any) => g.id === item.id);
+                if (gen) {
+                    return { ...item, has_account: true, generated_password: gen.password || gen.generated_password };
+                }
+                return item;
+            }));
+            showToast.success('Berhasil generate akun!');
+        } catch (error: any) {
+            console.error('Error generating accounts', error);
+            showToast.error(error?.response?.data?.message || 'Gagal generate akun');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleResetPassword = async (id: number) => {
+        const newPass = generateSecurePassword();
+        try {
+            await apiClient.post(`/admin/accounts/${id}/reset-password`, { password: newPass, type: activeTab });
+            setData(prev => prev.map(item =>
+                item.id === id ? { ...item, generated_password: newPass } : item
+            ));
+            showToast.success('Password berhasil di-reset');
+        } catch (error: any) {
+            console.error('Error resetting password', error);
+            showToast.error(error?.response?.data?.message || 'Gagal reset password');
+        }
     };
 
     const filteredData = data.filter(item =>

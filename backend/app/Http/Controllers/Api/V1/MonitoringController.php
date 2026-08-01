@@ -88,6 +88,7 @@ class MonitoringController extends Controller
             'system_health' => $this->monitoringService->getSystemHealth(),
             'queue_metrics' => $this->monitoringService->getQueueMetrics(),
             'slow_queries' => $this->monitoringService->getSlowQueryStats(1),
+            'deadlock_metrics' => \App\Http\Middleware\DeadlockRetryMiddleware::getMetrics(),
             'thresholds' => [
                 'slow_query_warning_ms' => config('monitoring.slow_query.warning_threshold'),
                 'slow_query_critical_ms' => config('monitoring.slow_query.critical_threshold'),
@@ -107,6 +108,7 @@ class MonitoringController extends Controller
         $health = $this->monitoringService->getSystemHealth();
         $queue = $this->monitoringService->getQueueMetrics();
         $slowQueries = $this->monitoringService->getSlowQueryStats(1);
+        $deadlock = \App\Http\Middleware\DeadlockRetryMiddleware::getMetrics();
         
         $metrics = [];
         
@@ -158,6 +160,19 @@ class MonitoringController extends Controller
         $metrics[] = "# HELP absensi_slow_query_avg_ms Average slow query duration in ms";
         $metrics[] = "# TYPE absensi_slow_query_avg_ms gauge";
         $metrics[] = "absensi_slow_query_avg_ms " . ($slowQueries['avg_duration_ms'] ?? 0);
+        
+        // Deadlock metrics
+        $metrics[] = "# HELP absensi_deadlock_detected_total Total deadlocks detected";
+        $metrics[] = "# TYPE absensi_deadlock_detected_total counter";
+        $metrics[] = "absensi_deadlock_detected_total " . ($deadlock['total_deadlocks'] ?? 0);
+        
+        $metrics[] = "# HELP absensi_deadlock_retries_total Total deadlock retry attempts";
+        $metrics[] = "# TYPE absensi_deadlock_retries_total counter";
+        $metrics[] = "absensi_deadlock_retries_total " . ($deadlock['total_retries'] ?? 0);
+        
+        $metrics[] = "# HELP absensi_deadlock_retry_success_rate Deadlock retry success rate percentage";
+        $metrics[] = "# TYPE absensi_deadlock_retry_success_rate gauge";
+        $metrics[] = "absensi_deadlock_retry_success_rate " . ($deadlock['success_rate'] ?? 100);
         
         return response(implode("\n", $metrics) . "\n", 200)
             ->header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');

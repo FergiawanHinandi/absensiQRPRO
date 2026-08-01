@@ -51,7 +51,7 @@ class CQRSAttendanceTest extends TestCase
         ]);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_command_data()
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -66,7 +66,7 @@ class CQRSAttendanceTest extends TestCase
         );
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_requires_check_in_time_for_present_status()
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -83,7 +83,7 @@ class CQRSAttendanceTest extends TestCase
         );
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_records_attendance_and_dispatches_event()
     {
         Event::fake();
@@ -110,7 +110,7 @@ class CQRSAttendanceTest extends TestCase
         Event::assertDispatched(\App\Domain\Attendance\Events\AttendanceRecorded::class);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_updates_read_model_on_attendance_recorded()
     {
         $command = new RecordAttendanceCommand(
@@ -148,7 +148,7 @@ class CQRSAttendanceTest extends TestCase
         $this->assertEquals(1, $classSummary->total_present);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_concurrent_attendance_recording()
     {
         $commands = [];
@@ -195,7 +195,7 @@ class CQRSAttendanceTest extends TestCase
         $this->assertEquals(10, $summary->total_present);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_attendance_with_locking()
     {
         $command = new RecordAttendanceCommand(
@@ -229,7 +229,7 @@ class CQRSAttendanceTest extends TestCase
         $this->assertEquals(1, $count);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_calculates_attendance_rate_correctly()
     {
         // Create 4 students with different statuses

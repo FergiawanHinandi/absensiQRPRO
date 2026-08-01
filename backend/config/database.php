@@ -245,17 +245,15 @@ return [
 
     'redis' => [
 
-        'client' => env('REDIS_CLIENT', 'phpredis'),
+        'client' => env('REDIS_CLIENT', 'predis'),
+
+        // Resilient connection configuration
+        'max_retries' => env('REDIS_MAX_RETRIES', 3),
+        'health_check_interval' => env('REDIS_HEALTH_CHECK_INTERVAL', 30),
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_database_'),
-            'replication' => env('REDIS_REPLICATION', null),
-            'service' => env('REDIS_SENTINEL_SERVICE', 'mymaster'),
-            'parameters' => [
-                'password' => env('REDIS_PASSWORD'),
-                'database' => env('REDIS_DB', '0'),
-            ],
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_'),
         ],
 
         /*
@@ -264,46 +262,95 @@ return [
         |--------------------------------------------------------------------------
         |
         | Supports both standard single-instance connection and Sentinel HA.
-        | To enable Sentinel: set REDIS_REPLICATION=sentinel in .env
+        | To enable Sentinel: set REDIS_SENTINELS=true in .env
+        |
+        | Database allocation:
+        | - Database 0: Default/General purpose
+        | - Database 1: Cache data
+        | - Database 2: Session data
+        | - Database 3: Queue data
         |
         */
 
-        'default' => env('REDIS_REPLICATION') === 'sentinel'
-            ? [
-                env('REDIS_SENTINEL_1', 'tcp://127.0.0.1:26379'),
-                env('REDIS_SENTINEL_2', 'tcp://127.0.0.1:26379'),
-                env('REDIS_SENTINEL_3', 'tcp://127.0.0.1:26379'),
-            ]
-            : [
-                'url' => env('REDIS_URL'),
-                'host' => env('REDIS_HOST', '127.0.0.1'),
-                'password' => env('REDIS_PASSWORD'),
-                'port' => env('REDIS_PORT', '6379'),
-                'database' => env('REDIS_DB', '0'),
+        'default' => env('REDIS_SENTINELS', false) ? [
+            env('REDIS_SENTINEL_1', 'tcp://sentinel-1:26379?timeout=0.1'),
+            env('REDIS_SENTINEL_2', 'tcp://sentinel-2:26379?timeout=0.1'),
+            env('REDIS_SENTINEL_3', 'tcp://sentinel-3:26379?timeout=0.1'),
+            'options' => [
+                'replication' => 'sentinel',
+                'service' => env('REDIS_SENTINEL_SERVICE', 'mymaster'),
+                'parameters' => [
+                    'database' => 0,
+                    'password' => env('REDIS_PASSWORD'),
+                ],
             ],
+        ] : [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => 0,
+        ],
 
-        'cache' => env('REDIS_REPLICATION') === 'sentinel'
-            ? [
-                'service' => env('REDIS_SENTINEL_SERVICE', 'mymaster'), // Explicitly point to service for cache if needed, or rely on options
-                // In sentinel mode with predis, the connection logic is often handled by the 'default' or top level options + connection list
-                // Duplicate connection list here if granular control needed, implies using same sentinels
-                env('REDIS_SENTINEL_1', 'tcp://127.0.0.1:26379'),
-                env('REDIS_SENTINEL_2', 'tcp://127.0.0.1:26379'),
-                env('REDIS_SENTINEL_3', 'tcp://127.0.0.1:26379'),
-                'options' => [
-                    'parameters' => [
-                        'password' => env('REDIS_PASSWORD'),
-                        'database' => env('REDIS_CACHE_DB', '1'),
-                    ]
-                ]
-            ]
-            : [
-                'url' => env('REDIS_URL'),
-                'host' => env('REDIS_HOST', '127.0.0.1'),
-                'password' => env('REDIS_PASSWORD'),
-                'port' => env('REDIS_PORT', '6379'),
-                'database' => env('REDIS_CACHE_DB', '1'),
+        'cache' => env('REDIS_SENTINELS', false) ? [
+            env('REDIS_SENTINEL_1', 'tcp://sentinel-1:26379?timeout=0.1'),
+            env('REDIS_SENTINEL_2', 'tcp://sentinel-2:26379?timeout=0.1'),
+            env('REDIS_SENTINEL_3', 'tcp://sentinel-3:26379?timeout=0.1'),
+            'options' => [
+                'replication' => 'sentinel',
+                'service' => env('REDIS_SENTINEL_SERVICE', 'mymaster'),
+                'parameters' => [
+                    'database' => 1,
+                    'password' => env('REDIS_PASSWORD'),
+                ],
             ],
+        ] : [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => 1,
+        ],
+
+        'session' => env('REDIS_SENTINELS', false) ? [
+            env('REDIS_SENTINEL_1', 'tcp://sentinel-1:26379?timeout=0.1'),
+            env('REDIS_SENTINEL_2', 'tcp://sentinel-2:26379?timeout=0.1'),
+            env('REDIS_SENTINEL_3', 'tcp://sentinel-3:26379?timeout=0.1'),
+            'options' => [
+                'replication' => 'sentinel',
+                'service' => env('REDIS_SENTINEL_SERVICE', 'mymaster'),
+                'parameters' => [
+                    'database' => 2,
+                    'password' => env('REDIS_PASSWORD'),
+                ],
+            ],
+        ] : [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => 2,
+        ],
+
+        'queue' => env('REDIS_SENTINELS', false) ? [
+            env('REDIS_SENTINEL_1', 'tcp://sentinel-1:26379?timeout=0.1'),
+            env('REDIS_SENTINEL_2', 'tcp://sentinel-2:26379?timeout=0.1'),
+            env('REDIS_SENTINEL_3', 'tcp://sentinel-3:26379?timeout=0.1'),
+            'options' => [
+                'replication' => 'sentinel',
+                'service' => env('REDIS_SENTINEL_SERVICE', 'mymaster'),
+                'parameters' => [
+                    'database' => 3,
+                    'password' => env('REDIS_PASSWORD'),
+                ],
+            ],
+        ] : [
+            'url' => env('REDIS_URL'),
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'password' => env('REDIS_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => 3,
+        ],
 
     ],
 

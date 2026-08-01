@@ -140,7 +140,7 @@ class PolicyEnforcementTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_from_school_a_cannot_view_student_from_school_b_via_policy()
     {
         $this->actingAs($this->adminA, 'sanctum');
@@ -151,7 +151,7 @@ class PolicyEnforcementTest extends TestCase
         $this->assertFalse($canView, 'Admin from School A should NOT be able to view student from School B');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_from_school_a_cannot_update_student_from_school_b_via_policy()
     {
         $this->actingAs($this->adminA, 'sanctum');
@@ -161,7 +161,7 @@ class PolicyEnforcementTest extends TestCase
         $this->assertFalse($canUpdate, 'Admin from School A should NOT be able to update student from School B');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_from_school_a_cannot_delete_student_from_school_b_via_policy()
     {
         $this->actingAs($this->adminA, 'sanctum');
@@ -171,7 +171,7 @@ class PolicyEnforcementTest extends TestCase
         $this->assertFalse($canDelete, 'Admin from School A should NOT be able to delete student from School B');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function attendance_policy_blocks_cross_school_access()
     {
         // Create class and schedule for School B
@@ -217,7 +217,7 @@ class PolicyEnforcementTest extends TestCase
         $this->assertFalse($canDelete, 'Admin from School A should NOT delete attendance from School B');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function class_policy_blocks_cross_school_access()
     {
         $academicYearB = \App\Models\AcademicYear::where('school_id', $this->schoolB->id)->first();
@@ -240,7 +240,7 @@ class PolicyEnforcementTest extends TestCase
         $this->assertFalse($canDelete, 'Admin from School A should NOT delete class from School B');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function schedule_policy_blocks_cross_school_access()
     {
         $academicYearB = \App\Models\AcademicYear::where('school_id', $this->schoolB->id)->first();
@@ -274,7 +274,7 @@ class PolicyEnforcementTest extends TestCase
         $this->assertFalse($canDelete, 'Teacher from School A should NOT delete schedule from School B');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_can_only_view_their_own_user_record()
     {
         $this->actingAs($this->studentA, 'sanctum');
@@ -302,7 +302,7 @@ class PolicyEnforcementTest extends TestCase
         $this->assertFalse($canViewSchoolB, 'Student should NOT view student from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_view_users_in_same_school_only()
     {
         $this->actingAs($this->adminA, 'sanctum');
@@ -322,7 +322,7 @@ class PolicyEnforcementTest extends TestCase
         $this->assertFalse($canViewTeacherB, 'Admin should NOT view teacher from different school');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function policy_blocks_access_even_with_direct_model_retrieval()
     {
         // Simulate bypassing global scope by getting model directly

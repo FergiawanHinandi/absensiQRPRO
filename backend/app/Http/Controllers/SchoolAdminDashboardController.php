@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\AcademicYear;
 use App\Models\Attendance;
+use App\Models\ClassModel;
 use App\Models\Classroom;
 use App\Models\School;
-use App\Models\Student;
-use App\Models\Teacher;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -57,11 +57,13 @@ class SchoolAdminDashboardController extends Controller
     public function dashboardSummary(Request $request)
     {
         $schoolId = $request->user()->school_id;
+        $tz = school_timezone();
         $cacheKey = "dashboard_summary_school_{$schoolId}";
         
         // OPTIMIZATION: Increased cache time from 60s to 300s (5 minutes)
-        $summary = Cache::remember($cacheKey, 300, function () use ($schoolId) {
-            $today = Carbon::today();
+        $summary = Cache::remember($cacheKey, 300, function () use ($schoolId, $tz) {
+            $today = now()->timezone($tz)->startOfDay();
+            $todayString = $today->toDateString();
             
             // OPTIMIZATION: Use single query with withCount()
             $school = School::withCount(['students', 'teachers'])->find($schoolId);
@@ -75,36 +77,34 @@ class SchoolAdminDashboardController extends Controller
                 })
                 ->count();
             
-            $attendanceToday = Attendance::where('school_id', $schoolId)
-                ->whereDate('date', $today)
-                ->selectRaw("
-                    SUM(status = 'present') as present,
-                    SUM(status = 'late') as late,
-                    SUM(status = 'absent') as absent
-                ")
-                ->first();
+            // ✅ OPTIMIZED: Use summary table instead of raw attendance aggregation
+            $summaries = \App\Models\AttendanceDailyClassSummary::where('school_id', $schoolId)
+                ->where('attendance_date', $todayString)
+                ->get();
             
-            $totalAttendance = ($attendanceToday->present ?? 0) + ($attendanceToday->late ?? 0) + ($attendanceToday->absent ?? 0);
+            $present = $summaries->sum('present_count');
+            $late = $summaries->sum('late_count');
+            $absent = $summaries->sum('absent_count');
+            
+            $totalAttendance = $present + $late + $absent;
             $attendanceRate = $totalAttendance > 0
-                ? round((($attendanceToday->present ?? 0) + ($attendanceToday->late ?? 0)) / $totalAttendance * 100, 2)
+                ? round(($present + $late) / $totalAttendance * 100, 2)
                 : 0;
             
-            // OPTIMIZATION: Use single query instead of pluck + whereNotIn
-            $notCheckedIn = Student::where('school_id', $schoolId)
-                ->whereNotExists(function ($query) use ($today) {
-                    $query->select(DB::raw(1))
-                        ->from('attendances')
-                        ->whereColumn('attendances.student_id', 'students.id')
-                        ->whereDate('attendances.date', $today);
-                })
-                ->count();
+            // Calculate not checked in from summary data
+            $attendedStudents = $summaries->sum('attended_students');
+            $notCheckedIn = max(0, $totalStudents - $attendedStudents);
             
-            $trend = Attendance::where('school_id', $schoolId)
-                ->where('date', '>=', $today->copy()->subDays(6))
-                ->where('date', '<=', $today)
-                ->selectRaw('date, SUM(status="present") as present, SUM(status="late") as late, SUM(status="absent") as absent')
-                ->groupBy('date')
-                ->orderBy('date')
+            // ✅ OPTIMIZED: Use summary table for trend data
+            $trend = \App\Models\AttendanceDailyClassSummary::where('school_id', $schoolId)
+                ->where('attendance_date', '>=', now()->timezone($tz)->subDays(6)->startOfDay()->toDateString())
+                ->where('attendance_date', '<=', $todayString)
+                ->select('attendance_date as date')
+                ->selectRaw('SUM(present_count) as present')
+                ->selectRaw('SUM(late_count) as late')
+                ->selectRaw('SUM(absent_count) as absent')
+                ->groupBy('attendance_date')
+                ->orderBy('attendance_date')
                 ->get();
 
             return [
@@ -112,9 +112,9 @@ class SchoolAdminDashboardController extends Controller
                 'total_teachers' => $totalTeachers,
                 'classes_active_today' => $classesActiveToday,
                 'attendance_today' => [
-                    'present' => (int) $attendanceToday->present,
-                    'late' => (int) $attendanceToday->late,
-                    'absent' => (int) $attendanceToday->absent,
+                    'present' => (int) $present,
+                    'late' => (int) $late,
+                    'absent' => (int) $absent,
                 ],
                 'attendance_rate' => $attendanceRate,
                 'students_not_checked_in' => $notCheckedIn,
@@ -129,7 +129,9 @@ class SchoolAdminDashboardController extends Controller
     public function liveAttendance(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $today = Carbon::today();
+        $tz = school_timezone();
+        $today = now()->timezone($tz)->startOfDay();
+        $todayString = $today->toDateString();
         $grade = $request->input('grade');
         $classId = $request->input('class_id');
         $timeSlot = $request->input('time_slot');
@@ -152,25 +154,22 @@ class SchoolAdminDashboardController extends Controller
             $classesQuery->where('id', $classId);
         }
         
-        // OPTIMIZATION: Use withCount() instead of loading all students
-        $classes = $classesQuery->withCount(['students'])->get();
+        $classes = $classesQuery->get(['id', 'name', 'grade']);
+        $classIds = $classes->pluck('id');
         
-        $attendance = Attendance::where('school_id', $schoolId)
-            ->whereDate('date', $today)
-            ->whereIn('classroom_id', $classes->pluck('id'))
-            ->selectRaw('
-                classroom_id,
-                SUM(status="present") as present,
-                SUM(status="late") as late
-            ')
-            ->groupBy('classroom_id')
+        // ✅ OPTIMIZED: Use summary table instead of raw attendance aggregation
+        $summaries = \App\Models\AttendanceDailyClassSummary::where('school_id', $schoolId)
+            ->where('attendance_date', $todayString)
+            ->whereIn('class_id', $classIds)
             ->get()
-            ->keyBy('classroom_id');
+            ->keyBy('class_id');
         
-        $result = $classes->map(function ($class) use ($attendance) {
-            $present = (int) ($attendance[$class->id]->present ?? 0);
-            $late = (int) ($attendance[$class->id]->late ?? 0);
-            $total = $class->students_count;
+        $result = $classes->map(function ($class) use ($summaries) {
+            $summary = $summaries[$class->id] ?? null;
+            
+            $present = $summary ? $summary->present_count : 0;
+            $late = $summary ? $summary->late_count : 0;
+            $total = $summary ? $summary->total_students : 0;
             $notCheckedIn = $total - $present - $late;
 
             return [
@@ -185,7 +184,7 @@ class SchoolAdminDashboardController extends Controller
         });
 
         return response()->json([
-            'date' => $today->toDateString(),
+            'date' => $todayString,
             'classes' => $result,
         ]);
     }
@@ -194,54 +193,60 @@ class SchoolAdminDashboardController extends Controller
     public function studentList(Request $request)
     {
         $schoolId = $request->user()->school_id;
+        $tz = school_timezone();
         $grade = $request->input('grade');
         $classId = $request->input('class_id');
         $status = $request->input('status');
         $search = $request->input('search');
         $perPage = min($request->input('per_page', 20), 100); // Cap at 100
-        $thirtyDaysAgo = Carbon::today()->subDays(30)->toDateString();
+        $thirtyDaysAgo = now()->timezone($tz)->subDays(30)->startOfDay()->toDateString();
         
         // SECURITY: Use parameter bindings in subqueries to prevent SQL injection
-        $query = Student::query()
+        $query = User::query()
             ->select([
-                'students.id',
-                'students.name',
-                'students.nisn',
-                'students.status',
-                'classrooms.name as class_name',
-                'classrooms.grade',
+                'users.id',
+                'users.name',
+                'users.username',
+                DB::raw("'' as nisn"),
+                'users.is_active as status',
+                'classes.name as class_name',
+                'classes.grade_level as grade',
             ])
             ->selectRaw(
-                '(SELECT ROUND(SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 2) 
-                  FROM attendances WHERE attendances.student_id = students.id AND attendances.date >= ?) as attendance_rate',
+                '(SELECT ROUND(SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 2)
+                  FROM attendances WHERE attendances.student_id = users.id AND attendances.attendance_date >= ?) as attendance_rate',
                 ['present', 'late', $thirtyDaysAgo]
             )
             ->selectRaw(
-                '(SELECT status FROM attendances WHERE attendances.student_id = students.id 
-                  ORDER BY date DESC, id DESC LIMIT 1) as last_attendance_status'
+                '(SELECT status FROM attendances WHERE attendances.student_id = users.id
+                  ORDER BY attendance_date DESC, id DESC LIMIT 1) as last_attendance_status'
             )
-            ->join('classrooms', 'students.classroom_id', '=', 'classrooms.id')
-            ->where('students.school_id', $schoolId);
+            ->leftJoin('class_students', function ($join) {
+                $join->on('class_students.student_id', '=', 'users.id')
+                     ->where('class_students.status', 'active');
+            })
+            ->leftJoin('classes', 'class_students.class_id', '=', 'classes.id')
+            ->where('users.school_id', $schoolId)
+            ->where('users.role_type', 'student');
         
         if ($grade) {
-            $query->where('classrooms.grade', $grade);
+            $query->where('classes.grade_level', $grade);
         }
         if ($classId) {
-            $query->where('classrooms.id', $classId);
+            $query->where('classes.id', $classId);
         }
         if ($status) {
-            $query->where('students.status', $status);
+            $query->where('users.is_active', $status === 'active');
         }
-        // SECURITY: Escape search input properly using parameter binding
         if ($search) {
             $searchTerm = '%' . addcslashes($search, '%_') . '%';
             $query->where(function ($q) use ($searchTerm) {
-                $q->where('students.name', 'like', $searchTerm)
-                    ->orWhere('students.nisn', 'like', $searchTerm);
+                $q->where('users.name', 'like', $searchTerm)
+                    ->orWhere('users.username', 'like', $searchTerm);
             });
         }
         
-        $students = $query->orderBy('students.name')->paginate($perPage);
+        $students = $query->orderBy('users.name')->paginate($perPage);
 
         return response()->json([
             'data' => $students->items(),
@@ -258,11 +263,12 @@ class SchoolAdminDashboardController extends Controller
     public function teacherPerformanceSummary(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $thirtyDaysAgo = Carbon::today()->subDays(30);
+        $tz = school_timezone();
+        $thirtyDaysAgo = now()->timezone($tz)->subDays(30)->startOfDay();
         
         // OPTIMIZATION: Single query with all data instead of N+1
-        $teachers = Teacher::where('school_id', $schoolId)
-            ->withCount('classrooms as classes_taught')
+        $teachers = User::where('school_id', $schoolId)
+            ->whereIn('role_type', ['teacher', 'homeroom_teacher'])
             ->get();
         
         // OPTIMIZATION: Preload all attendance data in single query
@@ -341,7 +347,10 @@ class SchoolAdminDashboardController extends Controller
     public function classHealthAnalytics(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $thirtyDaysAgo = Carbon::today()->subDays(30);
+        $tz = school_timezone();
+        $today = now()->timezone($tz)->startOfDay();
+        $thirtyDaysAgo = $today->copy()->subDays(30)->toDateString();
+        $todayString = $today->toDateString();
         
         // OPTIMIZATION: Use withCount() instead of loading all students
         $classes = Classroom::where('school_id', $schoolId)
@@ -350,18 +359,16 @@ class SchoolAdminDashboardController extends Controller
         
         $classIds = $classes->pluck('id');
         
-        // OPTIMIZATION: Preload all attendance stats in single query
-        $attendanceStats = Attendance::whereIn('classroom_id', $classIds)
-            ->where('date', '>=', $thirtyDaysAgo)
-            ->select(
-                'classroom_id',
-                'student_id',
-                DB::raw('SUM(status="present" OR status="late") as hadir'),
-                DB::raw('COUNT(*) as total')
-            )
-            ->groupBy('classroom_id', 'student_id')
+        // ✅ OPTIMIZED: Use summary table for attendance stats
+        $summaries = \App\Models\AttendanceDailyClassSummary::whereIn('class_id', $classIds)
+            ->where('attendance_date', '>=', $thirtyDaysAgo)
+            ->where('attendance_date', '<=', $today)
+            ->select('class_id', 'attendance_date')
+            ->selectRaw('SUM(present_count + late_count) as attended')
+            ->selectRaw('SUM(total_students) as total')
+            ->groupBy('class_id', 'attendance_date')
             ->get()
-            ->groupBy('classroom_id');
+            ->groupBy('class_id');
         
         // OPTIMIZATION: Preload absence by day in single query
         $absenceByDay = Attendance::whereIn('classroom_id', $classIds)
@@ -393,16 +400,17 @@ class SchoolAdminDashboardController extends Controller
         
         // OPTIMIZATION: Preload student names in single query
         $allLowStudentIds = $lowAttendanceStudentIds->flatten()->pluck('student_id')->unique();
-        $studentNames = Student::whereIn('id', $allLowStudentIds)
+        $studentNames = User::whereIn('id', $allLowStudentIds)
+            ->where('role_type', 'student')
             ->pluck('name', 'id');
         
         // OPTIMIZATION: Map with preloaded data (no queries in loop)
-        $result = $classes->map(function ($class) use ($attendanceStats, $absenceByDay, $lowAttendanceStudentIds, $studentNames) {
+        $result = $classes->map(function ($class) use ($summaries, $absenceByDay, $lowAttendanceStudentIds, $studentNames) {
             $totalStudents = $class->students_count;
             
-            $stats = $attendanceStats[$class->id] ?? collect();
-            $rates = $stats->map(function ($row) {
-                return $row->total > 0 ? $row->hadir / $row->total : 0;
+            $classSummaries = $summaries[$class->id] ?? collect();
+            $rates = $classSummaries->map(function ($row) {
+                return $row->total > 0 ? $row->attended / $row->total : 0;
             });
             $avgAttendanceRate = $rates->count() ? round($rates->avg() * 100, 2) : null;
             
@@ -433,7 +441,8 @@ class SchoolAdminDashboardController extends Controller
     public function alertsPanel(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $today = Carbon::today();
+        $tz = school_timezone();
+        $today = now()->timezone($tz)->startOfDay();
         
         $absent3days = DB::table('attendances')
             ->select('student_id', DB::raw('GROUP_CONCAT(date ORDER BY date DESC) as dates'))
@@ -470,7 +479,9 @@ class SchoolAdminDashboardController extends Controller
         
         // OPTIMIZATION: Single query for all student names
         $allStudentIds = $absent3days->merge($deviceMismatch)->merge($failedScans)->unique();
-        $studentNames = Student::whereIn('id', $allStudentIds)->pluck('name', 'id');
+        $studentNames = User::whereIn('id', $allStudentIds)
+            ->where('role_type', 'student')
+            ->pluck('name', 'id');
         
         // OPTIMIZATION: Single query for all classroom names
         $classNames = Classroom::whereIn('id', $lowAttendanceClasses)->pluck('name', 'id');
@@ -507,18 +518,22 @@ class SchoolAdminDashboardController extends Controller
     public function monthlyAttendanceStats(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $month = $request->input('month', Carbon::now()->format('Y-m'));
+        $tz = school_timezone();
+        $month = $request->input('month', now()->timezone($tz)->format('Y-m'));
         
-        $classRates = Attendance::where('school_id', $schoolId)
-            ->where('date', 'like', "$month%")
-            ->selectRaw('classroom_id, SUM(status="present" OR status="late") as hadir, COUNT(*) as total')
-            ->groupBy('classroom_id')
+        // ✅ OPTIMIZED: Use summary table for class rates
+        $classRates = \App\Models\AttendanceDailyClassSummary::where('school_id', $schoolId)
+            ->where('attendance_date', 'like', "$month%")
+            ->select('class_id')
+            ->selectRaw('SUM(present_count + late_count) as hadir')
+            ->selectRaw('SUM(present_count + late_count + absent_count + sick_count + permit_count + excused_count) as total')
+            ->groupBy('class_id')
             ->get()
             ->map(function ($row) {
                 $rate = $row->total > 0 ? round($row->hadir / $row->total * 100, 2) : null;
 
                 return [
-                    'classroom_id' => $row->classroom_id,
+                    'classroom_id' => $row->class_id,
                     'attendance_rate' => $rate,
                 ];
             });
@@ -546,7 +561,9 @@ class SchoolAdminDashboardController extends Controller
         $allStudentIds = $topStudentsData->pluck('student_id')
             ->merge($worstStudentsData->pluck('student_id'))
             ->unique();
-        $studentNames = Student::whereIn('id', $allStudentIds)->pluck('name', 'id');
+        $studentNames = User::whereIn('id', $allStudentIds)
+            ->where('role_type', 'student')
+            ->pluck('name', 'id');
         
         $topStudents = $topStudentsData->map(function ($row) use ($studentNames) {
             $rate = round($row->hadir / $row->total * 100, 2);
@@ -568,11 +585,14 @@ class SchoolAdminDashboardController extends Controller
             ];
         });
         
-        $trend = Attendance::where('school_id', $schoolId)
-            ->where('date', 'like', "$month%")
-            ->selectRaw('date, SUM(status="present" OR status="late") as present, SUM(status="absent") as absent')
-            ->groupBy('date')
-            ->orderBy('date')
+        // ✅ OPTIMIZED: Use summary table for trend data
+        $trend = \App\Models\AttendanceDailyClassSummary::where('school_id', $schoolId)
+            ->where('attendance_date', 'like', "$month%")
+            ->select('attendance_date as date')
+            ->selectRaw('SUM(present_count + late_count) as present')
+            ->selectRaw('SUM(absent_count) as absent')
+            ->groupBy('attendance_date')
+            ->orderBy('attendance_date')
             ->get();
 
         return response()->json([
@@ -587,30 +607,35 @@ class SchoolAdminDashboardController extends Controller
     public function scheduleOverview(Request $request)
     {
         $schoolId = $request->user()->school_id;
-        $today = Carbon::today()->toDateString();
-        $now = Carbon::now();
+        $tz = school_timezone();
+        $today = now()->timezone($tz)->startOfDay();
+        $now = now()->timezone($tz);
         
         // OPTIMIZATION: Eager load relationships to prevent N+1
         $schedules = \App\Models\Schedule::with(['classroom', 'teacher', 'room'])
             ->where('school_id', $schoolId)
-            ->whereDate('date', $today)
+            ->whereDate('date', $today->toDateString())
             ->orderBy('start_time')
             ->get();
         
         // OPTIMIZATION: Preload attendance existence in single query
         $classroomIds = $schedules->pluck('classroom_id')->unique();
         $attendanceExists = Attendance::whereIn('classroom_id', $classroomIds)
-            ->where('date', $today)
+            ->where('date', $today->toDateString())
             ->select('classroom_id')
             ->distinct()
             ->pluck('classroom_id')
             ->flip();
         
         // OPTIMIZATION: Map with preloaded data (no queries in loop)
-        $result = $schedules->map(function ($schedule) use ($now, $attendanceExists) {
-            if ($now->lt(Carbon::parse($schedule->start_time))) {
+        $result = $schedules->map(function ($schedule) use ($now, $attendanceExists, $tz) {
+            $todayDate = $now->format('Y-m-d');
+            $startTime = \Carbon\Carbon::parse("{$todayDate} {$schedule->start_time}", $tz);
+            $endTime = \Carbon\Carbon::parse("{$todayDate} {$schedule->end_time}", $tz);
+            
+            if ($now->lt($startTime)) {
                 $status = 'not_started';
-            } elseif ($now->between(Carbon::parse($schedule->start_time), Carbon::parse($schedule->end_time))) {
+            } elseif ($now->between($startTime, $endTime)) {
                 $status = 'ongoing';
             } else {
                 $status = 'finished';
@@ -630,7 +655,7 @@ class SchoolAdminDashboardController extends Controller
         });
 
         return response()->json([
-            'date' => $today,
+            'date' => $today->toDateString(),
             'timeline' => $result,
         ]);
     }

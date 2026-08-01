@@ -139,6 +139,42 @@ Do you want to continue? (yes/no) [no]:
 - ✅ Comprehensive logging dengan IP address
 - ✅ CLI only
 
+---
+
+### 3. Verify and Activate Accounts
+
+**Command**: `php artisan accounts:verify-activate`
+
+**Deskripsi**: Memverifikasi konsistensi `role_type` + Spatie role, lalu mengaktifkan akun yang nonaktif atau terkunci.
+
+**Usage**:
+```bash
+# Verify and activate all official roles
+php artisan accounts:verify-activate
+
+# Dry run only
+php artisan accounts:verify-activate --dry-run
+
+# Limit to specific roles
+php artisan accounts:verify-activate --roles=teacher,homeroom_teacher,student
+
+# Limit to a school and skip confirmation
+php artisan accounts:verify-activate --school=1 --force
+```
+
+**What it does**:
+- ✅ Memastikan role Spatie yang diperlukan tersedia
+- ✅ Menyalakan akun nonaktif
+- ✅ Mengosongkan lockout counters (`failed_login_attempts`, `locked_until`)
+- ✅ Menyinkronkan role yang hilang, termasuk `homeroom_teacher` → `teacher`
+- ✅ Menulis audit log per akun
+
+**Security Features**:
+- ✅ Mendukung `--dry-run` sebelum perubahan
+- ✅ Mendukung filter per sekolah
+- ✅ CLI only
+- ✅ Audit trail untuk setiap perubahan
+
 **Activity Log**:
 ```json
 {

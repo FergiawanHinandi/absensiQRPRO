@@ -46,7 +46,7 @@ class RedisFailureResilienceTest extends TestCase
         $this->redis = app(SafeRedisService::class);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_attendance_recording_when_redis_is_down()
     {
         // Create a student
@@ -89,7 +89,7 @@ class RedisFailureResilienceTest extends TestCase
         $this->assertEquals(1, $count);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_duplicate_attendance_with_database_fallback()
     {
         $student = Student::factory()->create([
@@ -128,7 +128,7 @@ class RedisFailureResilienceTest extends TestCase
         $this->assertEquals(1, $count);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_concurrent_attendance_recording_during_redis_failure()
     {
         // Create 10 students
@@ -176,7 +176,7 @@ class RedisFailureResilienceTest extends TestCase
         $this->assertEquals(10, $count);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_recovers_automatically_when_redis_comes_back()
     {
         $student = Student::factory()->create([

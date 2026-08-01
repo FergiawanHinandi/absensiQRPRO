@@ -91,7 +91,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->superAdmin->assignRole('super_admin');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_can_access_own_school_attendance_session()
     {
         $schedule = Schedule::factory()->create([
@@ -104,7 +104,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_cannot_access_other_school_attendance_session()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -120,7 +120,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_access_any_school_attendance_session()
     {
         $schedule = Schedule::factory()->create([
@@ -133,7 +133,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function authorization_fails_for_non_existent_session()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -144,7 +144,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function authorization_fails_for_invalid_session_id()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -155,7 +155,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_can_access_own_channel()
     {
         $result = ChannelAuthorization::authorizeStudentChannel($this->studentA, $this->studentA->id);
@@ -163,7 +163,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function parent_can_access_child_channel()
     {
         $result = ChannelAuthorization::authorizeStudentChannel($this->parentA, $this->studentA->id);
@@ -171,7 +171,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_can_access_student_channel_same_school()
     {
         $result = ChannelAuthorization::authorizeStudentChannel($this->teacherA, $this->studentA->id);
@@ -179,7 +179,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_cannot_access_student_channel_different_school()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -195,7 +195,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function parent_can_only_access_own_channel()
     {
         $result = ChannelAuthorization::authorizeParentChannel($this->parentA, $this->parentA->id);
@@ -203,7 +203,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function parent_cannot_access_other_parent_channel()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -220,7 +220,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_can_access_own_channel()
     {
         $result = ChannelAuthorization::authorizeTeacherChannel($this->teacherA, $this->teacherA->id);
@@ -228,7 +228,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_access_teacher_channel_same_school()
     {
         $result = ChannelAuthorization::authorizeTeacherChannel($this->adminA, $this->teacherA->id);
@@ -236,7 +236,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_cannot_access_teacher_channel_different_school()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -247,7 +247,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_can_access_own_school_channel()
     {
         $result = ChannelAuthorization::authorizeSchoolChannel($this->teacherA, $this->schoolA->id);
@@ -255,7 +255,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_cannot_access_other_school_channel()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -266,7 +266,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_access_own_school_security_channel()
     {
         $result = ChannelAuthorization::authorizeAdminSecurityChannel($this->adminA, $this->schoolA->id);
@@ -274,7 +274,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_cannot_access_other_school_security_channel()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -285,7 +285,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function super_admin_can_access_any_school_security_channel()
     {
         $result = ChannelAuthorization::authorizeAdminSecurityChannel($this->superAdmin, $this->schoolA->id);
@@ -293,7 +293,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_can_access_class_channel_same_school()
     {
         $class = ClassModel::factory()->create([
@@ -305,7 +305,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_cannot_access_class_channel_different_school()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -320,7 +320,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_access_system_health_channel()
     {
         $result = ChannelAuthorization::authorizeSystemHealthChannel($this->adminA);
@@ -328,7 +328,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_cannot_access_system_health_channel()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -339,7 +339,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_can_access_own_user_channel()
     {
         $result = ChannelAuthorization::authorizeUserChannel($this->teacherA, $this->teacherA->id);
@@ -347,7 +347,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertTrue($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function user_cannot_access_other_user_channel()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -358,7 +358,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function authorization_logs_unauthorized_attempts()
     {
         Log::shouldReceive('channel')
@@ -378,7 +378,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         ChannelAuthorization::authorizeSchoolChannel($this->teacherA, $this->schoolB->id);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function deleted_schedule_returns_false()
     {
         Log::shouldReceive('channel')->andReturnSelf();
@@ -396,7 +396,7 @@ class BroadcastChannelAuthorizationTest extends TestCase
         $this->assertFalse($result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function student_without_role_cannot_access_teacher_channel()
     {
         Log::shouldReceive('channel')->andReturnSelf();

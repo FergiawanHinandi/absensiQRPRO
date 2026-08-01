@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Helpers\TimezoneHelper;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Cache;
@@ -68,6 +70,9 @@ class PrometheusMetricsService
 
         // Attendance-specific Metrics
         $metrics[] = $this->collectAttendanceMetrics();
+
+        // Deadlock Retry Metrics
+        $metrics[] = $this->collectDeadlockMetrics();
 
         return implode("\n", array_filter($metrics));
     }
@@ -405,7 +410,7 @@ class PrometheusMetricsService
             // Today's attendance stats
             $today = now()->toDateString();
 
-            $attendanceToday = DB::table('attendances')
+            $attendanceToday = \App\Models\Attendance::query()
                 ->whereDate('created_at', $today)
                 ->count();
 
@@ -414,7 +419,7 @@ class PrometheusMetricsService
             $metrics[] = self::PREFIX . "_attendance_scans_today " . $attendanceToday;
 
             // Scans by status
-            $statusCounts = DB::table('attendances')
+            $statusCounts = \App\Models\Attendance::query()
                 ->whereDate('created_at', $today)
                 ->selectRaw('status, COUNT(*) as count')
                 ->groupBy('status')
@@ -454,7 +459,7 @@ class PrometheusMetricsService
             }
 
             // QR scans rate (last 5 minutes)
-            $recentScans = DB::table('attendances')
+            $recentScans = \App\Models\Attendance::query()
                 ->where('created_at', '>=', now()->subMinutes(5))
                 ->count();
             $scanRate = round($recentScans / 5, 2); // per minute
@@ -604,5 +609,63 @@ class PrometheusMetricsService
         } catch (\Exception $e) {
             // Silently fail
         }
+    }
+
+    /**
+     * Collect deadlock retry metrics
+     */
+    protected function collectDeadlockMetrics(): string
+    {
+        $metrics = [];
+
+        try {
+            $deadlockMetrics = \App\Http\Middleware\DeadlockRetryMiddleware::getMetrics();
+
+            // Total deadlocks detected
+            $metrics[] = "\n# HELP " . self::PREFIX . "_deadlock_detected_total Total deadlocks detected";
+            $metrics[] = "# TYPE " . self::PREFIX . "_deadlock_detected_total counter";
+            $metrics[] = self::PREFIX . "_deadlock_detected_total " . ($deadlockMetrics['total_deadlocks'] ?? 0);
+
+            // Total retry attempts
+            $metrics[] = "\n# HELP " . self::PREFIX . "_deadlock_retries_total Total deadlock retry attempts";
+            $metrics[] = "# TYPE " . self::PREFIX . "_deadlock_retries_total counter";
+            $metrics[] = self::PREFIX . "_deadlock_retries_total " . ($deadlockMetrics['total_retries'] ?? 0);
+
+            // Successful retries
+            $metrics[] = "\n# HELP " . self::PREFIX . "_deadlock_retries_successful Successful deadlock retries";
+            $metrics[] = "# TYPE " . self::PREFIX . "_deadlock_retries_successful counter";
+            $metrics[] = self::PREFIX . "_deadlock_retries_successful " . ($deadlockMetrics['successful_retries'] ?? 0);
+
+            // Exhausted retries (failed after max attempts)
+            $metrics[] = "\n# HELP " . self::PREFIX . "_deadlock_retries_exhausted Deadlock retries that exhausted all attempts";
+            $metrics[] = "# TYPE " . self::PREFIX . "_deadlock_retries_exhausted counter";
+            $metrics[] = self::PREFIX . "_deadlock_retries_exhausted " . ($deadlockMetrics['exhausted_retries'] ?? 0);
+
+            // Retry success rate
+            $metrics[] = "\n# HELP " . self::PREFIX . "_deadlock_retry_success_rate_percent Deadlock retry success rate";
+            $metrics[] = "# TYPE " . self::PREFIX . "_deadlock_retry_success_rate_percent gauge";
+            $metrics[] = self::PREFIX . "_deadlock_retry_success_rate_percent " . ($deadlockMetrics['success_rate'] ?? 100);
+
+            // Retries by attempt number
+            $metrics[] = "\n# HELP " . self::PREFIX . "_deadlock_retries_by_attempt Deadlock retries by attempt number";
+            $metrics[] = "# TYPE " . self::PREFIX . "_deadlock_retries_by_attempt counter";
+            
+            foreach ($deadlockMetrics['retry_attempts'] ?? [] as $attempt => $count) {
+                $metrics[] = self::PREFIX . "_deadlock_retries_by_attempt{attempt=\"{$attempt}\"} {$count}";
+            }
+
+            // Last occurrence timestamp
+            if (!empty($deadlockMetrics['last_occurrence'])) {
+                $lastOccurrence = Carbon::parse($deadlockMetrics['last_occurrence'])->timestamp;
+                $metrics[] = "\n# HELP " . self::PREFIX . "_deadlock_last_occurrence_timestamp Last deadlock occurrence timestamp";
+                $metrics[] = "# TYPE " . self::PREFIX . "_deadlock_last_occurrence_timestamp gauge";
+                $metrics[] = self::PREFIX . "_deadlock_last_occurrence_timestamp " . $lastOccurrence;
+            }
+
+        } catch (\Exception $e) {
+            $metrics[] = "# ERROR collecting deadlock metrics: " . $e->getMessage();
+        }
+
+        return implode("\n", $metrics);
     }
 }

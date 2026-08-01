@@ -57,7 +57,7 @@ class QRGenerationAtomicLockTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_generates_new_qr_when_no_active_session_exists()
     {
         Log::shouldReceive('channel->info')
@@ -77,7 +77,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertTrue(Redis::exists($key) > 0);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_existing_qr_when_active_session_exists()
     {
         // First request - generates new QR
@@ -97,7 +97,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertLessThanOrEqual(60, $secondResult['valid_for_seconds']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_race_condition_correctly()
     {
         $tokens = [];
@@ -113,7 +113,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertCount(1, $uniqueTokens);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_generates_new_qr_after_expiry()
     {
         // Generate first QR with short TTL
@@ -131,7 +131,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertArrayNotHasKey('reused', $secondResult);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_correct_redis_key_format()
     {
         $this->service->generateQR($this->schedule->id, $this->teacher);
@@ -140,7 +140,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertTrue(Redis::exists($expectedKey) > 0);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_stores_complete_qr_data_in_redis()
     {
         $this->service->generateQR($this->schedule->id, $this->teacher);
@@ -156,7 +156,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertArrayHasKey('created_at', $data);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_maintains_backward_compatibility_with_token_lookup()
     {
         $result = $this->service->generateQR($this->schedule->id, $this->teacher);
@@ -167,7 +167,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertTrue(Redis::exists($tokenKey) > 0);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_respects_custom_expiry_seconds()
     {
         $customExpiry = 120;
@@ -181,7 +181,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertLessThanOrEqual(120, $ttl);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_isolates_qr_by_school_id()
     {
         // Create another teacher from different school
@@ -213,7 +213,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertTrue(Redis::exists($key2) > 0);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_schedule_not_found()
     {
         $this->expectException(AttendanceException::class);
@@ -222,7 +222,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->service->generateQR(99999, $this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_schedule_inactive()
     {
         $this->schedule->update(['is_active' => false]);
@@ -233,7 +233,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->service->generateQR($this->schedule->id, $this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_throws_exception_when_teacher_not_authorized()
     {
         $otherTeacher = User::factory()->create([
@@ -247,7 +247,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->service->generateQR($this->schedule->id, $otherTeacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_qr_generated_event()
     {
         Log::shouldReceive('channel')
@@ -266,7 +266,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->service->generateQR($this->schedule->id, $this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_qr_reused_event()
     {
         // First generation
@@ -288,7 +288,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->service->generateQR($this->schedule->id, $this->teacher);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_includes_session_info_in_response()
     {
         $result = $this->service->generateQR($this->schedule->id, $this->teacher);
@@ -300,7 +300,7 @@ class QRGenerationAtomicLockTest extends TestCase
         $this->assertArrayHasKey('end_time', $result['session_info']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_generates_valid_hmac_signature()
     {
         $result = $this->service->generateQR($this->schedule->id, $this->teacher);

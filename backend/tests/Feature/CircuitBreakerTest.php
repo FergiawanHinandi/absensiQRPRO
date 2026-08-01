@@ -37,7 +37,7 @@ class CircuitBreakerTest extends TestCase
         Cache::store('file')->forget('circuit_breaker:redis:last_failure');
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_starts_in_closed_state()
     {
         $status = $this->circuitBreaker->getStatus();
@@ -46,7 +46,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertTrue($status['is_available']);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_executes_operation_successfully_in_closed_state()
     {
         $result = $this->circuitBreaker->execute(function() {
@@ -57,7 +57,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertTrue($this->circuitBreaker->isAvailable());
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_opens_circuit_after_threshold_failures()
     {
         // Simulate 3 failures (threshold)
@@ -78,7 +78,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertEquals(3, $status['failure_count']);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_fails_fast_when_circuit_is_open()
     {
         // Open the circuit
@@ -98,7 +98,7 @@ class CircuitBreakerTest extends TestCase
         });
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_fallback_when_circuit_is_open()
     {
         // Open the circuit
@@ -123,7 +123,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertEquals('fallback value', $result);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_transitions_to_half_open_after_timeout()
     {
         // Open the circuit
@@ -153,7 +153,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertContains($status['state'], ['half_open', 'closed']);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_closes_circuit_after_successful_half_open_tests()
     {
         // Open the circuit
@@ -181,7 +181,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertTrue($status['is_available']);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_reopens_circuit_if_half_open_test_fails()
     {
         // Open the circuit
@@ -208,7 +208,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertEquals('open', $status['state']);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_resets_failure_count_on_success()
     {
         // Cause 2 failures (below threshold)
@@ -230,7 +230,7 @@ class CircuitBreakerTest extends TestCase
         $this->assertEquals(0, $this->circuitBreaker->getStatus()['failure_count']);
     }
     
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_can_be_manually_reset()
     {
         // Open the circuit

@@ -39,7 +39,7 @@ Route::middleware(['auth:sanctum', 'role:student'])->prefix('student/attendance'
 // ============================================
 // TEACHER ROUTES
 // ============================================
-Route::middleware(['auth:sanctum', 'role:teacher|homeroom_teacher|school_admin|principal|vice_principal'])
+Route::middleware(['auth:sanctum', 'role:teacher,homeroom_teacher,school_admin,principal,vice_principal'])
     ->prefix('teacher/attendance')
     ->group(function () {
     

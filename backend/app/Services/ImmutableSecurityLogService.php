@@ -491,4 +491,55 @@ class ImmutableSecurityLogService
             ], $additionalData)
         );
     }
+
+    /**
+     * Get recent security logs for monitoring and testing.
+     * Returns logs from the last N hours.
+     */
+    public function getRecentLogs(int $hours = 24, int $limit = 100): array
+    {
+        try {
+            $logs = ImmutableSecurityLog::where('created_at', '>=', now()->subHours($hours))
+                ->orderByDesc('sequence_number')
+                ->limit($limit)
+                ->get()
+                ->map(function ($log) {
+                    return [
+                        'id' => $log->id,
+                        'event' => $log->event_type,
+                        'type' => $log->event_type,
+                        'description' => $log->description,
+                        'user_id' => $log->user_id,
+                        'school_id' => $log->school_id,
+                        'metadata' => $log->metadata,
+                        'sequence_number' => $log->sequence_number,
+                        'timestamp' => $log->created_at,
+                        'created_at' => $log->created_at,
+                    ];
+                })
+                ->toArray();
+
+            return $logs;
+        } catch (\Exception $e) {
+            Log::error('ImmutableSecurityLogService: Failed to get recent logs', [
+                'error' => $e->getMessage()
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Log a security event (convenience method for tests).
+     */
+    public function logSecurityEvent(array $eventData): void
+    {
+        $this->write(
+            $eventData['event'] ?? 'unknown_event',
+            $eventData['description'] ?? $eventData['message'] ?? '',
+            $eventData['user_id'] ?? null,
+            $eventData['school_id'] ?? null,
+            $eventData
+        );
+    }
+
 }

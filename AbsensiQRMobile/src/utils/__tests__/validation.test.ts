@@ -1,288 +1,412 @@
 import {
-  validators,
-  validateAll,
-  ValidationPatterns,
-  ValidationMessages,
-  compose,
+  required,
+  email,
+  username,
+  passwordStrong,
+  passwordMatch,
+  minLength,
+  maxLength,
+  nisn,
+  phoneIndonesia,
+  name,
+  dateISO,
+  qrToken,
+  deviceId,
+  uuid,
+  locationForAttendance,
+  attendanceScanPayload,
+  checkDangerousInput,
+  sanitizeInput,
+  requiredEmail,
+  requiredUsername,
+  requiredPassword,
+  requiredName,
+  isEmpty,
+  patterns,
+  errorMessages,
 } from '../validation';
+import validation from '../validation';
+
+// ============================================================================
+// Helper: convert base64 (Node polyfill for btoa)
+// ============================================================================
+const toBase64 = (str: string): string => Buffer.from(str).toString('base64');
+
+// ============================================================================
+// TESTS
+// ============================================================================
 
 describe('Mobile Validation Utilities', () => {
-  describe('required validator', () => {
+  describe('isEmpty', () => {
+    it('should return true for null, undefined, empty string', () => {
+      expect(isEmpty(null)).toBe(true);
+      expect(isEmpty(undefined)).toBe(true);
+      expect(isEmpty('')).toBe(true);
+      expect(isEmpty('   ')).toBe(true);
+    });
+
+    it('should return false for non-empty values', () => {
+      expect(isEmpty('hello')).toBe(false);
+      expect(isEmpty(0)).toBe(false);
+      expect(isEmpty([1])).toBe(false);
+    });
+
+    it('should return true for empty array', () => {
+      expect(isEmpty([])).toBe(true);
+    });
+  });
+
+  describe('required', () => {
     it('should fail for empty values', () => {
-      expect(validators.required('')).not.toBeNull();
-      expect(validators.required(null as any)).not.toBeNull();
-      expect(validators.required(undefined as any)).not.toBeNull();
+      expect(required('').isValid).toBe(false);
+      expect(required(null as any).isValid).toBe(false);
+      expect(required(undefined as any).isValid).toBe(false);
+      expect(required('   ').isValid).toBe(false);
     });
 
     it('should pass for non-empty values', () => {
-      expect(validators.required('hello')).toBeNull();
-      expect(validators.required(123)).toBeNull();
+      expect(required('hello').isValid).toBe(true);
+      expect(required('hello').error).toBeUndefined();
+    });
+
+    it('should return error message on failure', () => {
+      const result = required('');
+      expect(result.error).toContain('wajib');
     });
   });
 
-  describe('email validator', () => {
+  describe('email', () => {
     it('should pass for valid emails', () => {
-      expect(validators.email('user@example.com')).toBeNull();
-      expect(validators.email('admin@school.edu')).toBeNull();
+      expect(email('user@example.com').isValid).toBe(true);
+      expect(email('admin@school.edu').isValid).toBe(true);
     });
 
     it('should fail for invalid emails', () => {
-      expect(validators.email('notanemail')).not.toBeNull();
-      expect(validators.email('missing@domain')).not.toBeNull();
+      expect(email('notanemail').isValid).toBe(false);
+      expect(email('@nodomain').isValid).toBe(false);
     });
 
-    it('should allow empty values', () => {
-      expect(validators.email('')).toBeNull();
-    });
-  });
-
-  describe('minLength validator', () => {
-    it('should pass for values meeting minimum', () => {
-      const minLen8 = validators.minLength(8);
-      expect(minLen8('12345678')).toBeNull();
-      expect(minLen8('longer than 8')).toBeNull();
-    });
-
-    it('should fail for values below minimum', () => {
-      const minLen8 = validators.minLength(8);
-      expect(minLen8('short')).not.toBeNull();
+    it('should pass for empty values (not required by default)', () => {
+      expect(email('').isValid).toBe(true);
     });
   });
 
-  describe('maxLength validator', () => {
-    it('should pass for values under maximum', () => {
-      const maxLen50 = validators.maxLength(50);
-      expect(maxLen50('short')).toBeNull();
+  describe('username', () => {
+    it('should pass for valid usernames', () => {
+      expect(username('teacher01').isValid).toBe(true);
+      expect(username('user.name_99').isValid).toBe(true);
     });
 
-    it('should fail for values over maximum', () => {
-      const maxLen50 = validators.maxLength(50);
-      expect(maxLen50('a'.repeat(51))).not.toBeNull();
+    it('should fail for invalid usernames', () => {
+      expect(username('ab').isValid).toBe(false); // too short
+      expect(username('user@name').isValid).toBe(false); // invalid char
     });
   });
 
-  describe('password validator', () => {
+  describe('passwordStrong', () => {
     it('should pass for strong passwords', () => {
-      expect(validators.password('SecureP@ss123')).toBeNull();
-      expect(validators.password('MyP4ssw0rd!')).toBeNull();
+      expect(passwordStrong('SecurePass1').isValid).toBe(true);
+      expect(passwordStrong('MyP4ssw0rd').isValid).toBe(true);
     });
 
     it('should fail for weak passwords', () => {
-      expect(validators.password('short')).not.toBeNull();
-      expect(validators.password('nouppercase1!')).not.toBeNull();
+      expect(passwordStrong('short').isValid).toBe(false);
+      expect(passwordStrong('nouppercase1').isValid).toBe(false);
+      expect(passwordStrong('NOLOWER1').isValid).toBe(false);
+      expect(passwordStrong('NoDigits').isValid).toBe(false);
     });
   });
 
-  describe('deviceId validator', () => {
-    it('should pass for valid device IDs', () => {
-      expect(validators.deviceId('a1b2c3d4-e5f6-7890-abcd-ef1234567890')).toBeNull();
-      expect(validators.deviceId('VALID-DEVICE-ID-12345')).toBeNull();
+  describe('passwordMatch', () => {
+    it('should pass when passwords match', () => {
+      expect(passwordMatch('abc123', 'abc123').isValid).toBe(true);
     });
 
-    it('should fail for invalid device IDs', () => {
-      expect(validators.deviceId('')).not.toBeNull();
-      expect(validators.deviceId('ab')).not.toBeNull(); // too short
-      expect(validators.deviceId('<script>alert(1)</script>')).not.toBeNull(); // XSS attempt
+    it('should fail when passwords differ', () => {
+      const result = passwordMatch('abc123', 'xyz456');
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('cocok');
     });
   });
 
-  describe('qrToken validator', () => {
-    it('should pass for valid QR tokens', () => {
-      // Valid base64 pattern with dot separator
-      const validToken = btoa('{"schedule_id":1}') + '.validhash123abc';
-      expect(validators.qrToken(validToken)).toBeNull();
+  describe('minLength', () => {
+    it('should pass for values meeting minimum', () => {
+      expect(minLength('12345678', 8).isValid).toBe(true);
+      expect(minLength('longer than 8', 8).isValid).toBe(true);
+    });
+
+    it('should fail for values below minimum', () => {
+      const result = minLength('short', 8);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('8');
+    });
+
+    it('should pass for empty (non-required)', () => {
+      expect(minLength('', 5).isValid).toBe(true);
+    });
+  });
+
+  describe('maxLength', () => {
+    it('should pass for values under maximum', () => {
+      expect(maxLength('short', 50).isValid).toBe(true);
+    });
+
+    it('should fail for values over maximum', () => {
+      const result = maxLength('a'.repeat(51), 50);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('50');
+    });
+  });
+
+  describe('nisn', () => {
+    it('should pass for valid NISN (10 digits)', () => {
+      expect(nisn('1234567890').isValid).toBe(true);
+    });
+
+    it('should fail for invalid NISN', () => {
+      expect(nisn('12345').isValid).toBe(false);
+      expect(nisn('12345678901').isValid).toBe(false);
+      expect(nisn('123456789a').isValid).toBe(false);
+    });
+  });
+
+  describe('phoneIndonesia', () => {
+    it('should pass for valid Indonesian phone numbers', () => {
+      expect(phoneIndonesia('08123456789').isValid).toBe(true);
+      expect(phoneIndonesia('+6281234567890').isValid).toBe(true);
+      expect(phoneIndonesia('6281234567890').isValid).toBe(true);
+    });
+
+    it('should fail for invalid phone numbers', () => {
+      expect(phoneIndonesia('12345').isValid).toBe(false);
+      expect(phoneIndonesia('abc').isValid).toBe(false);
+    });
+  });
+
+  describe('name', () => {
+    it('should pass for valid names', () => {
+      expect(name('John Doe').isValid).toBe(true);
+      expect(name("O'Brien").isValid).toBe(true);
+    });
+
+    it('should fail for names with invalid characters', () => {
+      expect(name('User123').isValid).toBe(false);
+      expect(name('<script>').isValid).toBe(false);
+    });
+  });
+
+  describe('dateISO', () => {
+    it('should pass for valid ISO dates', () => {
+      expect(dateISO('2025-01-15').isValid).toBe(true);
+    });
+
+    it('should fail for invalid dates', () => {
+      expect(dateISO('15-01-2025').isValid).toBe(false);
+      expect(dateISO('not-a-date').isValid).toBe(false);
+    });
+  });
+
+  describe('qrToken', () => {
+    it('should pass for valid QR tokens (payload.hash)', () => {
+      const validToken = toBase64('{"schedule_id":1}') + '.validhash123abc';
+      expect(qrToken(validToken).isValid).toBe(true);
     });
 
     it('should fail for invalid QR tokens', () => {
-      expect(validators.qrToken('')).not.toBeNull();
-      expect(validators.qrToken('nodot')).not.toBeNull();
-      expect(validators.qrToken('too.many.dots')).not.toBeNull();
+      expect(qrToken('nodot').isValid).toBe(false);
+      expect(qrToken('too.many.dots').isValid).toBe(false);
+    });
+
+    it('should pass for empty (non-required)', () => {
+      expect(qrToken('').isValid).toBe(true);
     });
   });
 
-  describe('latitude validator', () => {
-    it('should pass for valid latitudes', () => {
-      expect(validators.latitude(-6.2088)).toBeNull(); // Jakarta
-      expect(validators.latitude(0)).toBeNull();
-      expect(validators.latitude(90)).toBeNull();
-      expect(validators.latitude(-90)).toBeNull();
+  describe('deviceId', () => {
+    it('should pass for valid device IDs', () => {
+      expect(deviceId('a1b2c3d4-e5f6-7890').isValid).toBe(true);
+      expect(deviceId('VALID-DEVICE-ID-12345').isValid).toBe(true);
     });
 
-    it('should fail for invalid latitudes', () => {
-      expect(validators.latitude(91)).not.toBeNull();
-      expect(validators.latitude(-91)).not.toBeNull();
+    it('should fail for IDs with invalid characters', () => {
+      expect(deviceId('<script>alert(1)</script>').isValid).toBe(false);
     });
   });
 
-  describe('longitude validator', () => {
-    it('should pass for valid longitudes', () => {
-      expect(validators.longitude(106.8456)).toBeNull(); // Jakarta
-      expect(validators.longitude(0)).toBeNull();
-      expect(validators.longitude(180)).toBeNull();
-      expect(validators.longitude(-180)).toBeNull();
+  describe('uuid', () => {
+    it('should pass for valid UUID v4', () => {
+      expect(uuid('a1b2c3d4-e5f6-4890-abcd-ef1234567890').isValid).toBe(true);
     });
 
-    it('should fail for invalid longitudes', () => {
-      expect(validators.longitude(181)).not.toBeNull();
-      expect(validators.longitude(-181)).not.toBeNull();
+    it('should fail for invalid UUIDs', () => {
+      expect(uuid('not-a-uuid').isValid).toBe(false);
     });
   });
 
-  describe('locationForAttendance validator', () => {
+  describe('locationForAttendance', () => {
     it('should pass for valid location data', () => {
-      const validLocation = {
+      const result = locationForAttendance({
         latitude: -6.2088,
         longitude: 106.8456,
         accuracy: 15,
-      };
-      expect(validators.locationForAttendance(validLocation)).toBeNull();
+      });
+      expect(result.isValid).toBe(true);
     });
 
-    it('should fail for poor accuracy', () => {
-      const poorAccuracy = {
+    it('should fail for poor accuracy (>100m)', () => {
+      const result = locationForAttendance({
         latitude: -6.2088,
         longitude: 106.8456,
-        accuracy: 150, // > 100m threshold
-      };
-      expect(validators.locationForAttendance(poorAccuracy)).not.toBeNull();
+        accuracy: 150,
+      });
+      expect(result.isValid).toBe(false);
     });
 
-    it('should fail for missing location data', () => {
-      expect(validators.locationForAttendance(null)).not.toBeNull();
-      expect(validators.locationForAttendance(undefined)).not.toBeNull();
+    it('should fail for null location', () => {
+      expect(locationForAttendance(null).isValid).toBe(false);
     });
 
-    it('should fail for mock location flag', () => {
-      const mockLocation = {
-        latitude: -6.2088,
-        longitude: 106.8456,
-        accuracy: 15,
-        isMock: true,
-      };
-      expect(validators.locationForAttendance(mockLocation)).not.toBeNull();
+    it('should fail for out-of-range latitude', () => {
+      const result = locationForAttendance({latitude: 100, longitude: 0});
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should fail for out-of-range longitude', () => {
+      const result = locationForAttendance({latitude: 0, longitude: 200});
+      expect(result.isValid).toBe(false);
     });
   });
 
-  describe('attendanceScanPayload validator', () => {
+  describe('attendanceScanPayload', () => {
     const validPayload = {
-      qr_token: btoa('{"schedule_id":1}') + '.validhash123abc',
+      qr_token: toBase64('{"schedule_id":1}') + '.validhash123abc',
       latitude: -6.2088,
       longitude: 106.8456,
       device_id: 'valid-device-id-12345678',
     };
 
     it('should pass for valid scan payload', () => {
-      expect(validators.attendanceScanPayload(validPayload)).toBeNull();
+      expect(attendanceScanPayload(validPayload).isValid).toBe(true);
+    });
+
+    it('should fail when qr_token is missing', () => {
+      const result = attendanceScanPayload({
+        ...validPayload,
+        qr_token: undefined,
+      });
+      expect(result.isValid).toBe(false);
     });
 
     it('should fail for invalid QR token in payload', () => {
-      const invalid = { ...validPayload, qr_token: 'invalid' };
-      expect(validators.attendanceScanPayload(invalid)).not.toBeNull();
+      const result = attendanceScanPayload({
+        ...validPayload,
+        qr_token: 'invalid',
+      });
+      expect(result.isValid).toBe(false);
     });
 
-    it('should fail for invalid coordinates', () => {
-      const invalid = { ...validPayload, latitude: 100 }; // Out of range
-      expect(validators.attendanceScanPayload(invalid)).not.toBeNull();
-    });
-
-    it('should fail for missing device_id', () => {
-      const invalid = { ...validPayload, device_id: '' };
-      expect(validators.attendanceScanPayload(invalid)).not.toBeNull();
+    it('should fail for out-of-range coordinates', () => {
+      const result = attendanceScanPayload({...validPayload, latitude: 100});
+      expect(result.isValid).toBe(false);
     });
   });
 
-  describe('nisn validator', () => {
-    it('should pass for valid NISN', () => {
-      expect(validators.nisn('1234567890')).toBeNull();
-    });
-
-    it('should fail for invalid NISN', () => {
-      expect(validators.nisn('12345')).not.toBeNull(); // too short
-      expect(validators.nisn('12345678901')).not.toBeNull(); // too long
-      expect(validators.nisn('123456789a')).not.toBeNull(); // has letter
-    });
-  });
-
-  describe('noXss validator', () => {
+  describe('checkDangerousInput', () => {
     it('should pass for clean input', () => {
-      expect(validators.noXss('Hello World')).toBeNull();
-      expect(validators.noXss('Normal text 123')).toBeNull();
+      expect(checkDangerousInput('Hello World').isValid).toBe(true);
+      expect(checkDangerousInput('Normal text 123').isValid).toBe(true);
     });
 
     it('should fail for XSS patterns', () => {
-      expect(validators.noXss('<script>alert(1)</script>')).not.toBeNull();
-      expect(validators.noXss('onclick="evil()"')).not.toBeNull();
-      expect(validators.noXss('javascript:void(0)')).not.toBeNull();
+      expect(checkDangerousInput('<script>alert(1)</script>').isValid).toBe(
+        false,
+      );
+      expect(checkDangerousInput('javascript:void(0)').isValid).toBe(false);
+    });
+  });
+
+  describe('sanitizeInput', () => {
+    it('should escape HTML characters', () => {
+      expect(sanitizeInput('<b>bold</b>')).toBe('&lt;b&gt;bold&lt;/b&gt;');
+      expect(sanitizeInput('"quoted"')).toBe('&quot;quoted&quot;');
+    });
+
+    it('should return empty string as-is', () => {
+      expect(sanitizeInput('')).toBe('');
+    });
+  });
+
+  describe('composite validators', () => {
+    it('requiredEmail should enforce required + email format', () => {
+      expect(requiredEmail('').isValid).toBe(false);
+      expect(requiredEmail('notanemail').isValid).toBe(false);
+      expect(requiredEmail('valid@test.com').isValid).toBe(true);
+    });
+
+    it('requiredUsername should enforce required + username format', () => {
+      expect(requiredUsername('').isValid).toBe(false);
+      expect(requiredUsername('ab').isValid).toBe(false);
+      expect(requiredUsername('teacher01').isValid).toBe(true);
+    });
+
+    it('requiredPassword should enforce required + strong password', () => {
+      expect(requiredPassword('').isValid).toBe(false);
+      expect(requiredPassword('weak').isValid).toBe(false);
+      expect(requiredPassword('SecurePass1').isValid).toBe(true);
+    });
+
+    it('requiredName should enforce required + min 2 chars + name format', () => {
+      expect(requiredName('').isValid).toBe(false);
+      expect(requiredName('A').isValid).toBe(false);
+      expect(requiredName('John Doe').isValid).toBe(true);
     });
   });
 });
 
-describe('validateAll function', () => {
-  it('should validate multiple fields', () => {
-    const loginValidators = {
-      username: [validators.required, validators.minLength(3)],
-      password: [validators.required, validators.password],
-    };
-
-    const validData = {
-      username: 'teacher01',
-      password: 'SecureP@ss123',
-    };
-
-    const errors = validateAll(validData, loginValidators);
-    expect(errors.username).toBeNull();
-    expect(errors.password).toBeNull();
-  });
-
-  it('should return errors for invalid data', () => {
-    const loginValidators = {
-      username: [validators.required, validators.minLength(3)],
-      password: [validators.required, validators.password],
-    };
-
-    const invalidData = {
-      username: '',
-      password: 'weak',
-    };
-
-    const errors = validateAll(invalidData, loginValidators);
-    expect(errors.username).not.toBeNull();
-    expect(errors.password).not.toBeNull();
-  });
-});
-
-describe('compose function', () => {
-  it('should combine multiple validators', () => {
-    const composed = compose([
-      validators.required,
-      validators.minLength(5),
-      validators.maxLength(20),
-    ]);
-
-    expect(composed('valid')).toBeNull();
-    expect(composed('')).not.toBeNull(); // fails required
-    expect(composed('abc')).not.toBeNull(); // fails minLength
-    expect(composed('x'.repeat(25))).not.toBeNull(); // fails maxLength
-  });
-});
-
-describe('ValidationPatterns', () => {
+describe('patterns', () => {
   it('should have QR token pattern', () => {
-    const validToken = btoa('payload') + '.hashvalue';
-    expect(ValidationPatterns.QR_TOKEN.test(validToken)).toBe(true);
-    expect(ValidationPatterns.QR_TOKEN.test('invalid')).toBe(false);
+    const validToken = toBase64('payload') + '.hashvalue';
+    expect(patterns.qrToken.test(validToken)).toBe(true);
+    expect(patterns.qrToken.test('invalid')).toBe(false);
   });
 
   it('should have device ID pattern', () => {
-    expect(ValidationPatterns.DEVICE_ID.test('valid-device-12345')).toBe(true);
-    expect(ValidationPatterns.DEVICE_ID.test('ab')).toBe(false);
+    expect(patterns.deviceId.test('valid-device-12345')).toBe(true);
+  });
+
+  it('should have email pattern', () => {
+    expect(patterns.email.test('user@test.com')).toBe(true);
+    expect(patterns.email.test('invalid')).toBe(false);
   });
 });
 
-describe('ValidationMessages', () => {
+describe('errorMessages', () => {
   it('should have Indonesian error messages', () => {
-    expect(ValidationMessages.REQUIRED).toContain('wajib');
-    expect(ValidationMessages.EMAIL_INVALID).toContain('email');
-    expect(ValidationMessages.PASSWORD_WEAK).toContain('password');
+    expect(errorMessages.required).toContain('wajib');
+    expect(errorMessages.email).toContain('email');
+    expect(errorMessages.password).toContain('Password');
+  });
+
+  it('should have dynamic length messages', () => {
+    expect(errorMessages.minLength(5)).toContain('5');
+    expect(errorMessages.maxLength(100)).toContain('100');
+  });
+});
+
+describe('default export (validation object)', () => {
+  it('should aggregate all validators', () => {
+    expect(typeof validation.required).toBe('function');
+    expect(typeof validation.email).toBe('function');
+    expect(typeof validation.minLength).toBe('function');
+    expect(typeof validation.maxLength).toBe('function');
+    expect(typeof validation.locationForAttendance).toBe('function');
+    expect(typeof validation.attendanceScanPayload).toBe('function');
+    expect(typeof validation.checkDangerousInput).toBe('function');
+    expect(typeof validation.sanitizeInput).toBe('function');
+  });
+
+  it('should include patterns and errorMessages', () => {
+    expect(validation.patterns).toBeDefined();
+    expect(validation.errorMessages).toBeDefined();
   });
 });

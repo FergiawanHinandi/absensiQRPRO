@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
+use App\Traits\BelongsToSchool;
 
 /**
  * Report Export Model
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Storage;
 class ReportExport extends Model
 {
     use HasUuids;
+    use BelongsToSchool; // Multi-tenancy: otomatis filter berdasarkan school_id
 
     protected $keyType = 'string';
 

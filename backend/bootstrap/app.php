@@ -46,7 +46,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'impersonation' => \App\Http\Middleware\CheckImpersonation::class,
             'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
             'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
-            'admin' => \App\Http\Middleware\EnsureUserHasRole::class,
             'validate.multi.tenant.restore' => \App\Http\Middleware\ValidateMultiTenantRestore::class,
             // NEW: Attendance Security Middleware
             'attendance.security' => \App\Http\Middleware\AttendanceSecurityMiddleware::class,
@@ -54,6 +53,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'idempotency' => \App\Http\Middleware\IdempotencyMiddleware::class,
             // NEW: Attendance Rate Limiting (Specialized)
             'attendance.rate.limit' => \App\Http\Middleware\AttendanceRateLimitMiddleware::class,
+            'upload.validate' => \App\Http\Middleware\ValidateFileUpload::class,
             // ✅ QR Signature Validation (Security Hardened)
             'qr.validate' => \App\Http\Middleware\ValidateQRSignature::class,
             // SECURITY: Device Binding Middleware

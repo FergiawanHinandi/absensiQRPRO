@@ -34,7 +34,7 @@ for ($i = 0; $i < 10; $i++) {
         'json' => [
             'student_id' => $studentId,
             'schedule_id' => $scheduleId,
-            'attendance_date' => date('Y-m-d'),
+            'attendance_date' => \App\Helpers\TimezoneHelper::now()->toDateString(),
             'status' => 'present',
             'notes' => 'Replay Test'
         ],

@@ -135,7 +135,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthenticated_user_cannot_access_security_trend()
     {
         $response = $this->getJson("{$this->baseUrl}/trend");
@@ -143,7 +143,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthenticated_user_cannot_access_security_by_type()
     {
         $response = $this->getJson("{$this->baseUrl}/by-type");
@@ -151,7 +151,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthenticated_user_cannot_access_security_by_severity()
     {
         $response = $this->getJson("{$this->baseUrl}/by-severity");
@@ -159,7 +159,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function unauthenticated_user_cannot_access_critical_recent()
     {
         $response = $this->getJson("{$this->baseUrl}/critical-recent");
@@ -167,7 +167,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(401);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function non_admin_user_cannot_access_security_trend()
     {
         Sanctum::actingAs($this->nonAdminUser);
@@ -177,7 +177,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function non_admin_user_cannot_access_security_by_type()
     {
         Sanctum::actingAs($this->nonAdminUser);
@@ -187,7 +187,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function non_admin_user_cannot_access_security_by_severity()
     {
         Sanctum::actingAs($this->nonAdminUser);
@@ -197,7 +197,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function non_admin_user_cannot_access_critical_recent()
     {
         Sanctum::actingAs($this->nonAdminUser);
@@ -207,7 +207,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_get_security_trend_data()
     {
         Sanctum::actingAs($this->adminUser);
@@ -244,7 +244,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $this->assertEquals($eventsFromSchool1, $totalEventsInResponse);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_get_security_by_type_data()
     {
         Sanctum::actingAs($this->adminUser);
@@ -292,7 +292,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $this->assertEquals($expectedCount, $totalCount);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_get_security_by_severity_data()
     {
         Sanctum::actingAs($this->adminUser);
@@ -338,7 +338,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $this->assertEquals($expectedCount, $totalCount);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function admin_can_get_critical_recent_events()
     {
         Sanctum::actingAs($this->adminUser);
@@ -389,7 +389,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $this->assertEquals($sortedTimestamps, $timestamps);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_trend_respects_date_range_parameter()
     {
         Sanctum::actingAs($this->adminUser);
@@ -409,7 +409,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $this->assertGreaterThanOrEqual(count($data7d), count($data30d));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_analytics_handles_empty_data_gracefully()
     {
         // Clear all events for this school
@@ -435,7 +435,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_analytics_validates_range_parameter()
     {
         Sanctum::actingAs($this->adminUser);
@@ -447,7 +447,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $response->assertStatus(200); // Assuming it defaults to 7d
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function critical_recent_respects_limit_parameter()
     {
         Sanctum::actingAs($this->adminUser);
@@ -460,7 +460,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         $this->assertLessThanOrEqual(5, count($data));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function multi_tenant_isolation_is_enforced_across_all_endpoints()
     {
         Sanctum::actingAs($this->adminUser);
@@ -487,7 +487,7 @@ class SecurityMonitoringAnalyticsTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function security_analytics_returns_correct_json_structure()
     {
         Sanctum::actingAs($this->adminUser);

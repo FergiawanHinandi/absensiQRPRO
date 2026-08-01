@@ -4,6 +4,9 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Event;
+use App\Events\CacheStampedeDetected;
+use App\Events\CacheRegenerationCompleted;
 
 /**
  * Cache Lock Service
@@ -23,7 +26,12 @@ use Illuminate\Support\Facades\Log;
  * - Reduces database load during cache expiration
  * - Ensures only one process regenerates cache at a time
  * 
- * @version 1.0.0
+ * MONITORING:
+ * - Tracks lock contention for hot keys
+ * - Monitors cache regeneration frequency
+ * - Alerts on cache stampede patterns
+ * 
+ * @version 2.0.0
  */
 class CacheLockService
 {
@@ -43,6 +51,18 @@ class CacheLockService
     const RETRY_DELAY_MS = 100;
 
     /**
+     * Metrics tracking
+     */
+    protected array $metrics = [
+        'cache_hits' => 0,
+        'cache_misses' => 0,
+        'lock_acquisitions' => 0,
+        'lock_contentions' => 0,
+        'regenerations' => 0,
+        'stale_served' => 0,
+    ];
+
+    /**
      * Get cached value with lock protection
      * 
      * @param string $cacheKey Cache key
@@ -57,17 +77,26 @@ class CacheLockService
         callable $callback,
         int $lockTimeout = self::LOCK_TIMEOUT
     ) {
+        $startTime = microtime(true);
+        
         // Step 1: Try cache first (fast path)
         $value = Cache::get($cacheKey);
         if ($value !== null) {
+            $this->metrics['cache_hits']++;
+            $this->trackMetric('cache_hit', $cacheKey, microtime(true) - $startTime);
             return $value;
         }
+
+        $this->metrics['cache_misses']++;
+        $this->trackMetric('cache_miss', $cacheKey, microtime(true) - $startTime);
 
         // Step 2: Cache miss - acquire lock
         $lockKey = "lock:{$cacheKey}";
         $lock = Cache::lock($lockKey, $lockTimeout);
 
         if ($lock->get()) {
+            $this->metrics['lock_acquisitions']++;
+            
             try {
                 // Step 3: Double-check cache (another process may have filled it)
                 $value = Cache::get($cacheKey);
@@ -79,13 +108,22 @@ class CacheLockService
                 }
 
                 // Step 4: Calculate and cache value
+                $this->metrics['regenerations']++;
+                
                 Log::info('Cache lock: Regenerating cache', [
                     'cache_key' => $cacheKey,
                     'ttl' => $ttl,
                 ]);
 
+                $regenerationStart = microtime(true);
                 $value = $callback();
+                $regenerationTime = microtime(true) - $regenerationStart;
+                
                 Cache::put($cacheKey, $value, $ttl);
+
+                $this->trackMetric('cache_regeneration', $cacheKey, $regenerationTime);
+                
+                Event::dispatch(new CacheRegenerationCompleted($cacheKey, $regenerationTime));
 
                 return $value;
             } finally {
@@ -95,6 +133,12 @@ class CacheLockService
         }
 
         // Step 6: Lock acquisition failed - wait and retry
+        $this->metrics['lock_contentions']++;
+        $this->trackMetric('lock_contention', $cacheKey, microtime(true) - $startTime);
+        
+        // Detect potential stampede
+        $this->detectStampede($cacheKey);
+        
         return $this->retryWithBackoff($cacheKey, $ttl, $callback, $lockTimeout);
     }
 
@@ -200,8 +244,11 @@ class CacheLockService
         // Try fresh cache first
         $value = Cache::get($cacheKey);
         if ($value !== null) {
+            $this->metrics['cache_hits']++;
             return $value;
         }
+
+        $this->metrics['cache_misses']++;
 
         // Try stale cache
         $staleValue = Cache::get($staleKey);
@@ -211,6 +258,8 @@ class CacheLockService
         $lock = Cache::lock($lockKey, self::LOCK_TIMEOUT);
 
         if ($lock->get()) {
+            $this->metrics['lock_acquisitions']++;
+            
             try {
                 // Double-check fresh cache
                 $value = Cache::get($cacheKey);
@@ -219,18 +268,25 @@ class CacheLockService
                 }
 
                 // Regenerate
+                $this->metrics['regenerations']++;
+                
                 Log::info('Cache lock: Regenerating with stale support', [
                     'cache_key' => $cacheKey,
                     'has_stale' => $staleValue !== null,
                 ]);
 
+                $regenerationStart = microtime(true);
                 $value = $callback();
+                $regenerationTime = microtime(true) - $regenerationStart;
 
                 // Store fresh cache
                 Cache::put($cacheKey, $value, $ttl);
 
                 // Store stale cache (for next expiration)
                 Cache::put($staleKey, $value, $ttl + $staleTtl);
+
+                $this->trackMetric('cache_regeneration_stale', $cacheKey, $regenerationTime);
+                Event::dispatch(new CacheRegenerationCompleted($cacheKey, $regenerationTime));
 
                 return $value;
             } finally {
@@ -239,14 +295,112 @@ class CacheLockService
         }
 
         // Lock failed - serve stale if available
+        $this->metrics['lock_contentions']++;
+        
         if ($staleValue !== null) {
+            $this->metrics['stale_served']++;
+            
             Log::info('Cache lock: Serving stale cache', [
                 'cache_key' => $cacheKey,
             ]);
+            
+            $this->trackMetric('stale_cache_served', $cacheKey, 0);
+            
             return $staleValue;
         }
 
         // No stale cache - wait and retry
         return $this->retryWithBackoff($cacheKey, $ttl, $callback, self::LOCK_TIMEOUT);
+    }
+
+    /**
+     * Track metric for monitoring
+     * 
+     * @param string $metricName
+     * @param string $cacheKey
+     * @param float $value
+     */
+    protected function trackMetric(string $metricName, string $cacheKey, float $value): void
+    {
+        // Store metric in cache for monitoring
+        $metricsKey = "cache_metrics:{$metricName}:{$cacheKey}";
+        $currentMetrics = Cache::get($metricsKey, []);
+        
+        $currentMetrics[] = [
+            'timestamp' => now()->toIso8601String(),
+            'value' => $value,
+        ];
+        
+        // Keep only last 100 entries
+        if (count($currentMetrics) > 100) {
+            $currentMetrics = array_slice($currentMetrics, -100);
+        }
+        
+        Cache::put($metricsKey, $currentMetrics, 3600); // 1 hour
+    }
+
+    /**
+     * Detect cache stampede pattern
+     * 
+     * @param string $cacheKey
+     */
+    protected function detectStampede(string $cacheKey): void
+    {
+        $contentionKey = "cache_contention_count:{$cacheKey}";
+        $contentionCount = Cache::get($contentionKey, 0);
+        $contentionCount++;
+        
+        Cache::put($contentionKey, $contentionCount, 60); // Track for 1 minute
+        
+        // Alert if more than 5 contentions in 1 minute
+        if ($contentionCount > 5) {
+            Log::warning('Cache stampede detected', [
+                'cache_key' => $cacheKey,
+                'contention_count' => $contentionCount,
+            ]);
+            
+            Event::dispatch(new CacheStampedeDetected($cacheKey, $contentionCount));
+        }
+    }
+
+    /**
+     * Get current metrics
+     * 
+     * @return array
+     */
+    public function getMetrics(): array
+    {
+        return $this->metrics;
+    }
+
+    /**
+     * Reset metrics
+     */
+    public function resetMetrics(): void
+    {
+        $this->metrics = [
+            'cache_hits' => 0,
+            'cache_misses' => 0,
+            'lock_acquisitions' => 0,
+            'lock_contentions' => 0,
+            'regenerations' => 0,
+            'stale_served' => 0,
+        ];
+    }
+
+    /**
+     * Get cache hit rate
+     * 
+     * @return float
+     */
+    public function getHitRate(): float
+    {
+        $total = $this->metrics['cache_hits'] + $this->metrics['cache_misses'];
+        
+        if ($total === 0) {
+            return 0.0;
+        }
+        
+        return ($this->metrics['cache_hits'] / $total) * 100;
     }
 }

@@ -4,7 +4,7 @@
 
 ```
 absensiQRPro/
-├── backend/                    # Laravel 12 API Backend
+├── backend/                    # Laravel 11 API Backend
 ├── frontend-web/               # React TypeScript Frontend  
 ├── AbsensiQRMobile/           # React Native Mobile App
 ├── docs/                      # Project Documentation
@@ -20,9 +20,15 @@ backend/
 │   ├── Core/                  # Domain layer
 │   │   ├── Domain/
 │   │   │   └── Repositories/  # Repository interfaces
-│   │   └── Services/          # Core business services
+│   │   └── Services/          # Core business domain services
 │   │       ├── Attendance/    # Attendance domain services
-│   │       └── Payment/       # Payment domain services
+│   │       ├── Payment/       # Payment domain services
+│   │       └── RateLimit/     # Rate limiting domain services
+│   │           ├── SlidingWindowCounter.php
+│   │           ├── TenantKeyBuilder.php
+│   │           ├── RateLimiterService.php
+│   │           ├── AdminBypassService.php
+│   │           └── RateLimitLogger.php
 │   ├── Infrastructure/        # Infrastructure layer
 │   │   └── Repositories/      # Repository implementations
 │   ├── Http/
@@ -32,13 +38,26 @@ backend/
 │   │   ├── Middleware/       # Custom middleware
 │   │   └── Requests/         # Form request validation
 │   ├── Models/               # Eloquent models
+│   │   └── DR/               # Disaster recovery models
 │   ├── Services/             # Application services
+│   │   ├── DR/               # Disaster recovery services
+│   │   │   ├── AlertManager.php
+│   │   │   ├── AuditTrailSystem.php
+│   │   │   ├── BackupEncryption.php
+│   │   │   └── TenantSecurityValidator.php
+│   │   └── Redis/            # Redis HA services
+│   │       ├── CacheWarmingService.php
+│   │       ├── QueueRecoveryService.php
+│   │       └── ResilientRedisConnection.php
 │   ├── Jobs/                 # Queue jobs
 │   ├── Events/               # Domain events
 │   ├── Listeners/            # Event listeners
 │   ├── Policies/             # Authorization policies
 │   └── Traits/               # Reusable traits
 ├── config/                   # Configuration files
+│   ├── rate-limiting.php     # Rate limit endpoint config
+│   ├── disaster_recovery.php # DR scenarios, RTO/RPO config
+│   └── backup.php            # Spatie backup config
 ├── database/
 │   ├── migrations/           # Database schema migrations
 │   └── seeders/              # Database seeders

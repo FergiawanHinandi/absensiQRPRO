@@ -11,6 +11,8 @@ import {
     LayoutDashboard,
     Clock
 } from 'lucide-react';
+import { ErrorBoundary } from '../common/ErrorBoundary';
+import PageErrorFallback from '../common/PageErrorFallback';
 import { useAuthStore } from '../../modules/auth/stores/useAuthStore';
 import { MENUS } from '../../config/navigation';
 import type { RoleType, MenuItem } from '../../config/navigation';
@@ -340,7 +342,9 @@ const DashboardLayout: React.FC = () => {
                 {/* Content */}
                 <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 lg:p-8">
                     <div className="max-w-7xl mx-auto space-y-6">
-                        <Outlet />
+                        <ErrorBoundary fallback={<PageErrorFallback />} key={location.pathname}>
+                            <Outlet />
+                        </ErrorBoundary>
                     </div>
                 </main>
             </div>

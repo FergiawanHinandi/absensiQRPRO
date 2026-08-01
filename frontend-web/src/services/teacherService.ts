@@ -32,15 +32,17 @@ export const teacherService = {
         const response = await apiClient.get<{ data: TeacherSchedule[] }>(`/teacher/schedules`, {
             params: { week: weekStartDate }
         });
-        return response.data.data;
+        // FE-05 FIX: interceptor sudah unwrap, response.data langsung berisi data array
+        // response.data = data sebenarnya (sudah di-unwrap dari {success, data} → data)
+        return (response.data as any)?.data ?? response.data ?? [];
     },
 
     getStudentsBySession: async (sessionId: number): Promise<Student[]> => {
         // GET /api/v1/teacher/schedules/{id}/attendance
         const response = await apiClient.get<{ data: any }>(`/teacher/schedules/${sessionId}/attendance`);
-        // The backend returns { schedule: {...}, students: [...] } in data
-        // We need to return valid Student[]
-        return response.data.data.students || [];
+        // FE-05 FIX: response.data sudah di-unwrap → langsung akses .students
+        const data = (response.data as any);
+        return data?.students ?? data?.data?.students ?? [];
     },
 
     saveAttendance: async (sessionId: number, payload: AttendancePayload): Promise<void> => {

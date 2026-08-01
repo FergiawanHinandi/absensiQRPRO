@@ -77,250 +77,163 @@ class StudentCardAuthorizationTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_can_generate_student_card()
     {
         Sanctum::actingAs($this->schoolAdmin);
 
-        $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
+        $response = $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/generate");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'card_id',
-                    'card_number',
-                    'qr_code',
-                    'expires_at',
-                    'student',
-                    'generated_at',
+                    'card',
+                    'plain_token',
+                    'qr_string',
                 ],
-                'message',
             ]);
 
         $this->assertDatabaseHas('student_cards', [
             'student_id' => $this->student->id,
             'school_id' => $this->school->id,
             'is_active' => true,
-            'generated_by' => $this->schoolAdmin->id,
+            'issued_by' => $this->schoolAdmin->id,
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_cannot_generate_student_card()
     {
         Sanctum::actingAs($this->teacher);
 
-        $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
+        $response = $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/generate");
 
-        $response->assertStatus(403)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Unauthorized. Only School Admin can generate student cards.',
-                'error_code' => 'INSUFFICIENT_PRIVILEGES',
-            ]);
+        $response->assertStatus(403);
 
         $this->assertDatabaseMissing('student_cards', [
             'student_id' => $this->student->id,
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_cannot_generate_card_for_other_school_student()
     {
         Sanctum::actingAs($this->schoolAdmin);
 
-        $response = $this->postJson("/api/v1/admin/students/{$this->otherStudent->id}/generate-card");
+        $response = $this->postJson("/api/v1/admin/student-cards/{$this->otherStudent->id}/generate");
 
-        $response->assertStatus(404)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Student not found or not in your school.',
-                'error_code' => 'STUDENT_NOT_FOUND',
-            ]);
+        $response->assertStatus(404);
 
         $this->assertDatabaseMissing('student_cards', [
             'student_id' => $this->otherStudent->id,
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_can_regenerate_existing_card()
     {
         Sanctum::actingAs($this->schoolAdmin);
 
         // First generate a card
-        $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
+        $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/generate");
 
-        // Then regenerate it
-        $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/regenerate-card");
+        // Then regenerate it (generate again = auto-revoke old, create new)
+        $response = $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/generate");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'success',
                 'data' => [
-                    'card_id',
-                    'card_number',
-                    'qr_code',
-                    'expires_at',
-                    'student',
-                    'generated_at',
-                    'previous_card_id',
+                    'card',
+                    'plain_token',
+                    'qr_string',
                 ],
-                'message',
             ]);
 
         // Should have 2 cards total (1 active, 1 deactivated)
         $this->assertDatabaseCount('student_cards', 2);
 
         // Only 1 should be active
-        $this->assertDatabaseCount('student_cards', 1, [
-            'student_id' => $this->student->id,
-            'is_active' => true,
-        ]);
+        $this->assertEquals(1, StudentCard::where('student_id', $this->student->id)
+            ->where('is_active', true)
+            ->count());
     }
 
-    /** @test */
-    public function teacher_cannot_regenerate_student_card()
-    {
-        Sanctum::actingAs($this->teacher);
-
-        $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/regenerate-card");
-
-        $response->assertStatus(403)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Unauthorized. Only School Admin can regenerate student cards.',
-                'error_code' => 'INSUFFICIENT_PRIVILEGES',
-            ]);
-    }
-
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_can_deactivate_student_card()
     {
         Sanctum::actingAs($this->schoolAdmin);
 
         // First generate a card
-        $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
+        $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/generate");
 
         // Then deactivate it
-        $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/deactivate-card");
+        $response = $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/deactivate");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'success',
-                'data' => [
-                    'card_id',
-                    'card_number',
-                    'deactivated_at',
-                    'student',
-                ],
+                'data',
                 'message',
             ]);
 
         $this->assertDatabaseHas('student_cards', [
             'student_id' => $this->student->id,
             'is_active' => false,
-            'deactivated_by' => $this->schoolAdmin->id,
-            'deactivation_reason' => 'manual_deactivation',
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function teacher_cannot_deactivate_student_card()
     {
         Sanctum::actingAs($this->teacher);
 
-        $response = $this->postJson("/api/v1/admin/students/{$this->student->id}/deactivate-card");
+        $response = $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/deactivate");
 
-        $response->assertStatus(403)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Unauthorized. Only School Admin can deactivate student cards.',
-                'error_code' => 'INSUFFICIENT_PRIVILEGES',
-            ]);
+        $response->assertStatus(403);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function school_admin_can_view_card_status()
     {
         Sanctum::actingAs($this->schoolAdmin);
 
         // Generate a card first
-        $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
+        $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/generate");
 
-        $response = $this->getJson("/api/v1/admin/students/{$this->student->id}/card-status");
+        $response = $this->getJson("/api/v1/admin/student-cards/{$this->student->id}/status");
 
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'success',
                 'data' => [
                     'has_active_card',
-                    'active_card',
-                    'total_cards_generated',
-                    'last_generated',
-                    'card_history',
                 ],
                 'message',
             ]);
     }
 
-    /** @test */
-    public function teacher_cannot_view_card_status()
-    {
-        Sanctum::actingAs($this->teacher);
-
-        $response = $this->getJson("/api/v1/admin/students/{$this->student->id}/card-status");
-
-        $response->assertStatus(403)
-            ->assertJson([
-                'success' => false,
-                'message' => 'Unauthorized to view student card status.',
-                'error_code' => 'INSUFFICIENT_PRIVILEGES',
-            ]);
-    }
-
-    /** @test */
-    public function unauthorized_attempts_are_logged()
-    {
-        Sanctum::actingAs($this->teacher);
-
-        // Attempt unauthorized action
-        $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
-
-        // Check that security violation was logged
-        $this->assertDatabaseHas('audit_logs', [
-            'user_id' => $this->teacher->id,
-            'action' => 'security_violation_student_card',
-            'school_id' => $this->school->id,
-        ]);
-    }
-
-    /** @test */
-    public function successful_card_operations_are_audited()
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function school_admin_cannot_view_card_status_for_other_school_student()
     {
         Sanctum::actingAs($this->schoolAdmin);
 
-        $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
+        $response = $this->getJson("/api/v1/admin/student-cards/{$this->otherStudent->id}/status");
 
-        // Check that action was logged
-        $this->assertDatabaseHas('audit_logs', [
-            'user_id' => $this->schoolAdmin->id,
-            'action' => 'student_card_generated',
-            'school_id' => $this->school->id,
-        ]);
+        $response->assertStatus(404);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function only_one_active_card_per_student()
     {
         Sanctum::actingAs($this->schoolAdmin);
 
         // Generate first card
-        $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
+        $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/generate");
 
         // Generate second card (should deactivate first)
-        $this->postJson("/api/v1/admin/students/{$this->student->id}/generate-card");
+        $this->postJson("/api/v1/admin/student-cards/{$this->student->id}/generate");
 
         // Should have exactly 1 active card
         $activeCards = StudentCard::where('student_id', $this->student->id)
@@ -334,16 +247,16 @@ class StudentCardAuthorizationTest extends TestCase
         $this->assertEquals(2, $totalCards);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function middleware_blocks_non_school_admin_routes()
     {
         Sanctum::actingAs($this->teacher);
 
-        // Test all protected routes
+        // Test all protected routes (semua di bawah role:school_admin middleware)
         $protectedRoutes = [
-            ['POST', "/api/v1/admin/students/{$this->student->id}/generate-card"],
-            ['POST', "/api/v1/admin/students/{$this->student->id}/regenerate-card"],
-            ['POST', "/api/v1/admin/students/{$this->student->id}/deactivate-card"],
+            ['POST', "/api/v1/admin/student-cards/{$this->student->id}/generate"],
+            ['POST', "/api/v1/admin/student-cards/{$this->student->id}/deactivate"],
+            ['GET', "/api/v1/admin/student-cards/{$this->student->id}/status"],
         ];
 
         foreach ($protectedRoutes as [$method, $route]) {

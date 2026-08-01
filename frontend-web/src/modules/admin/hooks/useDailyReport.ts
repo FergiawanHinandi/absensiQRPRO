@@ -21,7 +21,9 @@ export const useDailyReport = () => {
                 return response.data;
             } catch (error) {
                 // Fallback Mock Data as per original requirement during dev
-                console.warn("Using mock data for daily report");
+                if (import.meta.env.DEV) {
+                    console.warn("Using mock data for daily report");
+                }
                 return {
                     total_students: 120,
                     attendance_rate: 85,

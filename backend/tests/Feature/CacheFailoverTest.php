@@ -21,7 +21,7 @@ class CacheFailoverTest extends TestCase
         Cache::flush();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failover_cache_store_is_configured_correctly(): void
     {
         $stores = Config::get('cache.stores.failover.stores');
@@ -33,7 +33,7 @@ class CacheFailoverTest extends TestCase
         $this->assertEquals('array', $stores[2]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failover_cache_can_store_and_retrieve_values(): void
     {
         Cache::store('failover')->put('test_key', 'test_value', 60);
@@ -43,7 +43,7 @@ class CacheFailoverTest extends TestCase
         $this->assertEquals('test_value', $value);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failover_cache_can_store_complex_data(): void
     {
         $data = [
@@ -62,7 +62,7 @@ class CacheFailoverTest extends TestCase
         $this->assertEquals($data, $retrieved);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failover_cache_respects_ttl(): void
     {
         Cache::store('failover')->put('expiring_key', 'value', 1);
@@ -75,7 +75,7 @@ class CacheFailoverTest extends TestCase
         $this->assertNull(Cache::store('failover')->get('expiring_key'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failover_cache_can_forget_keys(): void
     {
         Cache::store('failover')->put('key_to_forget', 'value', 60);
@@ -87,7 +87,7 @@ class CacheFailoverTest extends TestCase
         $this->assertNull(Cache::store('failover')->get('key_to_forget'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failover_cache_can_flush_all_keys(): void
     {
         Cache::store('failover')->put('key1', 'value1', 60);
@@ -99,7 +99,7 @@ class CacheFailoverTest extends TestCase
         $this->assertNull(Cache::store('failover')->get('key2'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failover_cache_remember_works_correctly(): void
     {
         $callCount = 0;
@@ -122,7 +122,7 @@ class CacheFailoverTest extends TestCase
         $this->assertEquals(1, $callCount); // Should not increment
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function database_cache_works_as_fallback(): void
     {
         // Use database cache directly
@@ -140,7 +140,7 @@ class CacheFailoverTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function array_cache_works_as_final_fallback(): void
     {
         // Use array cache directly
@@ -151,7 +151,7 @@ class CacheFailoverTest extends TestCase
         $this->assertEquals('array_value', $value);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cache_prefix_is_applied_correctly(): void
     {
         $prefix = Config::get('cache.prefix');
@@ -162,13 +162,11 @@ class CacheFailoverTest extends TestCase
 
     /**
      * Test that verifies failover behavior when Redis is unavailable.
-     * 
      * Note: This test requires Redis to be stopped manually to verify failover.
      * In CI/CD, this can be automated by stopping the Redis service.
-     * 
-     * @test
-     * @group manual
      */
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('manual')]
     public function failover_cache_falls_back_when_redis_unavailable(): void
     {
         // This test is marked as manual because it requires Redis to be stopped

@@ -180,11 +180,16 @@ class DashboardCacheService
     /**
      * Invalidate class cache
      * 
-     * @param int $classId
+     * @param int|null $classId
      * @param string|null $date
      */
-    public function invalidateClass(int $classId, string $date = null): void
+    public function invalidateClass(?int $classId, string $date = null): void
     {
+        // Skip if class_id is null (e.g., during testing or incomplete records)
+        if ($classId === null) {
+            return;
+        }
+        
         $date = $date ?? Carbon::today()->toDateString();
         Cache::forget("class_summary_{$classId}_{$date}");
         

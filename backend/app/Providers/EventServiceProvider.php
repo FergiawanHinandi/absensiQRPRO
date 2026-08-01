@@ -74,6 +74,14 @@ class EventServiceProvider extends ServiceProvider
             \App\Listeners\UpdateAttendanceSummaryListener::class . '@handleAttendanceStatusChanged',
             \App\Listeners\PublishDomainEvent::class,
         ],
+        
+        // Cache Stampede Monitoring
+        \App\Events\CacheStampedeDetected::class => [
+            \App\Listeners\MonitorCacheStampede::class . '@handleStampedeDetected',
+        ],
+        \App\Events\CacheRegenerationCompleted::class => [
+            \App\Listeners\MonitorCacheStampede::class . '@handleRegenerationCompleted',
+        ],
     ];
 
     /**
@@ -83,6 +91,7 @@ class EventServiceProvider extends ServiceProvider
      */
     protected $subscribe = [
         \App\Listeners\SendMonitoringAlert::class,
+        \App\Listeners\LogRedisCircuitBreakerEvent::class,
     ];
 
     /**

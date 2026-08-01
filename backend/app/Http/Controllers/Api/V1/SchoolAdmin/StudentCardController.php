@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Services\StudentCardService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 
 /**
  * Student Card Controller - STRICT AUTHORIZATION
@@ -38,15 +37,7 @@ class StudentCardController extends Controller
     {
         try {
             // CRITICAL: Double-check authorization at method level
-            if (! Gate::allows('generate', 'student-card')) {
-                $this->logSecurityViolation($request->user(), 'generate', $studentId, 'AUTHORIZATION_DENIED');
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized. Only School Admin can generate student cards.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES',
-                ], 403);
-            }
+            $this->authorize('generate', \App\Models\StudentCard::class);
 
             $user = $request->user();
 
@@ -103,15 +94,7 @@ class StudentCardController extends Controller
     {
         try {
             // CRITICAL: Double-check authorization at method level
-            if (! Gate::allows('regenerate', 'student-card')) {
-                $this->logSecurityViolation($request->user(), 'regenerate', $studentId, 'AUTHORIZATION_DENIED');
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized. Only School Admin can regenerate student cards.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES',
-                ], 403);
-            }
+            $this->authorize('regenerate', \App\Models\StudentCard::class);
 
             $user = $request->user();
 
@@ -170,15 +153,7 @@ class StudentCardController extends Controller
     {
         try {
             // CRITICAL: Double-check authorization at method level
-            if (! Gate::allows('deactivate', 'student-card')) {
-                $this->logSecurityViolation($request->user(), 'deactivate', $studentId, 'AUTHORIZATION_DENIED');
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized. Only School Admin can deactivate student cards.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES',
-                ], 403);
-            }
+            $this->authorize('deactivate', \App\Models\StudentCard::class);
 
             $user = $request->user();
 
@@ -235,13 +210,7 @@ class StudentCardController extends Controller
     {
         try {
             // CRITICAL: Check view authorization
-            if (! Gate::allows('view', 'student-card')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized to view student card status.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES',
-                ], 403);
-            }
+            $this->authorize('view', \App\Models\StudentCard::class);
 
             $user = $request->user();
 
@@ -291,13 +260,7 @@ class StudentCardController extends Controller
     public function markDistributed(Request $request, int $cardId): JsonResponse
     {
         try {
-            if (! Gate::allows('distribute', 'student-card')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES',
-                ], 403);
-            }
+            $this->authorize('distribute', \App\Models\StudentCard::class);
 
             $user = $request->user();
             $card = \App\Models\StudentCard::where('id', $cardId)
@@ -334,13 +297,7 @@ class StudentCardController extends Controller
     public function getCardHistory(Request $request, int $studentId): JsonResponse
     {
         try {
-            if (! Gate::allows('view', 'student-card')) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized.',
-                    'error_code' => 'INSUFFICIENT_PRIVILEGES',
-                ], 403);
-            }
+            $this->authorize('viewAny', \App\Models\StudentCard::class);
 
             $user = $request->user();
             $student = User::where('id', $studentId)

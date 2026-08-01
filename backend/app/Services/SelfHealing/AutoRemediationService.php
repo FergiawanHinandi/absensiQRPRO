@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use App\Events\AutoRemediationTriggered;
 use App\Events\SystemDegradedModeEnabled;
 use App\Events\SystemDegradedModeDisabled;
+use App\Services\Alerting\SlackAlert;
 
 class AutoRemediationService
 {
@@ -225,7 +226,7 @@ class AutoRemediationService
             Cache::put('system:write_freeze', true, 3600); // 1 hour
             
             // Send critical alert
-            // TODO: Integrate with PagerDuty/Slack
+            SlackAlert::critical('Write freeze activated - possible data corruption prevented', $context);
             
             return true;
         } catch (Throwable $e) {
@@ -247,7 +248,7 @@ class AutoRemediationService
         ]);
         
         // Send alert
-        // TODO: Integrate with PagerDuty
+        SlackAlert::critical('MANUAL ESCALATION REQUIRED - ' . $e->getMessage(), $context);
         
         return false;
     }

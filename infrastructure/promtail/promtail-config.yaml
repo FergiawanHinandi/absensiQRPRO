@@ -1,0 +1,70 @@
+# Promtail Configuration for AbsensiQRPro
+# Log collector - ships logs from all sources to Loki
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Laravel application logs
+  - job_name: laravel
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: laravel
+          app: absensi
+          __path__: /var/www/storage/logs/laravel*.log
+    pipeline_stages:
+      - regex:
+          expression: '^\[(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] (?P<env>\w+)\.(?P<level>\w+):.*'
+      - labels:
+          level:
+          env:
+
+  # Queue worker logs
+  - job_name: queue-workers
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: queue
+          app: absensi
+          __path__: /var/www/storage/logs/queue*.log
+
+  # Supervisor logs
+  - job_name: supervisor
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: supervisor
+          app: absensi
+          __path__: /var/log/supervisor/*.log
+
+  # Nginx access logs
+  - job_name: nginx
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: nginx
+          app: absensi
+          __path__: /var/log/nginx/*.log
+    pipeline_stages:
+      - regex:
+          expression: '(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<timestamp>.*?)\] "(?P<method>\S+) (?P<path>\S+) \S+" (?P<status>\d{3}) (?P<body_bytes>\d+)'
+      - labels:
+          method:
+          status:
+
+  # System logs
+  - job_name: system
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: system
+          app: absensi
+          __path__: /var/log/syslog

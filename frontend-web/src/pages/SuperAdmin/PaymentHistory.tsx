@@ -34,15 +34,17 @@ export const PaymentHistory: React.FC = () => {
     const fetchPayments = async () => {
         try {
             setLoading(true);
+            // FE-04 FIX: interceptor sudah auto-unwrap response, tidak perlu .data.success atau .data.data.data
             const response = await apiClient.get('/super-admin/billing/payments', {
                 params: {
                     search: search || undefined,
                     status: 'paid'
                 },
             });
-            if (response.data.success) {
-                setPayments(response.data.data.data);
-            }
+            // response.data sekarang = payload data sebenarnya (sudah di-unwrap dari {success, data})
+            const payload = response.data as any;
+            const items = payload?.data ?? payload ?? [];
+            setPayments(Array.isArray(items) ? items : []);
         } catch (error) {
             console.error('Failed to fetch payments:', error);
         } finally {

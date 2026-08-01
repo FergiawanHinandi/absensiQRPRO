@@ -10,25 +10,21 @@ use Tests\TestCase;
 
 /**
  * TimingAttackTest
- *
  * Test login response times to prevent timing attacks.
- *
  * SCENARIO:
  * - Compare response time for:
  *   1. Valid email + wrong password
  *   2. Invalid email (non-existent)
  * - Response times should be similar (within acceptable variance)
- *
  * PROTECTION MECHANISMS:
  * - Constant-time comparison
  * - Dummy hash check for non-existent users
  * - Minimum response time enforcement
  * - Random jitter
- *
- * @group security
- * @group timing-attack
- * @group critical
  */
+#[\PHPUnit\Framework\Attributes\Group('security')]
+#[\PHPUnit\Framework\Attributes\Group('timing-attack')]
+#[\PHPUnit\Framework\Attributes\Group('critical')]
 class TimingAttackTest extends TestCase
 {
     use RefreshDatabase;
@@ -54,14 +50,12 @@ class TimingAttackTest extends TestCase
 
     /**
      * Test response time comparison
-     *
      * SCENARIO:
      * - Measure response time for valid email + wrong password
      * - Measure response time for invalid email
      * - Compare times - should be similar
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_has_similar_response_times_for_valid_and_invalid_emails()
     {
         $iterations = 20; // Number of samples
@@ -171,9 +165,8 @@ class TimingAttackTest extends TestCase
 
     /**
      * Test minimum response time enforcement
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_enforces_minimum_response_time()
     {
         $iterations = 10;
@@ -219,9 +212,8 @@ class TimingAttackTest extends TestCase
 
     /**
      * Test random jitter is applied
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_applies_random_jitter()
     {
         $iterations = 20;
@@ -289,9 +281,8 @@ class TimingAttackTest extends TestCase
 
     /**
      * Test constant-time comparison
-     *
-     * @test
      */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_constant_time_comparison()
     {
         $iterations = 15;

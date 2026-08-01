@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\BelongsToSchool;
 
 class BackupJob extends Model
 {
     use HasFactory;
+    use BelongsToSchool; // Multi-tenancy: otomatis filter berdasarkan school_id
 
     protected $fillable = [
         'job_id',

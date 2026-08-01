@@ -1,17 +1,17 @@
 /**
  * Attendance API - Refactored (Server-Side Logic Only)
- * 
+ *
  * PRINCIPLES:
  * 1. Client sends RAW DATA only (no computed status, no business logic)
  * 2. Server determines ALL business logic (status, validation, etc.)
  * 3. GPS validation ONLY on server
  * 4. Device fingerprint verification server-side
  * 5. Offline queue encrypted
- * 
+ *
  * @version 2.0.0 - Refactored for server-side logic
  */
 
-import { secureApi } from './secureClient';
+import {secureApi} from './secureClient';
 import {
   encryptOfflineData,
   decryptOfflineData,
@@ -20,12 +20,12 @@ import {
 
 /**
  * Scan Payload - RAW DATA ONLY
- * 
+ *
  * REMOVED:
  * - status (server determines)
  * - computed fields
  * - client-side validations
- * 
+ *
  * ADDED:
  * - device_fingerprint (server validates)
  * - security_context (server logs)
@@ -43,21 +43,21 @@ export interface ScanPayload {
   heading?: number | null;
 
   // Security Metadata (server validates & logs)
-  is_mocked?: boolean;              // Mock location flag
-  device_fingerprint: string;       // Device identity
+  is_mocked?: boolean; // Mock location flag
+  device_fingerprint: string; // Device identity
   security_context?: {
-    is_secure: boolean;             // Device security status
+    is_secure: boolean; // Device security status
     risk_level: 'low' | 'medium' | 'high' | 'critical' | 'unknown';
-    violation_count: number;        // Security violations detected
-    violations?: string[];          // List of violation types
+    violation_count: number; // Security violations detected
+    violations?: string[]; // List of violation types
   };
 
   // Idempotency & Retry Support
-  request_id: string;               // UUID for idempotency
+  request_id: string; // UUID for idempotency
 
   // Timestamps (for server validation, NOT for record)
-  client_timestamp?: number;        // Client time (for clock skew detection)
-  scanned_at?: string;              // ISO timestamp when QR was scanned
+  client_timestamp?: number; // Client time (for clock skew detection)
+  scanned_at?: string; // ISO timestamp when QR was scanned
 }
 
 /**
@@ -76,8 +76,8 @@ export interface AttendanceRecord {
   status: 'present' | 'late' | 'sick' | 'permit' | 'alpha';
 
   // SERVER TIMESTAMPS (source of truth)
-  attendance_date: string;          // YYYY-MM-DD
-  check_in_time: string;            // HH:mm:ss
+  attendance_date: string; // YYYY-MM-DD
+  check_in_time: string; // HH:mm:ss
 
   // Metadata
   is_manual: boolean;
@@ -89,7 +89,7 @@ export interface AttendanceRecord {
   lng_in?: number;
 
   // Idempotency
-  is_retry?: boolean;               // True if this was an idempotent replay
+  is_retry?: boolean; // True if this was an idempotent replay
 }
 
 /**
@@ -124,12 +124,12 @@ const MAX_RETRY_COUNT = 3;
 export const attendanceApi = {
   /**
    * Submit attendance via QR code scan
-   * 
+   *
    * SECURITY:
    * - SSL pinning in production
    * - Idempotency key for retry safety
    * - Offline queue with encryption
-   * 
+   *
    * SERVER DETERMINES:
    * - Attendance status (present/late)
    * - Radius validation
@@ -137,18 +137,18 @@ export const attendanceApi = {
    * - Time window validation
    * - Device fingerprint verification
    */
-  scan: async (payload: ScanPayload): Promise<AttendanceApiResponse<AttendanceRecord>> => {
+  scan: async (
+    payload: ScanPayload,
+  ): Promise<AttendanceApiResponse<AttendanceRecord>> => {
     try {
-      const response = await secureApi.post<AttendanceApiResponse<AttendanceRecord>>(
-        '/v1/attendance/scan',
-        payload,
-        {
-          headers: {
-            'X-Idempotency-Key': payload.request_id,
-            'X-Device-ID': payload.device_fingerprint,
-          },
-        }
-      );
+      const response = await secureApi.post<
+        AttendanceApiResponse<AttendanceRecord>
+      >('/v1/attendance/scan', payload, {
+        headers: {
+          'X-Idempotency-Key': payload.request_id,
+          'X-Device-ID': payload.device_fingerprint,
+        },
+      });
 
       return response.data;
     } catch (error: any) {
@@ -157,7 +157,8 @@ export const attendanceApi = {
         await attendanceApi.queueOffline(payload);
         throw {
           code: 'QUEUED_OFFLINE',
-          message: 'Tidak ada koneksi. Absensi akan dikirim otomatis saat online.',
+          message:
+            'Tidak ada koneksi. Absensi akan dikirim otomatis saat online.',
         };
       }
 
@@ -166,38 +167,8 @@ export const attendanceApi = {
   },
 
   /**
-   * Get attendance history for the current user
-   */
-  getHistory: async (params?: {
-    limit?: number;
-    offset?: number;
-    start_date?: string;
-    end_date?: string;
-  }): Promise<AttendanceApiResponse<AttendanceRecord[]>> => {
-    const response = await secureApi.get<AttendanceApiResponse<AttendanceRecord[]>>(
-      '/v1/attendance/history',
-      { params }
-    );
-    return response.data;
-  },
-
-  /**
-   * Get today's attendance status
-   */
-  getTodayStatus: async (): Promise<AttendanceApiResponse<{
-    has_attendance: boolean;
-    attendance?: AttendanceRecord;
-  }>> => {
-    const response = await secureApi.get<AttendanceApiResponse<{
-      has_attendance: boolean;
-      attendance?: AttendanceRecord;
-    }>>('/v1/attendance/today');
-    return response.data;
-  },
-
-  /**
    * Queue attendance for offline sync (ENCRYPTED)
-   * 
+   *
    * SECURITY:
    * - Payload encrypted before storage
    * - Decrypted only when syncing
@@ -235,7 +206,9 @@ export const attendanceApi = {
   getOfflineQueue: async (): Promise<OfflineQueueItem[]> => {
     try {
       const decrypted = await decryptOfflineData(OFFLINE_QUEUE_KEY);
-      if (!decrypted) return [];
+      if (!decrypted) {
+        return [];
+      }
 
       return JSON.parse(decrypted);
     } catch (error) {
@@ -246,7 +219,7 @@ export const attendanceApi = {
 
   /**
    * Sync offline queue
-   * 
+   *
    * PROCESS:
    * 1. Get encrypted queue
    * 2. Decrypt items
@@ -264,7 +237,7 @@ export const attendanceApi = {
     const queue = await attendanceApi.getOfflineQueue();
 
     if (queue.length === 0) {
-      return { synced: 0, failed: 0, removed: 0 };
+      return {synced: 0, failed: 0, removed: 0};
     }
 
     let synced = 0;
@@ -294,20 +267,26 @@ export const attendanceApi = {
         } else {
           // Other errors (validation, etc.) - remove from queue
           removed++;
-          console.log('Removed offline attendance (validation error):', item.id, error.message);
+          console.log(
+            'Removed offline attendance (validation error):',
+            item.id,
+            error.message,
+          );
         }
       }
     }
 
     // Save remaining queue (encrypted)
     if (remainingQueue.length > 0) {
-      await encryptOfflineData(OFFLINE_QUEUE_KEY, JSON.stringify(remainingQueue));
+      await encryptOfflineData(
+        OFFLINE_QUEUE_KEY,
+        JSON.stringify(remainingQueue),
+      );
     } else {
       await removeEncryptedData(OFFLINE_QUEUE_KEY);
     }
 
-    return { synced, failed, removed };
-  },
+    return {synced, failed, removed};
   },
 
   /**

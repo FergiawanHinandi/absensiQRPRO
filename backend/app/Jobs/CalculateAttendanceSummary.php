@@ -4,31 +4,40 @@ namespace App\Jobs;
 
 use App\Models\Attendance;
 use App\Models\AttendanceSummary;
-use App\Models\School;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class CalculateAttendanceSummary implements ShouldQueue
+/**
+ * Calculate Attendance Summary Job
+ * 
+ * Calculates monthly attendance summaries for all students in a school.
+ * 
+ * TENANT SAFETY:
+ * - Extends TenantAwareJob to ensure school_id context
+ * - All queries are scoped to the school_id
+ * - Should be dispatched separately per school
+ * 
+ * Usage:
+ *   CalculateAttendanceSummary::dispatch($schoolId, $date);
+ * 
+ * @version 2.0.0 - Updated to extend TenantAwareJob for tenant safety
+ */
+class CalculateAttendanceSummary extends TenantAwareJob
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
     protected $targetDate;
 
     /**
      * Create a new job instance.
      *
-     * @param  Carbon|null  $date  Date to calculate summary for (defaults to today)
+     * @param int $schoolId The school ID for tenant context (REQUIRED)
+     * @param Carbon|null $date Date to calculate summary for (defaults to today)
      */
-    public function __construct($date = null)
+    public function __construct(int $schoolId, $date = null)
     {
-        $this->targetDate = $date ? Carbon::parse($date) : now();
+        parent::__construct($schoolId);
+        $this->targetDate = $date ? Carbon::parse($date) : now(\App\Models\School::find($this->schoolId)?->timezone ?? config("app.timezone"));
     }
 
     /**
@@ -39,36 +48,39 @@ class CalculateAttendanceSummary implements ShouldQueue
         $year = $this->targetDate->year;
         $month = $this->targetDate->month;
 
-        Log::info("Starting Attendance Summary Calculation for {$year}-{$month}");
+        Log::info("Starting Attendance Summary Calculation for {$year}-{$month}", [
+            'school_id' => $this->schoolId,
+        ]);
 
-        // Process by School to handle timezones correctly in future if needed
-        // For now, we process all active schools
-        School::where('is_active', true)->chunk(10, function ($schools) use ($year, $month) {
-            foreach ($schools as $school) {
-                $this->processSchool($school, $year, $month);
-            }
-        });
-
-        Log::info("Completed Attendance Summary Calculation for {$year}-{$month}");
-    }
-
-    protected function processSchool(School $school, int $year, int $month)
-    {
-        // Get all students in this school
-        // Use chunking to avoid memory issues
-        User::where('school_id', $school->id)
-            ->where('role_type', 'student') // Assuming 'student' role identifier
+        // ✅ TENANT SAFETY: Process only students from this school
+        User::where('school_id', $this->schoolId)
+            ->where('role_type', 'student')
             ->chunk(100, function ($students) use ($year, $month) {
                 foreach ($students as $student) {
+                    // ✅ TENANT SAFETY: Validate student belongs to this school
+                    if ($student->school_id !== $this->schoolId) {
+                        Log::error("Tenant context violation in CalculateAttendanceSummary", [
+                            'job_school_id' => $this->schoolId,
+                            'student_school_id' => $student->school_id,
+                            'student_id' => $student->id,
+                        ]);
+                        continue;
+                    }
+
                     $this->calculateStudentSummary($student, $year, $month);
                 }
             });
+
+        Log::info("Completed Attendance Summary Calculation for {$year}-{$month}", [
+            'school_id' => $this->schoolId,
+        ]);
     }
 
     protected function calculateStudentSummary(User $student, int $year, int $month)
     {
-        // Aggregate attendance counts for this student in the given month
-        $stats = Attendance::where('student_id', $student->id)
+        // ✅ TENANT SAFETY: Aggregate attendance with explicit school_id filter
+        $stats = Attendance::where('school_id', $this->schoolId)
+            ->where('student_id', $student->id)
             ->whereYear('attendance_date', $year)
             ->whereMonth('attendance_date', $month)
             ->select('status', DB::raw('count(*) as count'))
@@ -91,7 +103,7 @@ class CalculateAttendanceSummary implements ShouldQueue
         // Update or Create Summary
         AttendanceSummary::updateOrCreate(
             [
-                'school_id' => $student->school_id,
+                'school_id' => $this->schoolId, // ✅ Explicit school_id
                 'student_id' => $student->id,
                 'year' => $year,
                 'month' => $month,
@@ -107,6 +119,7 @@ class CalculateAttendanceSummary implements ShouldQueue
     {
         Log::error('CalculateAttendanceSummary job failed', [
             'job' => self::class,
+            'school_id' => $this->schoolId,
             'target_date' => $this->targetDate->toDateString(),
             'error' => $exception->getMessage(),
             'trace' => $exception->getTraceAsString(),

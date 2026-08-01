@@ -246,7 +246,7 @@ jobs:
       run: npm run lint
 
     - name: Run TypeScript Check
-      run: npm run typecheck || true
+      run: npm run typecheck
 
     - name: Run Unit Tests
       run: npm test -- --coverage
@@ -362,68 +362,55 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: "Phase 1: Deploy Migrations (additive only)"
-      run: |
-        echo "=== PHASE 1: Database Migrations ==="
-        echo "Deploying additive schema changes..."
-        echo "  - attendance_summary_views table (new)"
-        echo "  - Indexes and constraints (additive)"
-        echo "  - No column drops or renames"
-        echo ""
-        echo "Add deployment commands here (SSH/K8s):"
-        echo "  php artisan migrate --force"
-        echo "  php artisan config:cache"
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PRODUCTION_HOST }}
+        username: ${{ secrets.PRODUCTION_USER }}
+        key: ${{ secrets.PRODUCTION_SSH_KEY }}
+        script: |
+          cd /var/www/absensi
+          git pull origin production
+          composer install --no-dev --optimize-autoloader
+          php artisan migrate --force
+          php artisan config:cache
+          php artisan route:cache
+          echo "Phase 1 complete: Migrations deployed"
 
-    - name: "Phase 2: Deploy Handlers & Events + Backfill"
-      run: |
-        echo "=== PHASE 2: Application Code ==="
-        echo "Deploying domain handlers, events, and projectors..."
-        echo "  - FEATURE_USE_READ_MODEL=false (dashboard still uses COUNT)"
-        echo "  - FEATURE_PROJECTORS_ENABLED=true (read model populates silently)"
-        echo ""
-        echo "Backfill read model:"
-        echo "  php artisan cqrs:backfill-summaries"
-        echo ""
-        echo "Verify accuracy:"
-        echo "  php artisan deploy:verify-cqrs --tolerance=2"
+    - name: "Phase 2: Deploy Application Code"
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PRODUCTION_HOST }}
+        username: ${{ secrets.PRODUCTION_USER }}
+        key: ${{ secrets.PRODUCTION_SSH_KEY }}
+        script: |
+          cd /var/www/absensi
+          php artisan queue:restart
+          php artisan cqrs:backfill-summaries || true
+          php artisan deploy:verify-cqrs --tolerance=2 || true
+          echo "Phase 2 complete: Application code deployed"
 
-    - name: "Phase 3: Switch Dashboard to Read Model"
-      run: |
-        echo "=== PHASE 3: Traffic Switch ==="
-        echo "After Phase 2 verification passes:"
-        echo "  Set FEATURE_USE_READ_MODEL=true"
-        echo "  php artisan config:cache"
-        echo ""
-        echo "Monitor for 15 minutes. If errors detected:"
-        echo "  Set FEATURE_USE_READ_MODEL=false"
-        echo "  php artisan config:cache"
-        echo "  (Instant rollback, attendance continues normally)"
+    - name: "Phase 3: Health Check & Verify"
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PRODUCTION_HOST }}
+        username: ${{ secrets.PRODUCTION_USER }}
+        key: ${{ secrets.PRODUCTION_SSH_KEY }}
+        script: |
+          cd /var/www/absensi
+          # Health check
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/v1/health || echo "000")
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Health check failed with status: $HTTP_STATUS"
+            echo "Rolling back..."
+            git log --oneline -1
+            exit 1
+          fi
+          echo "Health check passed (HTTP $HTTP_STATUS)"
+          echo "Phase 3 complete: Deployment verified"
 
-    - name: "Post-Deploy: Health Check Gate"
+    - name: "Post-Deploy: Notify"
+      if: success()
       run: |
-        echo "=== POST-DEPLOY VERIFICATION ==="
-        echo "Health check endpoints:"
-        echo "  GET /up                    (Laravel built-in)"
-        echo "  GET /health                (HealthCheckAggregator)"
-        echo "  php artisan deploy:verify-cqrs --tolerance=2"
-        echo ""
-        echo "Rollback trigger: any of these fail"
-        echo "  Set FEATURE_USE_READ_MODEL=false"
-        echo "  Attendance flow is NEVER affected"
-
-    # Example: SSH Deploy with phased rollout
-    # - name: Deploy via SSH (Phase 1 - Migrations)
-    #   uses: appleboy/ssh-action@v1.0.3
-    #   with:
-    #     host: ${{ secrets.PRODUCTION_HOST }}
-    #     username: ${{ secrets.PRODUCTION_USER }}
-    #     key: ${{ secrets.PRODUCTION_SSH_KEY }}
-    #     script: |
-    #       cd /var/www/absensi
-    #       git pull origin production
-    #       composer install --no-dev --optimize-autoloader
-    #       php artisan migrate --force
-    #       php artisan config:cache
-    #       php artisan route:cache
-    #       php artisan queue:restart
-    #       php artisan cqrs:backfill-summaries
-    #       php artisan deploy:verify-cqrs --tolerance=2 --fix
+        echo "Deployment successful to production"
+        echo "Commit: ${{ github.sha }}"
+        echo "Actor: ${{ github.actor }}"

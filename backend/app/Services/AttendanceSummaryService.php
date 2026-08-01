@@ -3,272 +3,313 @@
 namespace App\Services;
 
 use App\Models\Attendance;
+use App\Models\AttendanceDailyClassSummary;
 use App\Models\ClassModel;
-use App\Models\DailyAttendanceSummary;
-use App\Models\School;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * Attendance Summary Service
  * 
- * ✅ SECURITY AUDIT FIX: Dashboard Optimization (HIGH PRIORITY)
- * 
- * Pre-calculates daily attendance statistics to prevent slow
- * count() queries on large attendance tables. Dashboard queries
- * this summary table instead of raw data.
- * 
- * Performance Impact:
- * - Before: SELECT COUNT(*) FROM attendances WHERE ... (5-10 seconds on 10M rows)
- * - After: SELECT * FROM daily_attendance_summaries WHERE ... (< 100ms)
+ * Manages the calculation and updating of daily class attendance summaries.
+ * Used by AttendanceObserver to keep summaries in sync with attendance changes.
  */
-class AttendanceSummaryService
+final class AttendanceSummaryService
 {
     /**
-     * Calculate and store daily summary for a specific school and date
+     * Update summary for a specific school, class, and date.
+     * 
+     * This method recalculates the entire summary from scratch to ensure accuracy.
+     * It's idempotent - can be called multiple times safely.
      * 
      * @param int $schoolId
-     * @param string $date YYYY-MM-DD format
-     * @param int|null $classId Optional: calculate for specific class only
-     * @return DailyAttendanceSummary|array
+     * @param int $classId
+     * @param string|Carbon $date
+     * @return AttendanceDailyClassSummary
      */
-    public function calculateDailySummary(int $schoolId, string $date, ?int $classId = null)
+    public function updateSummary(int $schoolId, int $classId, string|Carbon $date): AttendanceDailyClassSummary
     {
-        // If class_id provided, calculate for that class only
-        if ($classId) {
-            return $this->calculateClassSummary($schoolId, $classId, $date);
-        }
+        $dateString = $date instanceof Carbon ? $date->toDateString() : $date;
 
-        // Calculate for all classes in school
-        $classes = ClassModel::where('school_id', $schoolId)
-            ->where('is_active', true)
-            ->get();
+        return DB::transaction(function () use ($schoolId, $classId, $dateString) {
+            // Calculate counts from actual attendance records
+            $counts = $this->calculateCounts($schoolId, $classId, $dateString);
 
-        $summaries = [];
+            // Get total active students in class
+            $totalStudents = $this->getTotalStudents($classId, $dateString);
 
-        foreach ($classes as $class) {
-            $summaries[] = $this->calculateClassSummary($schoolId, $class->id, $date);
-        }
+            // Calculate alpha (no-show) count
+            $attendedCount = array_sum([
+                $counts['present'] ?? 0,
+                $counts['late'] ?? 0,
+                $counts['sick'] ?? 0,
+                $counts['permit'] ?? 0,
+                $counts['excused'] ?? 0,
+                $counts['absent'] ?? 0,
+            ]);
+            $alphaCount = max(0, $totalStudents - $attendedCount);
 
-        // Also calculate school-wide summary (class_id = null)
-        $summaries[] = $this->calculateSchoolWideSummary($schoolId, $date);
-
-        return $summaries;
-    }
-
-    /**
-     * Calculate summary for a specific class
-     */
-    protected function calculateClassSummary(int $schoolId, int $classId, string $date): DailyAttendanceSummary
-    {
-        return DB::transaction(function () use ($schoolId, $classId, $date) {
-            // Get total students in class
-            $totalStudents = DB::table('users')
-                ->where('school_id', $schoolId)
-                ->where('class_id', $classId)
-                ->where('role_type', 'student')
-                ->where('is_active', true)
-                ->count();
-
-            // Calculate attendance counts using optimized query
-            $counts = DB::table('attendances')
-                ->where('school_id', $schoolId)
-                ->where('class_id', $classId)
-                ->whereDate('attendance_date', $date)
-                ->selectRaw("
-                    COUNT(CASE WHEN status = 'present' THEN 1 END) as present_count,
-                    COUNT(CASE WHEN status = 'late' THEN 1 END) as late_count,
-                    COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent_count,
-                    COUNT(CASE WHEN status = 'excused' THEN 1 END) as excused_count,
-                    COUNT(CASE WHEN status = 'sick' THEN 1 END) as sick_count
-                ")
-                ->first();
-
-            // Calculate rates
-            $presentCount = $counts->present_count ?? 0;
-            $lateCount = $counts->late_count ?? 0;
-            
-            $attendanceRate = $totalStudents > 0 
-                ? round(($presentCount + $lateCount) / $totalStudents * 100, 2) 
-                : 0;
-                
-            $lateRate = $totalStudents > 0 
-                ? round($lateCount / $totalStudents * 100, 2) 
-                : 0;
-
-            // Upsert summary
-            return DailyAttendanceSummary::updateOrCreate(
+            // Update or create summary
+            $summary = AttendanceDailyClassSummary::updateOrCreate(
                 [
                     'school_id' => $schoolId,
                     'class_id' => $classId,
-                    'summary_date' => $date,
+                    'attendance_date' => $dateString,
                 ],
                 [
                     'total_students' => $totalStudents,
-                    'present_count' => $presentCount,
-                    'late_count' => $lateCount,
-                    'absent_count' => $counts->absent_count ?? 0,
-                    'excused_count' => $counts->excused_count ?? 0,
-                    'sick_count' => $counts->sick_count ?? 0,
-                    'attendance_rate' => $attendanceRate,
-                    'late_rate' => $lateRate,
-                    'last_calculated_at' => now(),
+                    'present_count' => $counts['present'] ?? 0,
+                    'late_count' => $counts['late'] ?? 0,
+                    'absent_count' => $counts['absent'] ?? 0,
+                    'sick_count' => $counts['sick'] ?? 0,
+                    'permit_count' => $counts['permit'] ?? 0,
+                    'excused_count' => $counts['excused'] ?? 0,
+                    'alpha_count' => $alphaCount,
+                    'last_updated_at' => now(),
                 ]
             );
+
+            Log::info('Attendance summary updated', [
+                'school_id' => $schoolId,
+                'class_id' => $classId,
+                'date' => $dateString,
+                'total_students' => $totalStudents,
+                'attended' => $attendedCount,
+                'alpha' => $alphaCount,
+            ]);
+
+            return $summary;
         });
     }
 
     /**
-     * Calculate school-wide summary (all classes combined)
-     */
-    protected function calculateSchoolWideSummary(int $schoolId, string $date): DailyAttendanceSummary
-    {
-        return DB::transaction(function () use ($schoolId, $date) {
-            // Get total students in school
-            $totalStudents = DB::table('users')
-                ->where('school_id', $schoolId)
-                ->where('role_type', 'student')
-                ->where('is_active', true)
-                ->count();
-
-            // Calculate attendance counts across all classes
-            $counts = DB::table('attendances')
-                ->where('school_id', $schoolId)
-                ->whereDate('attendance_date', $date)
-                ->selectRaw("
-                    COUNT(CASE WHEN status = 'present' THEN 1 END) as present_count,
-                    COUNT(CASE WHEN status = 'late' THEN 1 END) as late_count,
-                    COUNT(CASE WHEN status = 'absent' THEN 1 END) as absent_count,
-                    COUNT(CASE WHEN status = 'excused' THEN 1 END) as excused_count,
-                    COUNT(CASE WHEN status = 'sick' THEN 1 END) as sick_count
-                ")
-                ->first();
-
-            // Calculate rates
-            $presentCount = $counts->present_count ?? 0;
-            $lateCount = $counts->late_count ?? 0;
-            
-            $attendanceRate = $totalStudents > 0 
-                ? round(($presentCount + $lateCount) / $totalStudents * 100, 2) 
-                : 0;
-                
-            $lateRate = $totalStudents > 0 
-                ? round($lateCount / $totalStudents * 100, 2) 
-                : 0;
-
-            // Upsert summary (class_id = NULL for school-wide)
-            return DailyAttendanceSummary::updateOrCreate(
-                [
-                    'school_id' => $schoolId,
-                    'class_id' => null, // School-wide summary
-                    'summary_date' => $date,
-                ],
-                [
-                    'total_students' => $totalStudents,
-                    'present_count' => $presentCount,
-                    'late_count' => $lateCount,
-                    'absent_count' => $counts->absent_count ?? 0,
-                    'excused_count' => $counts->excused_count ?? 0,
-                    'sick_count' => $counts->sick_count ?? 0,
-                    'attendance_rate' => $attendanceRate,
-                    'late_rate' => $lateRate,
-                    'last_calculated_at' => now(),
-                ]
-            );
-        });
-    }
-
-    /**
-     * Recalculate summaries for date range
+     * Calculate attendance counts by status for a class on a specific date.
      * 
      * @param int $schoolId
-     * @param string $startDate
-     * @param string $endDate
-     * @return int Number of summaries calculated
+     * @param int $classId
+     * @param string $date
+     * @return array<string, int>
      */
-    public function recalculateDateRange(int $schoolId, string $startDate, string $endDate): int
+    protected function calculateCounts(int $schoolId, int $classId, string $date): array
     {
-        $start = \Carbon\Carbon::parse($startDate);
-        $end = \Carbon\Carbon::parse($endDate);
-        
+        // Get attendance counts grouped by status
+        $results = Attendance::query()
+            ->join('schedules', 'attendances.schedule_id', '=', 'schedules.id')
+            ->where('attendances.school_id', $schoolId)
+            ->where('schedules.class_id', $classId)
+            ->whereDate('attendances.attendance_date', $date)
+            ->groupBy('attendances.status')
+            ->select('attendances.status', DB::raw('COUNT(DISTINCT attendances.student_id) as count'))
+            ->get();
+
+        // Convert to associative array
+        $counts = [];
+        foreach ($results as $result) {
+            $counts[$result->status] = (int) $result->count;
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Get total active students in a class on a specific date.
+     * 
+     * @param int $classId
+     * @param string $date
+     * @return int
+     */
+    protected function getTotalStudents(int $classId, string $date): int
+    {
+        return DB::table('class_students')
+            ->where('class_id', $classId)
+            ->where('status', 'active')
+            ->count();
+    }
+
+    /**
+     * Batch update summaries for multiple classes on a specific date.
+     * 
+     * Useful for backfilling or recalculating summaries.
+     * 
+     * @param int $schoolId
+     * @param string|Carbon $date
+     * @return int Number of summaries updated
+     */
+    public function updateSummariesForDate(int $schoolId, string|Carbon $date): int
+    {
+        $dateString = $date instanceof Carbon ? $date->toDateString() : $date;
+
+        // Get all classes with attendance on this date
+        $classIds = Attendance::query()
+            ->join('schedules', 'attendances.schedule_id', '=', 'schedules.id')
+            ->where('attendances.school_id', $schoolId)
+            ->whereDate('attendances.attendance_date', $dateString)
+            ->distinct()
+            ->pluck('schedules.class_id');
+
         $count = 0;
-
-        while ($start->lte($end)) {
-            try {
-                $this->calculateDailySummary($schoolId, $start->toDateString());
-                $count++;
-            } catch (\Exception $e) {
-                Log::error('Failed to calculate daily summary', [
-                    'school_id' => $schoolId,
-                    'date' => $start->toDateString(),
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            $start->addDay();
+        foreach ($classIds as $classId) {
+            $this->updateSummary($schoolId, $classId, $dateString);
+            $count++;
         }
 
         return $count;
     }
 
     /**
-     * Get summary for dashboard (with caching)
+     * Batch update summaries for a date range.
      * 
      * @param int $schoolId
-     * @param string $date
-     * @param int|null $classId
-     * @return DailyAttendanceSummary|null
+     * @param string|Carbon $startDate
+     * @param string|Carbon $endDate
+     * @return int Number of summaries updated
      */
-    public function getDashboardSummary(int $schoolId, string $date, ?int $classId = null): ?DailyAttendanceSummary
+    public function updateSummariesForDateRange(int $schoolId, string|Carbon $startDate, string|Carbon $endDate): int
     {
-        $summary = DailyAttendanceSummary::where('school_id', $schoolId)
-            ->where('class_id', $classId)
-            ->whereDate('summary_date', $date)
-            ->first();
+        $start = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate);
+        $end = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate);
 
-        // If summary doesn't exist or is older than 1 hour, recalculate
-        if (!$summary || $summary->last_calculated_at->lt(now()->subHour())) {
-            return $classId 
-                ? $this->calculateClassSummary($schoolId, $classId, $date)
-                : $this->calculateSchoolWideSummary($schoolId, $date);
+        $totalCount = 0;
+        $currentDate = $start->copy();
+
+        while ($currentDate->lte($end)) {
+            $count = $this->updateSummariesForDate($schoolId, $currentDate);
+            $totalCount += $count;
+            $currentDate->addDay();
         }
 
-        return $summary;
+        Log::info('Batch summary update completed', [
+            'school_id' => $schoolId,
+            'start_date' => $start->toDateString(),
+            'end_date' => $end->toDateString(),
+            'total_summaries' => $totalCount,
+        ]);
+
+        return $totalCount;
     }
 
     /**
-     * Get weekly trend for dashboard
+     * Validate summary accuracy by comparing with raw attendance data.
      * 
      * @param int $schoolId
-     * @param int|null $classId
-     * @param int $days
-     * @return \Illuminate\Support\Collection
+     * @param int $classId
+     * @param string|Carbon $date
+     * @return array{accurate: bool, summary: array, actual: array, differences: array}
      */
-    public function getWeeklyTrend(int $schoolId, ?int $classId = null, int $days = 7)
+    public function validateSummary(int $schoolId, int $classId, string|Carbon $date): array
     {
-        return DailyAttendanceSummary::where('school_id', $schoolId)
+        $dateString = $date instanceof Carbon ? $date->toDateString() : $date;
+
+        // Get summary
+        $summary = AttendanceDailyClassSummary::where('school_id', $schoolId)
             ->where('class_id', $classId)
-            ->where('summary_date', '>=', now()->subDays($days))
-            ->orderBy('summary_date')
-            ->get(['summary_date', 'attendance_rate', 'late_rate', 'present_count', 'total_students']);
+            ->where('attendance_date', $dateString)
+            ->first();
+
+        if (!$summary) {
+            return [
+                'accurate' => false,
+                'summary' => null,
+                'actual' => null,
+                'differences' => ['Summary does not exist'],
+            ];
+        }
+
+        // Calculate actual counts
+        $actualCounts = $this->calculateCounts($schoolId, $classId, $dateString);
+        $actualTotal = $this->getTotalStudents($classId, $dateString);
+        $actualAttended = array_sum($actualCounts);
+        $actualAlpha = max(0, $actualTotal - $actualAttended);
+
+        // Compare
+        $differences = [];
+        
+        if ($summary->total_students !== $actualTotal) {
+            $differences[] = "total_students: {$summary->total_students} vs {$actualTotal}";
+        }
+        if ($summary->present_count !== ($actualCounts['present'] ?? 0)) {
+            $differences[] = "present_count: {$summary->present_count} vs " . ($actualCounts['present'] ?? 0);
+        }
+        if ($summary->late_count !== ($actualCounts['late'] ?? 0)) {
+            $differences[] = "late_count: {$summary->late_count} vs " . ($actualCounts['late'] ?? 0);
+        }
+        if ($summary->absent_count !== ($actualCounts['absent'] ?? 0)) {
+            $differences[] = "absent_count: {$summary->absent_count} vs " . ($actualCounts['absent'] ?? 0);
+        }
+        if ($summary->sick_count !== ($actualCounts['sick'] ?? 0)) {
+            $differences[] = "sick_count: {$summary->sick_count} vs " . ($actualCounts['sick'] ?? 0);
+        }
+        if ($summary->permit_count !== ($actualCounts['permit'] ?? 0)) {
+            $differences[] = "permit_count: {$summary->permit_count} vs " . ($actualCounts['permit'] ?? 0);
+        }
+        if ($summary->excused_count !== ($actualCounts['excused'] ?? 0)) {
+            $differences[] = "excused_count: {$summary->excused_count} vs " . ($actualCounts['excused'] ?? 0);
+        }
+        if ($summary->alpha_count !== $actualAlpha) {
+            $differences[] = "alpha_count: {$summary->alpha_count} vs {$actualAlpha}";
+        }
+
+        return [
+            'accurate' => empty($differences),
+            'summary' => [
+                'total_students' => $summary->total_students,
+                'present' => $summary->present_count,
+                'late' => $summary->late_count,
+                'absent' => $summary->absent_count,
+                'sick' => $summary->sick_count,
+                'permit' => $summary->permit_count,
+                'excused' => $summary->excused_count,
+                'alpha' => $summary->alpha_count,
+            ],
+            'actual' => [
+                'total_students' => $actualTotal,
+                'present' => $actualCounts['present'] ?? 0,
+                'late' => $actualCounts['late'] ?? 0,
+                'absent' => $actualCounts['absent'] ?? 0,
+                'sick' => $actualCounts['sick'] ?? 0,
+                'permit' => $actualCounts['permit'] ?? 0,
+                'excused' => $actualCounts['excused'] ?? 0,
+                'alpha' => $actualAlpha,
+            ],
+            'differences' => $differences,
+        ];
     }
 
     /**
-     * Get classes with low attendance (for alerts)
+     * Delete summary for a specific class and date.
      * 
      * @param int $schoolId
-     * @param string $date
-     * @param float $threshold
+     * @param int $classId
+     * @param string|Carbon $date
+     * @return bool
+     */
+    public function deleteSummary(int $schoolId, int $classId, string|Carbon $date): bool
+    {
+        $dateString = $date instanceof Carbon ? $date->toDateString() : $date;
+
+        return AttendanceDailyClassSummary::where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('attendance_date', $dateString)
+            ->delete() > 0;
+    }
+
+    /**
+     * Get summary for dashboard display.
+     * 
+     * @param int $schoolId
+     * @param string|Carbon $date
      * @return \Illuminate\Support\Collection
      */
-    public function getLowAttendanceClasses(int $schoolId, string $date, float $threshold = 75.0)
+    public function getSummariesForDashboard(int $schoolId, string|Carbon $date)
     {
-        return DailyAttendanceSummary::with('class')
-            ->where('school_id', $schoolId)
-            ->whereDate('summary_date', $date)
-            ->whereNotNull('class_id') // Exclude school-wide summary
-            ->where('attendance_rate', '<', $threshold)
-            ->orderBy('attendance_rate')
+        $dateString = $date instanceof Carbon ? $date->toDateString() : $date;
+
+        return AttendanceDailyClassSummary::where('school_id', $schoolId)
+            ->where('attendance_date', $dateString)
+            ->with('class:id,name,grade_level')
+            ->orderBy('class_id')
             ->get();
     }
 }
+

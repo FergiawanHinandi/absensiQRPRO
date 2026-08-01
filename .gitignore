@@ -46,6 +46,16 @@ pnpm-debug.log*
 !backend/.env.example
 !frontend-web/.env.example
 !AbsensiQRMobile/.env.example
+!.env.production.template
+
+# ---- Mobile Keystore ----
+AbsensiQRMobile/keystore.properties
+AbsensiQRMobile/*.jks
+AbsensiQRMobile/*.keystore
+
+# ---- Deployment reports ----
+tests/load-test/results/
+tests/security/reports/
 
 # ---- Build outputs ----
 dist/
@@ -70,6 +80,17 @@ coverage/
 .phpunit.result.cache
 .phpunit.cache/
 
+# ---- Frontend legacy artifacts (never commit) ----
+frontend-web/login_page.html
+frontend-web/loginpage_tsx.txt
+frontend-web/main_tsx.txt
+frontend-web/vite_client.js
+frontend-web/migrate-alerts.js
+frontend-web/restart-clean.ps1
+
+# ---- Env restore backups (never commit) ----
+*.pre_restore_backup
+
 # ---- Misc ----
 *.key
 *.pem
@@ -86,5 +107,11 @@ backend/tokens.local.json
 # Environment Variables
 .env
 .env.*
+!.env.example
+!backend/.env.example
+!frontend-web/.env.example
+!AbsensiQRMobile/.env.example
+!.env.production.template
 backend/.env
+frontend-web/.env
 

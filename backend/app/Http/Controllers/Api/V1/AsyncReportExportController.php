@@ -76,8 +76,8 @@ class AsyncReportExportController extends Controller
             'status' => ReportExport::STATUS_PENDING,
         ]);
 
-        // Dispatch job to queue
-        GenerateReportExport::dispatch($export);
+        // ✅ TENANT SAFETY: Dispatch job with school_id for tenant context
+        GenerateReportExport::dispatch($user->school_id, $export->id);
 
         return response()->json([
             'success' => true,

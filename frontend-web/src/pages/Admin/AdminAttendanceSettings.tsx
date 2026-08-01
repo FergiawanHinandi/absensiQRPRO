@@ -10,19 +10,25 @@ const AdminAttendanceSettings: React.FC = () => {
     const updateMutation = useUpdateAttendanceSettings();
 
     const [formData, setFormData] = useState({
-        check_in_start: '',
-        check_in_end: '',
-        late_threshold_minutes: '',
-        qr_validity_minutes: '',
+        school_start_time: '',
+        school_end_time: '',
+        grace_period_minutes: '',
+        qr_expiry_seconds: '',
+        latitude: '',
+        longitude: '',
+        radius_meters: '',
     });
 
     React.useEffect(() => {
         if (data) {
             setFormData({
-                check_in_start: data.check_in_start || '',
-                check_in_end: data.check_in_end || '',
-                late_threshold_minutes: data.late_threshold_minutes?.toString() || '',
-                qr_validity_minutes: data.qr_validity_minutes?.toString() || '',
+                school_start_time: data.school_start_time || '',
+                school_end_time: data.school_end_time || '',
+                grace_period_minutes: data.grace_period_minutes?.toString() || '',
+                qr_expiry_seconds: data.qr_expiry_seconds?.toString() || '',
+                latitude: data.latitude?.toString() || '',
+                longitude: data.longitude?.toString() || '',
+                radius_meters: data.radius_meters?.toString() || '100',
             });
         }
     }, [data]);
@@ -32,10 +38,13 @@ const AdminAttendanceSettings: React.FC = () => {
 
         try {
             await updateMutation.mutateAsync({
-                check_in_start: formData.check_in_start,
-                check_in_end: formData.check_in_end,
-                late_threshold_minutes: parseInt(formData.late_threshold_minutes),
-                qr_validity_minutes: parseInt(formData.qr_validity_minutes),
+                school_start_time: formData.school_start_time,
+                school_end_time: formData.school_end_time,
+                grace_period_minutes: parseInt(formData.grace_period_minutes),
+                qr_expiry_seconds: parseInt(formData.qr_expiry_seconds),
+                latitude: formData.latitude ? parseFloat(formData.latitude) : null,
+                longitude: formData.longitude ? parseFloat(formData.longitude) : null,
+                radius_meters: parseInt(formData.radius_meters),
             });
             refetch();
         } catch (error) {
@@ -82,8 +91,9 @@ const AdminAttendanceSettings: React.FC = () => {
                             </label>
                             <input
                                 type="time"
-                                value={formData.check_in_start}
-                                onChange={(e) => setFormData({ ...formData, check_in_start: e.target.value })}
+                                step="1"
+                                value={formData.school_start_time}
+                                onChange={(e) => setFormData({ ...formData, school_start_time: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
@@ -97,8 +107,9 @@ const AdminAttendanceSettings: React.FC = () => {
                             </label>
                             <input
                                 type="time"
-                                value={formData.check_in_end}
-                                onChange={(e) => setFormData({ ...formData, check_in_end: e.target.value })}
+                                step="1"
+                                value={formData.school_end_time}
+                                onChange={(e) => setFormData({ ...formData, school_end_time: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
@@ -114,8 +125,8 @@ const AdminAttendanceSettings: React.FC = () => {
                                 type="number"
                                 min="0"
                                 max="60"
-                                value={formData.late_threshold_minutes}
-                                onChange={(e) => setFormData({ ...formData, late_threshold_minutes: e.target.value })}
+                                value={formData.grace_period_minutes}
+                                onChange={(e) => setFormData({ ...formData, grace_period_minutes: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
@@ -129,14 +140,57 @@ const AdminAttendanceSettings: React.FC = () => {
                             </label>
                             <input
                                 type="number"
-                                min="1"
-                                max="30"
-                                value={formData.qr_validity_minutes}
-                                onChange={(e) => setFormData({ ...formData, qr_validity_minutes: e.target.value })}
+                                min="10"
+                                max="300"
+                                value={formData.qr_expiry_seconds}
+                                onChange={(e) => setFormData({ ...formData, qr_expiry_seconds: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 required
                             />
-                            <p className="mt-1 text-xs text-gray-500">Durasi QR code valid setelah dibuat oleh guru</p>
+                            <p className="mt-1 text-xs text-gray-500">Durasi QR code valid setelah dibuat oleh guru (dalam detik)</p>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-gray-100"></div>
+                    <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-6">
+                        <Settings className="w-5 h-5 text-blue-600" />
+                        Pengaturan Lokasi GPS
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Latitude</label>
+                            <input
+                                type="number"
+                                step="any"
+                                value={formData.latitude}
+                                onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="-6.200000"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Longitude</label>
+                            <input
+                                type="number"
+                                step="any"
+                                value={formData.longitude}
+                                onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="106.816666"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Radius Valid (Meter)</label>
+                            <input
+                                type="number"
+                                min="50"
+                                max="5000"
+                                value={formData.radius_meters}
+                                onChange={(e) => setFormData({ ...formData, radius_meters: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                            />
                         </div>
                     </div>
 
@@ -146,19 +200,23 @@ const AdminAttendanceSettings: React.FC = () => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
                                 <span className="text-blue-600 font-medium">Check-in Mulai:</span>
-                                <p className="text-blue-900 font-semibold">{data?.check_in_start || '-'}</p>
+                                <p className="text-blue-900 font-semibold">{data?.school_start_time || '-'}</p>
                             </div>
                             <div>
                                 <span className="text-blue-600 font-medium">Check-in Akhir:</span>
-                                <p className="text-blue-900 font-semibold">{data?.check_in_end || '-'}</p>
+                                <p className="text-blue-900 font-semibold">{data?.school_end_time || '-'}</p>
                             </div>
                             <div>
                                 <span className="text-blue-600 font-medium">Toleransi:</span>
-                                <p className="text-blue-900 font-semibold">{data?.late_threshold_minutes || 0} menit</p>
+                                <p className="text-blue-900 font-semibold">{data?.grace_period_minutes || 0} menit</p>
                             </div>
                             <div>
                                 <span className="text-blue-600 font-medium">Validitas QR:</span>
-                                <p className="text-blue-900 font-semibold">{data?.qr_validity_minutes || 0} menit</p>
+                                <p className="text-blue-900 font-semibold">{data?.qr_expiry_seconds || 0} detik</p>
+                            </div>
+                            <div>
+                                <span className="text-blue-600 font-medium">Radius Lokasi:</span>
+                                <p className="text-blue-900 font-semibold">{data?.radius_meters || 100} m</p>
                             </div>
                         </div>
                     </div>

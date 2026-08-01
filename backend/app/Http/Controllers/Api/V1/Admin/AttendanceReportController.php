@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Exports\AttendanceReportExport;
+use App\Helpers\TimezoneHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Classroom;
@@ -24,7 +25,7 @@ class AttendanceReportController extends Controller
     public function daily(Request $request)
     {
         $user = $request->user();
-        $date = $request->input('date', Carbon::today()->toDateString());
+        $date = $request->input('date', TimezoneHelper::now()->toDateString());
         $classId = $request->input('class_id');
         $class = Classroom::findOrFail($classId);
         $this->authorize('viewClassReport', $class);
@@ -91,8 +92,8 @@ class AttendanceReportController extends Controller
     public function monthly(Request $request)
     {
         $user = $request->user();
-        $month = $request->input('month', Carbon::now()->month);
-        $year = $request->input('year', Carbon::now()->year);
+        $month = $request->input('month', TimezoneHelper::now()->month);
+        $year = $request->input('year', TimezoneHelper::now()->year);
         $classId = $request->input('class_id');
         $class = Classroom::findOrFail($classId);
         $this->authorize('viewClassReport', $class);
@@ -192,8 +193,8 @@ class AttendanceReportController extends Controller
         $user = $request->user();
         $student = Student::findOrFail($studentId);
         $this->authorize('viewStudentReport', $student);
-        $month = Carbon::now()->month;
-        $year = Carbon::now()->year;
+        $month = TimezoneHelper::now()->month;
+        $year = TimezoneHelper::now()->year;
 
         // OPTIMIZED: Single aggregation query
         $stats = DB::table('attendances')
@@ -247,8 +248,8 @@ class AttendanceReportController extends Controller
     {
         $user = $request->user();
         $this->authorize('viewSchoolReport', $user);
-        $month = $request->input('month', Carbon::now()->month);
-        $year = $request->input('year', Carbon::now()->year);
+        $month = $request->input('month', TimezoneHelper::now()->month);
+        $year = $request->input('year', TimezoneHelper::now()->year);
         $schoolId = $user->school_id;
 
         $cacheKey = "school_monthly_attendance_{$schoolId}_{$month}_{$year}_v2";

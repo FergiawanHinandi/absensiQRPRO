@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../lib/api';
 import showToast from '../../utils/toast';
+import { getErrorMessage } from '../../utils/errorHandler';
 
 interface School {
     id: number;
@@ -78,9 +79,18 @@ export const SchoolsManagement: React.FC = () => {
                 },
             });
 
-            if (response.data.success) {
-                setSchools(response.data.data.data);
-                setTotalPages(response.data.data.last_page);
+            // Handle unwrapped response (interceptor may have unwrapped it)
+            const responseData = response.data;
+
+            // Check if responseData IS the paginator (unwrapped)
+            if (responseData && (Array.isArray(responseData.data) || responseData.current_page)) {
+                setSchools(responseData.data || []);
+                setTotalPages(responseData.last_page || 1);
+            }
+            // Check if responseData is wrapped (has success and data keys)
+            else if (responseData && responseData.success && responseData.data) {
+                setSchools(responseData.data.data);
+                setTotalPages(responseData.data.last_page);
             }
         } catch (error) {
             console.error('Failed to fetch schools:', error);
@@ -142,7 +152,7 @@ export const SchoolsManagement: React.FC = () => {
                 fetchSchools(); // Refresh list
             } catch (error) {
                 console.error('Failed to delete school:', error);
-                showToast.error('Gagal menghapus sekolah. Silakan coba lagi.');
+                showToast.error(getErrorMessage(error));
             }
         }
     };
@@ -151,10 +161,18 @@ export const SchoolsManagement: React.FC = () => {
         if (window.confirm(`Login sebagai Admin untuk sekolah "${name}"? Anda akan logout dari Super Admin.`)) {
             try {
                 const response = await apiClient.post(`/super-admin/schools/${id}/impersonate`);
-                if (response.data.success) {
-                    const data = response.data.data;
-                    // Security: Use auth store's login which stores token in memory only
-                    // Import and use the auth store's login method
+
+                // Handle unwrapped vs wrapped response
+                let data;
+                if (response.data && response.data.token) {
+                    // Unwrapped
+                    data = response.data;
+                } else if (response.data && response.data.success && response.data.data) {
+                    // Wrapped
+                    data = response.data.data;
+                }
+
+                if (data && data.token) {
                     const { useAuthStore } = await import('../../modules/auth/stores/useAuthStore');
                     useAuthStore.getState().login(data.token, data.user);
 
@@ -163,8 +181,7 @@ export const SchoolsManagement: React.FC = () => {
                 }
             } catch (error: any) {
                 console.error('Impersonation failed:', error);
-                const msg = error.response?.data?.message || 'Gagal login ke sekolah ini. Pastikan sekolah memiliki Admin aktif.';
-                showToast.error(msg);
+                showToast.error(getErrorMessage(error));
             }
         }
     };
@@ -186,8 +203,7 @@ export const SchoolsManagement: React.FC = () => {
             fetchSchools();
         } catch (error: any) {
             console.error('Failed to save school:', error);
-            const msg = error.response?.data?.message || 'Terjadi kesalahan saat menyimpan data.';
-            showToast.error(msg);
+            showToast.error(getErrorMessage(error));
         } finally {
             setSubmitting(false);
         }

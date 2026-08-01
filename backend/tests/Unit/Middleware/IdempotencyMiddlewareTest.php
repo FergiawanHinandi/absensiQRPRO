@@ -13,10 +13,9 @@ use Tests\TestCase;
 
 /**
  * Unit tests for IdempotencyMiddleware
- *
- * @group middleware
- * @group idempotency
  */
+#[\PHPUnit\Framework\Attributes\Group('middleware')]
+#[\PHPUnit\Framework\Attributes\Group('idempotency')]
 class IdempotencyMiddlewareTest extends TestCase
 {
     use RefreshDatabase;
@@ -32,9 +31,7 @@ class IdempotencyMiddlewareTest extends TestCase
         $this->user = User::factory()->create();
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function safe_methods_bypass_idempotency_check(): void
     {
         $request = Request::create('/api/v1/attendance', 'GET');
@@ -45,9 +42,7 @@ class IdempotencyMiddlewareTest extends TestCase
         $this->assertEquals(200, $response->getStatusCode());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function missing_idempotency_key_returns_400(): void
     {
         $request = Request::create('/api/v1/attendance/scan', 'POST');
@@ -59,9 +54,7 @@ class IdempotencyMiddlewareTest extends TestCase
         $this->assertEquals('MISSING_IDEMPOTENCY_KEY', $response->getData()->code);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function invalid_uuid_format_returns_400(): void
     {
         $request = Request::create('/api/v1/attendance/scan', 'POST');
@@ -74,9 +67,7 @@ class IdempotencyMiddlewareTest extends TestCase
         $this->assertEquals('INVALID_IDEMPOTENCY_KEY', $response->getData()->code);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function valid_uuid_v4_is_accepted(): void
     {
         $request = Request::create('/api/v1/attendance/scan', 'POST');
@@ -88,9 +79,7 @@ class IdempotencyMiddlewareTest extends TestCase
         $this->assertEquals(200, $response->getStatusCode());
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function duplicate_key_returns_409_conflict(): void
     {
         $idempotencyKey = (string) Str::uuid();
@@ -118,9 +107,7 @@ class IdempotencyMiddlewareTest extends TestCase
         $this->assertTrue($response->headers->has('X-Duplicate-Request'));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function successful_request_stores_idempotency_key(): void
     {
         $idempotencyKey = (string) Str::uuid();
@@ -137,9 +124,7 @@ class IdempotencyMiddlewareTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function idempotency_key_respects_ttl_parameter(): void
     {
         $idempotencyKey = (string) Str::uuid();
@@ -162,9 +147,7 @@ class IdempotencyMiddlewareTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function response_includes_idempotency_key_header(): void
     {
         $idempotencyKey = (string) Str::uuid();
@@ -178,9 +161,7 @@ class IdempotencyMiddlewareTest extends TestCase
         $this->assertEquals($idempotencyKey, $response->headers->get('X-Idempotency-Key'));
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function failed_response_does_not_store_key(): void
     {
         $idempotencyKey = (string) Str::uuid();
@@ -196,9 +177,7 @@ class IdempotencyMiddlewareTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function optional_idempotency_key_allows_request_without_header(): void
     {
         $request = Request::create('/api/v1/attendance/scan', 'POST');

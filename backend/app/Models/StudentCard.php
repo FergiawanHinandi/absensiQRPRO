@@ -27,11 +27,11 @@ class StudentCard extends Model
     ];
 
     protected $casts = [
-        'issued_at' => 'datetime',
-        'distributed_at' => 'datetime',
-        'revoked_at' => 'datetime',
-        'is_active' => 'boolean',
-        'qr_token_encrypted' => 'encrypted',
+        'issued_at'           => 'datetime',
+        'distributed_at'      => 'datetime',
+        'revoked_at'          => 'datetime',
+        'is_active'           => 'boolean',
+        'qr_token_encrypted'  => 'encrypted',
     ];
 
     public function student()
@@ -44,14 +44,13 @@ class StudentCard extends Model
         return $this->belongsTo(User::class, 'issued_by');
     }
 
-    public function school()
-    {
-        return $this->belongsTo(School::class);
-    }
-}
-
     public function distributedBy()
     {
         return $this->belongsTo(User::class, 'distributed_by');
+    }
+
+    public function school()
+    {
+        return $this->belongsTo(School::class);
     }
 }

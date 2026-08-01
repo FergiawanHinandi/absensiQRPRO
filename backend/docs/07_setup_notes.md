@@ -3,7 +3,7 @@
 ## Project Status
 
 ✅ **Completed:**
-- Laravel 12 project initialized
+- Laravel 11 project initialized
 - Core dependencies installed:
   - Laravel Sanctum v4.2 (API Authentication)
   - Spatie Laravel Permission v6.24 (RBAC)

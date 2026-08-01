@@ -6,6 +6,7 @@ use App\Models\School;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class CompleteUserSeeder extends Seeder
 {
@@ -19,6 +20,12 @@ class CompleteUserSeeder extends Seeder
             return;
         }
 
+        // Ensure roles exist
+        $roleNames = ['super_admin', 'school_admin', 'principal', 'teacher', 'homeroom_teacher', 'student', 'parent'];
+        foreach ($roleNames as $name) {
+            Role::firstOrCreate(['name' => $name, 'guard_name' => 'sanctum']);
+        }
+
         $users = [
             // Super Admin (Pemilik Platform)
             [
@@ -29,6 +36,7 @@ class CompleteUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role_type' => 'super_admin',
                 'is_active' => true,
+                'spatie_role' => 'super_admin',
             ],
 
             // Admin Sekolah (School Admin)
@@ -40,6 +48,7 @@ class CompleteUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role_type' => 'school_admin',
                 'is_active' => true,
+                'spatie_role' => 'school_admin',
             ],
 
             // Kepala Sekolah (Principal)
@@ -51,6 +60,7 @@ class CompleteUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role_type' => 'principal',
                 'is_active' => true,
+                'spatie_role' => 'principal',
             ],
 
             // Guru Mapel (Subject Teacher) - HANYA role 'teacher'
@@ -60,8 +70,9 @@ class CompleteUserSeeder extends Seeder
                 'username' => 'guru.matematika',
                 'email' => 'guru.mtk@smp1.com',
                 'password' => Hash::make('password'),
-                'role_type' => 'teacher', // BUKAN homeroom_teacher
+                'role_type' => 'teacher',
                 'is_active' => true,
+                'spatie_role' => 'teacher',
             ],
             [
                 'school_id' => $school->id,
@@ -69,8 +80,9 @@ class CompleteUserSeeder extends Seeder
                 'username' => 'guru.ipa',
                 'email' => 'guru.ipa@smp1.com',
                 'password' => Hash::make('password'),
-                'role_type' => 'teacher', // BUKAN homeroom_teacher
+                'role_type' => 'teacher',
                 'is_active' => true,
+                'spatie_role' => 'teacher',
             ],
 
             // Guru Wali Kelas - TETAP role 'teacher', tapi dengan konfigurasi
@@ -80,8 +92,9 @@ class CompleteUserSeeder extends Seeder
                 'username' => 'wali.7a',
                 'email' => 'wali.7a@smp1.com',
                 'password' => Hash::make('password'),
-                'role_type' => 'teacher', // BUKAN homeroom_teacher!
+                'role_type' => 'teacher',
                 'is_active' => true,
+                'spatie_role' => 'teacher',
             ],
 
             // Siswa
@@ -93,6 +106,7 @@ class CompleteUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role_type' => 'student',
                 'is_active' => true,
+                'spatie_role' => 'student',
             ],
             [
                 'school_id' => $school->id,
@@ -102,6 +116,7 @@ class CompleteUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role_type' => 'student',
                 'is_active' => true,
+                'spatie_role' => 'student',
             ],
             [
                 'school_id' => $school->id,
@@ -111,6 +126,7 @@ class CompleteUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role_type' => 'student',
                 'is_active' => true,
+                'spatie_role' => 'student',
             ],
 
             // Orang Tua
@@ -122,6 +138,7 @@ class CompleteUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role_type' => 'parent',
                 'is_active' => true,
+                'spatie_role' => 'parent',
             ],
             [
                 'school_id' => $school->id,
@@ -131,20 +148,27 @@ class CompleteUserSeeder extends Seeder
                 'password' => Hash::make('password'),
                 'role_type' => 'parent',
                 'is_active' => true,
+                'spatie_role' => 'parent',
             ],
         ];
 
         foreach ($users as $userData) {
-            User::updateOrCreate(
+            $spatieRole = $userData['spatie_role'] ?? null;
+            unset($userData['spatie_role']);
+
+            $user = User::updateOrCreate(
                 ['username' => $userData['username']],
                 $userData
             );
+
+            // Assign Spatie role
+            if ($spatieRole && $user->roles->pluck('name')->first() !== $spatieRole) {
+                $user->syncRoles([$spatieRole]);
+            }
         }
 
-        $this->command->info('✅ Complete user demo created successfully!');
+        $this->command->info('✅ Complete user demo created successfully with Spatie roles!');
         $this->command->info('📋 Total users: '.count($users));
-        $this->command->info('⚠️  CATATAN: Semua guru menggunakan role_type = "teacher"');
-        $this->command->info('⚠️  Peran wali kelas akan ditentukan via tabel teacher_roles');
-        $this->command->info('⚠️  Untuk testing, gunakan admin sekolah untuk assign wali kelas');
+        $this->command->info('🔐 Default password: password');
     }
 }

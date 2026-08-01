@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Log;
+use App\Traits\BelongsToSchool;
 
 /**
  * Immutable Security Log Model
@@ -27,6 +28,8 @@ use Illuminate\Support\Facades\Log;
  */
 class ImmutableSecurityLog extends Model
 {
+    use BelongsToSchool; // Multi-tenancy: otomatis filter berdasarkan school_id
+
     /**
      * Disable timestamps auto-management (we only use created_at)
      */

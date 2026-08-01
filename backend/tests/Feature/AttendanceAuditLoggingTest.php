@@ -42,7 +42,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->schedule = Schedule::factory()->create(['school_id' => $this->school->id]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_check_in_transition()
     {
         $this->attendance = Attendance::create([
@@ -75,7 +75,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertNotNull($log->user_agent);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_check_out_transition()
     {
         $this->attendance = Attendance::create([
@@ -103,7 +103,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals('Check-out recorded', $log->reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_correction_request_transition()
     {
         $this->attendance = Attendance::create([
@@ -131,7 +131,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertStringContainsString('Wrong check-in time', $log->reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_approval_transition()
     {
         $this->attendance = Attendance::create([
@@ -161,7 +161,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals('Approved after review', $log->reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_logs_rejection_transition()
     {
         $this->attendance = Attendance::create([
@@ -191,7 +191,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals('Invalid correction request', $log->reason);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_captures_attribute_changes_in_audit_log()
     {
         $this->attendance = Attendance::create([
@@ -212,7 +212,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals('checked_in', $log->changes['state']['to']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_captures_device_information_in_audit_log()
     {
         $this->attendance = Attendance::create([
@@ -241,7 +241,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals('iOS 15.0', $log->device_info['os_version']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_maintains_complete_audit_trail_for_full_workflow()
     {
         $this->attendance = Attendance::create([
@@ -281,7 +281,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals('approved', $logs[3]->to_state);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function audit_service_can_retrieve_complete_audit_trail()
     {
         $this->attendance = Attendance::create([
@@ -303,7 +303,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals($this->teacher->name, $trail[0]['performed_by']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function audit_service_can_generate_transition_statistics()
     {
         // Create multiple attendances with transitions
@@ -325,7 +325,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals(3, $stats['total_transitions']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function audit_service_can_generate_user_activity_report()
     {
         $this->attendance = Attendance::create([
@@ -346,7 +346,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertEquals(2, $report->first()['total_actions']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function audit_service_can_detect_suspicious_activity()
     {
         // Create attendance with many rapid transitions (suspicious)
@@ -370,7 +370,7 @@ class AttendanceAuditLoggingTest extends TestCase
         $this->assertContains($this->attendance->id, $suspicious['rapid_state_changes']['attendance_ids']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function audit_service_can_calculate_approval_metrics()
     {
         // Create attendances with different approval outcomes

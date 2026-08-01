@@ -40,9 +40,10 @@ class TeacherHeatmapService
         if (! $school) {
             return ['points' => [], 'school' => null];
         }
+        $tz = $school->timezone ?? config("app.timezone");
 
         // Determine date range
-        [$startDate, $endDate] = $this->getDateRange($date, $range);
+        [$startDate, $endDate] = $this->getDateRange($date, $range, $tz);
 
         // Query scan locations from attendance_logs
         $logsQuery = AttendanceLog::query()
@@ -112,7 +113,8 @@ class TeacherHeatmapService
         ?string $date = null,
         ?string $range = null
     ): array {
-        [$startDate, $endDate] = $this->getDateRange($date, $range);
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
+        [$startDate, $endDate] = $this->getDateRange($date, $range, $tz);
 
         // Get all logs within cluster radius
         $logs = AttendanceLog::query()
@@ -160,7 +162,8 @@ class TeacherHeatmapService
         ?string $date = null,
         ?string $range = null
     ): array {
-        [$startDate, $endDate] = $this->getDateRange($date, $range);
+        $tz = \App\Models\School::find($schoolId)?->timezone ?? config("app.timezone");
+        [$startDate, $endDate] = $this->getDateRange($date, $range, $tz);
 
         $school = School::find($schoolId);
         $schoolLat = $school?->latitude ?? 0;
@@ -356,7 +359,7 @@ class TeacherHeatmapService
             return [$dateObj->startOfDay(), $dateObj->endOfDay()];
         }
 
-        $end = Carbon::now()->endOfDay();
+        $end = Carbon::now(\school_timezone())->endOfDay();
         $days = match ($range) {
             '30d' => 30,
             '14d' => 14,

@@ -5,6 +5,8 @@ import { teacherService } from '../../services/teacherService';
 import type { AttendancePayload, AttendanceStatus } from '../../services/teacherService';
 import { Save, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { SkeletonTable } from '../../components/ui/LoadingStates';
+import { EmptyState } from '../../components/ui/EmptyStates';
 
 const ManualAttendancePage: React.FC = () => {
   // We expect sessionId to be in the URL path: /teacher/attendance/manual/:sessionId
@@ -98,9 +100,10 @@ const ManualAttendancePage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh]">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-2" />
-        <p className="text-slate-500">Memuat data siswa...</p>
+      <div className="max-w-5xl mx-auto p-4">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-6">
+          <SkeletonTable rows={5} cols={4} />
+        </div>
       </div>
     );
   }
@@ -225,9 +228,12 @@ const ManualAttendancePage: React.FC = () => {
 
         {/* Empty State */}
         {students?.length === 0 && (
-          <div className="p-8 text-center text-slate-500">
-            <p>Tidak ada siswa dalam sesi ini.</p>
-          </div>
+          <EmptyState
+            preset="no-students"
+            title="Tidak Ada Siswa dalam Sesi Ini"
+            description="Belum ada siswa terdaftar pada sesi yang dipilih."
+            size="sm"
+          />
         )}
       </div>
     </div>

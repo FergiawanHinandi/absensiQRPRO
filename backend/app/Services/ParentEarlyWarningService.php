@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 
@@ -43,10 +44,35 @@ class ParentEarlyWarningService
     }
 
     /**
-     * Send notification to parent (stub/log only)
+     * Send notification to parent
+     *
+     * ARCH-02 FIX: Sebelumnya hanya stub/log. Sekarang membuat record
+     * Notification in-app untuk orang tua (bisa ditampilkan di menu
+     * notifikasi). Channel FCM/WA/Email tetap bisa ditambahkan di masa depan.
      */
     private function sendToParent(User $student, array $payload)
     {
+        $parentId = $payload['to_parent_id'] ?? $student->parent_id;
+
+        if ($parentId) {
+            try {
+                Notification::create([
+                    'user_id' => $parentId,
+                    'school_id' => $student->school_id,
+                    'title' => $payload['title'] ?? 'Peringatan Dini Kehadiran',
+                    'message' => $payload['body'] ?? $payload['message'] ?? '',
+                    'type' => 'risk',
+                ]);
+            } catch (\Throwable $e) {
+                // Notification DB gagal — jangan blokir alur, cukup log
+                Log::channel('single')->warning('[ParentEarlyWarning] Gagal simpan Notification', [
+                    'parent_id' => $parentId,
+                    'student_id' => $student->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         // In production, integrate with FCM/WA/Email
         Log::channel('single')->info('[ParentEarlyWarning] Notif to parent of student '.$student->id, $payload);
     }

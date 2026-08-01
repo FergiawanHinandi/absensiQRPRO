@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\BelongsToSchool;
 
 class AttendanceScanRequest extends Model
 {
+    use BelongsToSchool; // Multi-tenancy: otomatis filter berdasarkan school_id
+
     protected $table = 'attendance_scan_requests';
 
     public $incrementing = false;

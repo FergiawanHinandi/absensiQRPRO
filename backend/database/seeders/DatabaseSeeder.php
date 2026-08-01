@@ -56,7 +56,7 @@ class DatabaseSeeder extends Seeder
 
         // 3. Create Roles (Using 'sanctum' guard as defined in User model)
         // Adjust guard if necessary. Usually 'web' is default, but User has $guard_name = 'sanctum'
-        $roleNames = ['super_admin', 'school_admin', 'teacher', 'homeroom_teacher', 'student', 'parent'];
+        $roleNames = ['super_admin', 'school_admin', 'principal', 'teacher', 'homeroom_teacher', 'student', 'parent'];
         foreach ($roleNames as $name) {
             Role::create(['name' => $name, 'guard_name' => 'sanctum']);
         }

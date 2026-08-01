@@ -24,13 +24,28 @@ class AttendanceSessionController extends Controller
                 ->today()
                 ->get(['id', 'class_id', 'subject_id', 'start_time', 'end_time'])
                 ->map(function ($s) {
+                    // ARCH-02 FIX: Hitung status sesi nyata berdasarkan jam sekarang
+                    // (bukan null placeholder) agar frontend bisa menampilkan status akurat.
+                    $now = Carbon::now();
+                    $start = Carbon::parse($s->start_time);
+                    $end = Carbon::parse($s->end_time);
+
+                    $attendanceStatus = 'not_started';
+                    if ($now->lt($start->copy()->subMinutes(15))) {
+                        $attendanceStatus = 'not_started';
+                    } elseif ($now->lt($end)) {
+                        $attendanceStatus = 'ongoing';
+                    } else {
+                        $attendanceStatus = 'finished';
+                    }
+
                     return [
                         'session_id' => $s->id,
                         'class' => optional($s->class)->name,
                         'subject' => optional($s->subject)->name,
                         'start_time' => $s->start_time,
                         'end_time' => $s->end_time,
-                        'attendance_status' => null, // Todo: calculate real status if needed
+                        'attendance_status' => $attendanceStatus,
                     ];
                 });
         });

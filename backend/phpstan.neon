@@ -26,6 +26,10 @@ parameters:
     
     # Report unmatched ignored errors
     reportUnmatchedIgnoredErrors: false
+    
+    # Bootstrap files to load before analysis
+    bootstrapFiles:
+        - phpstan/PreventRawQueryOnTenantModels.php
 
 services:
     # Custom rules for tenant safety - prevents DB::table() usage on tenant models

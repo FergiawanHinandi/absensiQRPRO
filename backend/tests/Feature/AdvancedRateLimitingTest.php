@@ -65,7 +65,7 @@ class AdvancedRateLimitingTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function login_rate_limit_blocks_after_5_attempts()
     {
         // Make 5 failed login attempts
@@ -93,7 +93,7 @@ class AdvancedRateLimitingTest extends TestCase
         $response->assertHeader('Retry-After');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function successful_login_does_not_count_towards_rate_limit()
     {
         // Make 5 successful logins (should not be rate limited)
@@ -115,7 +115,7 @@ class AdvancedRateLimitingTest extends TestCase
         $response->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function qr_scan_rate_limit_blocks_after_10_scans()
     {
         Sanctum::actingAs($this->student, ['*']);
@@ -146,7 +146,7 @@ class AdvancedRateLimitingTest extends TestCase
         $response->assertStatus(429);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function qr_scan_rate_limit_is_per_device()
     {
         Sanctum::actingAs($this->student, ['*']);
@@ -185,7 +185,7 @@ class AdvancedRateLimitingTest extends TestCase
         $this->assertNotEquals(429, $response2->status());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function api_rate_limit_blocks_after_60_requests()
     {
         Sanctum::actingAs($this->admin, ['*']);
@@ -201,7 +201,7 @@ class AdvancedRateLimitingTest extends TestCase
         $response->assertStatus(429);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_headers_are_present()
     {
         Sanctum::actingAs($this->admin, ['*']);
@@ -213,7 +213,7 @@ class AdvancedRateLimitingTest extends TestCase
         $response->assertHeader('X-RateLimit-Remaining');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_remaining_decreases_with_each_request()
     {
         Sanctum::actingAs($this->admin, ['*']);
@@ -230,7 +230,7 @@ class AdvancedRateLimitingTest extends TestCase
         $this->assertLessThan($remaining1, $remaining2);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function different_users_have_separate_rate_limits()
     {
         // User 1 makes 60 requests
@@ -249,7 +249,7 @@ class AdvancedRateLimitingTest extends TestCase
         $response2->assertStatus(200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function global_rate_limit_applies_to_public_routes()
     {
         // This test would need to make 1000+ requests
@@ -261,7 +261,7 @@ class AdvancedRateLimitingTest extends TestCase
         $response->assertHeader('X-RateLimit-Limit');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_response_includes_retry_after()
     {
         Sanctum::actingAs($this->admin, ['*']);
@@ -283,7 +283,7 @@ class AdvancedRateLimitingTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function login_rate_limit_is_per_ip_not_per_username()
     {
         // Try different usernames from same IP
@@ -305,7 +305,7 @@ class AdvancedRateLimitingTest extends TestCase
         $response->assertStatus(429);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function rate_limit_violation_is_logged()
     {
         Sanctum::actingAs($this->admin, ['*']);

@@ -12,7 +12,7 @@ class SecurityLeakTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_404_when_accessing_other_tenant_record()
     {
         // 1. Setup Data for School A
@@ -39,7 +39,7 @@ class SecurityLeakTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function eloquent_find_fails_for_other_tenant()
     {
         // 1. Setup Data
@@ -62,7 +62,7 @@ class SecurityLeakTest extends TestCase
         $this->assertNull($found, 'SECURITY LEAK: Eloquent find() returned record from another tenant!');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function tenant_scope_auto_fills_correct_school_id()
     {
         $schoolA = School::factory()->create();

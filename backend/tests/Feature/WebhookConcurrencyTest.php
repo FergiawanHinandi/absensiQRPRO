@@ -69,7 +69,7 @@ class WebhookConcurrencyTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_acquires_lock_with_300_second_timeout()
     {
         $orderId = 'TEST_ORDER_LOCK_001';
@@ -100,7 +100,7 @@ class WebhookConcurrencyTest extends TestCase
         $this->assertFalse(Cache::has($lockKey));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_marks_as_processing_before_execution()
     {
         $orderId = 'TEST_ORDER_PROCESSING_001';
@@ -132,7 +132,7 @@ class WebhookConcurrencyTest extends TestCase
         $this->assertEquals('success', $webhook->status);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function concurrent_webhooks_return_processing_status()
     {
         $orderId = 'TEST_ORDER_CONCURRENT_002';
@@ -177,7 +177,7 @@ class WebhookConcurrencyTest extends TestCase
         $lock->release();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_returns_429_when_lock_timeout_exceeded()
     {
         $orderId = 'TEST_ORDER_TIMEOUT_001';
@@ -212,7 +212,7 @@ class WebhookConcurrencyTest extends TestCase
         $lock->release();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_releases_lock_on_exception()
     {
         $orderId = 'NONEXISTENT_ORDER_001';
@@ -233,7 +233,7 @@ class WebhookConcurrencyTest extends TestCase
         $this->assertFalse(Cache::has($lockKey));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_prevents_double_subscription_processing()
     {
         $orderId = 'TEST_ORDER_DOUBLE_SUB_001';
@@ -275,7 +275,7 @@ class WebhookConcurrencyTest extends TestCase
         $this->assertEquals($firstUpdatedAt, $this->school->package_updated_at);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_handles_transaction_id_idempotency()
     {
         $orderId = 'TEST_ORDER_TXN_001';
@@ -309,7 +309,7 @@ class WebhookConcurrencyTest extends TestCase
         $this->assertEquals(1, ProcessedWebhook::where('transaction_id', $transactionId)->count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_processing_status_prevents_duplicate_execution()
     {
         $orderId = 'TEST_ORDER_STATUS_001';
@@ -347,7 +347,7 @@ class WebhookConcurrencyTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_updates_processing_to_success_after_completion()
     {
         $orderId = 'TEST_ORDER_UPDATE_001';
@@ -377,7 +377,7 @@ class WebhookConcurrencyTest extends TestCase
         $this->assertNotNull($webhook->processed_at);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_records_failed_status_on_processing_error()
     {
         $orderId = 'INVALID_ORDER_001';
@@ -399,7 +399,7 @@ class WebhookConcurrencyTest extends TestCase
         $this->assertNotNull($webhook->processed_at);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_lock_prevents_race_condition_on_payment_update()
     {
         $orderId = 'TEST_ORDER_RACE_001';
@@ -432,7 +432,7 @@ class WebhookConcurrencyTest extends TestCase
         $this->assertEquals(1, ProcessedWebhook::where('order_id', $orderId)->count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function webhook_processing_history_tracks_all_attempts()
     {
         $orderId = 'TEST_ORDER_HISTORY_001';

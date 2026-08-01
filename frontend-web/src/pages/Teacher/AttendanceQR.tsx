@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
-import { Clock, Users, RefreshCw, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, Users, RefreshCw, AlertCircle, CheckCircle, XCircle, Maximize2, Minimize2, Monitor } from 'lucide-react';
 import { teacherAttendanceApi } from '../../modules/teacher/services/attendanceApi';
 
 interface Session {
@@ -36,6 +36,7 @@ export default function AttendanceQR() {
   const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isExpired, setIsExpired] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Fetch today's sessions
   const fetchSessions = useCallback(async () => {
@@ -160,16 +161,156 @@ export default function AttendanceQR() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      try {
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
+      } catch (e) {
+        console.warn('Fullscreen API not supported, using fallback UI', e);
+        setIsFullscreen(true);
+      }
+    } else {
+      try {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      } catch (e) {
+        console.warn('Failed to exit fullscreen', e);
+        setIsFullscreen(false);
+      }
+    }
+  };
+
+  // UX-03 FIX: QR responsive terhadap ukuran viewport (tablet/proyektor).
+  // Ukuran QR dihitung dari lebar viewport agar tidak terpotong saat
+  // ditampilkan di LCD proyektor atau tablet, dan diperbarui saat resize.
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1024
+  );
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // QR inline: skala 40%-60% lebar viewport, minimum 224px, maksimum 320px
+  const inlineQrSize = Math.min(
+    Math.max(Math.round(viewportWidth * 0.45), 224),
+    320,
+  );
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  // If fullscreen mode, show projector-optimized layout
+  if (isFullscreen && qrData && selectedSession) {
+    // UX-03 FIX: gunakan state viewportWidth agar QR ikut menyesuaikan saat resize
+    const qrSize = Math.min(viewportWidth, window.innerHeight) * 0.55;
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
+        {/* Fullscreen QR Display - Optimized for Projector */}
+        <div className="text-center">
+          {/* Session Info */}
+          <div className="mb-6">
+            <h2 className="text-4xl font-bold text-white mb-2">{selectedSession.subject_name}</h2>
+            <p className="text-2xl text-blue-300">{selectedSession.class_name}</p>
+            <p className="text-xl text-gray-400 mt-2">{selectedSession.start_time} - {selectedSession.end_time}</p>
+          </div>
+
+          {/* QR Code - Large for projector */}
+          <div className={`inline-block p-8 bg-white rounded-2xl ${isExpired ? 'border-8 border-red-500' : 'border-8 border-blue-500'}`}>
+            {isExpired ? (
+              <div
+                className="flex items-center justify-center bg-gray-100 rounded-xl"
+                style={{ width: qrSize, height: qrSize }}
+              >
+                <div className="text-center">
+                  <XCircle className="w-24 h-24 text-red-500 mx-auto mb-4" />
+                  <p className="text-2xl text-red-600 font-bold">QR Expired</p>
+                  <button
+                    onClick={handleGenerateQR}
+                    className="mt-6 px-8 py-4 bg-blue-600 text-white text-xl rounded-xl hover:bg-blue-700"
+                  >
+                    Generate Ulang
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <QRCodeCanvas
+                value={qrData.qr_payload}
+                size={qrSize}
+                level="H"
+                includeMargin={true}
+              />
+            )}
+          </div>
+
+          {/* Timer & Controls */}
+          {!isExpired && (
+            <div className="mt-6 flex items-center justify-center gap-6">
+              <div className="inline-flex items-center gap-3 px-6 py-3 bg-blue-900/50 text-blue-200 rounded-full text-xl">
+                <Clock className="w-6 h-6" />
+                <span className="font-bold font-mono">{formatTime(timeLeft)}</span>
+              </div>
+              <div className="inline-flex items-center gap-3 px-6 py-3 bg-green-900/50 text-green-200 rounded-full text-xl">
+                <Users className="w-6 h-6" />
+                <span className="font-bold">{attendances.length} Hadir</span>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Controls */}
+          <div className="mt-8 flex items-center justify-center gap-4">
+            <button
+              onClick={handleGenerateQR}
+              disabled={loading}
+              className="px-6 py-3 bg-blue-600 text-white text-lg rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              Refresh QR
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="px-6 py-3 bg-gray-700 text-white text-lg rounded-xl hover:bg-gray-600 transition-colors flex items-center gap-2"
+            >
+              <Minimize2 className="w-5 h-5" />
+              Keluar Layar Penuh
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Absensi QR Code</h1>
-          <p className="text-gray-600 mt-1">Generate QR code untuk absensi siswa</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Absensi QR Code</h1>
+            <p className="text-gray-600 mt-1">Generate QR code untuk absensi siswa</p>
+          </div>
+          {selectedSession && qrData && (
+            <button
+              onClick={toggleFullscreen}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              title="Tampilkan di proyektor"
+            >
+              <Monitor className="w-5 h-5" />
+              <span className="hidden sm:inline">Layar Penuh</span>
+              <Maximize2 className="w-4 h-4 sm:hidden" />
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6">
           {/* Left Column - Session Selection */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -282,7 +423,7 @@ export default function AttendanceQR() {
                     ) : (
                       <QRCodeCanvas
                         value={qrData.qr_payload}
-                        size={256}
+                        size={inlineQrSize}
                         level="H"
                         includeMargin={true}
                       />

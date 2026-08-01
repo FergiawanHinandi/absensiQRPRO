@@ -2,7 +2,7 @@
 
 > **Date:** 2026-01-19  
 > **Auditor:** External Security & Architecture Review  
-> **Project:** AbsensiQRPro Backend (Laravel 12)
+> **Project:** AbsensiQRPro Backend (Laravel 11)
 
 ---
 

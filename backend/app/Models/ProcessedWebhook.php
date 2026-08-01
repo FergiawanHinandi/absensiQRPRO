@@ -153,6 +153,90 @@ class ProcessedWebhook extends Model
     }
 
     /**
+     * Get cached response for a processed webhook
+     * 
+     * @param string $orderId
+     * @return array|null
+     */
+    public static function getCachedResponse(string $orderId): ?array
+    {
+        $webhook = self::where('order_id', $orderId)
+            ->whereIn('status', ['success', 'failed'])
+            ->first();
+
+        if (!$webhook) {
+            return null;
+        }
+
+        return [
+            'success' => $webhook->status === 'success',
+            'message' => $webhook->status === 'success' ? 'Already processed' : 'Processing failed',
+            'idempotent' => true,
+            'processed_at' => $webhook->processed_at?->toISOString(),
+            'status' => $webhook->status,
+            'transaction_status' => $webhook->transaction_status,
+            'payment_method' => $webhook->payment_method,
+            'notes' => $webhook->processing_notes,
+        ];
+    }
+
+    /**
+     * Get processing response for a webhook currently being processed
+     * 
+     * @param string $orderId
+     * @return array|null
+     */
+    public static function getProcessingResponse(string $orderId): ?array
+    {
+        $webhook = self::where('order_id', $orderId)
+            ->where('status', 'processing')
+            ->first();
+
+        if (!$webhook) {
+            return null;
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Currently processing',
+            'processing' => true,
+            'started_at' => $webhook->created_at?->toISOString(),
+        ];
+    }
+
+    /**
+     * Clear processing status (mark as complete or failed)
+     * This is called automatically by markAsProcessed()
+     * 
+     * @param string $orderId
+     * @param string $status
+     * @return bool
+     */
+    public static function clearProcessingStatus(string $orderId, string $status = 'success'): bool
+    {
+        $webhook = self::where('order_id', $orderId)
+            ->where('status', 'processing')
+            ->first();
+
+        if (!$webhook) {
+            return false;
+        }
+
+        $webhook->update([
+            'status' => $status,
+            'processed_at' => now(),
+        ]);
+
+        Log::info('Webhook processing status cleared', [
+            'order_id' => $orderId,
+            'final_status' => $status,
+            'webhook_id' => $webhook->id,
+        ]);
+
+        return true;
+    }
+
+    /**
      * Get processing history for an order
      * 
      * @param string $orderId
