@@ -185,7 +185,7 @@ class MobileSecurityApi {
       }
 
       const response = await secureApi.post<SecurityEventResponse>(
-        '/v1/security/mobile-event',
+        '/security/mobile-event',
         event,
       );
 
@@ -236,7 +236,7 @@ class MobileSecurityApi {
         const batch = this.eventQueue.splice(0, this.BATCH_SIZE);
 
         try {
-          await secureApi.post('/v1/security/mobile-events/batch', {
+          await secureApi.post('/security/mobile-events/batch', {
             events: batch,
           });
         } catch (error) {

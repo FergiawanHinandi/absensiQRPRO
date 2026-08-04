@@ -143,7 +143,7 @@ export const attendanceApi = {
     try {
       const response = await secureApi.post<
         AttendanceApiResponse<AttendanceRecord>
-      >('/v1/attendance/scan', payload, {
+      >('/attendance/scan', payload, {
         headers: {
           'X-Idempotency-Key': payload.request_id,
           'X-Device-ID': payload.device_fingerprint,
