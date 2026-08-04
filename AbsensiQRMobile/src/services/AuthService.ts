@@ -27,10 +27,7 @@ class AuthService {
     // berada di /api/auth/*, berbeda dengan apiClient yang menggunakan
     // API_BASE_URL = /api/v1 untuk resource endpoints.
     this.api = axios.create({
-      baseURL:
-        Config.API_BASE_URL?.replace(/\/v1\/?$/, '') ||
-        Config.API_URL ||
-        'http://localhost:8000/api',
+      baseURL: this.getBaseUrl(),
       timeout: 15000,
       headers: {
         'Content-Type': 'application/json',
@@ -39,6 +36,20 @@ class AuthService {
     });
 
     this.setupInterceptors();
+  }
+
+  /**
+   * Resolve the auth API base URL.
+   *
+   * API_BASE_URL points at /api/v1 (resource endpoints). Auth endpoints
+   * (/v1/auth/*) need the parent /api base, so strip the trailing /v1.
+   */
+  private getBaseUrl(): string {
+    return (
+      Config.API_BASE_URL?.replace(/\/v1\/?$/, '') ||
+      Config.API_URL ||
+      'http://localhost:8000/api'
+    );
   }
 
   /**
@@ -110,7 +121,7 @@ class AuthService {
 
             // Call refresh endpoint
             const response = await axios.post(
-              `${Config.API_URL}/v1/auth/refresh`,
+              `${this.getBaseUrl()}/v1/auth/refresh`,
               {refresh_token: tokens.refreshToken},
               {
                 headers: {
@@ -320,7 +331,7 @@ class AuthService {
       }
 
       const response = await axios.post(
-        `${Config.API_URL}/v1/auth/refresh`,
+        `${this.getBaseUrl()}/v1/auth/refresh`,
         {refresh_token: tokens.refreshToken},
         {
           headers: {
