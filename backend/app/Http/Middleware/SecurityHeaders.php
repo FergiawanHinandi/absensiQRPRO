@@ -84,7 +84,7 @@ class SecurityHeaders
         }
 
         // Content Security Policy
-        $response->headers->set('Content-Security-Policy', $this->buildCSP($nonce));
+        $response->headers->set('Content-Security-Policy', $this->buildCSP($nonce, $response));
 
         // Echo back request ID for correlation
         $response->headers->set('X-Request-ID', $request->header('X-Request-ID'));
@@ -95,8 +95,13 @@ class SecurityHeaders
     /**
      * Build Content Security Policy directives
      */
-    private function buildCSP(string $nonce): string
+    private function buildCSP(string $nonce, Response $response): string
     {
+        // SEC-007: Strict CSP for API responses (JSON) — no scripts/styles needed
+        $isApi = str_starts_with($response->headers->get('Content-Type', ''), 'application/json');
+        if ($isApi) {
+            return "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+        }
         $directives = [
             // Default: only allow same-origin
             "default-src 'self'",
