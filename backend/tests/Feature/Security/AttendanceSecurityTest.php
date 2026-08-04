@@ -98,12 +98,14 @@ class AttendanceSecurityTest extends TestCase
         $payload = $this->generateQrPayload($this->schedule);
         
         $response1 = $this->actingAs($this->student)
+             ->withHeader('X-Idempotency-Key', (string) Str::uuid())
              ->postJson('/api/v1/attendance/scan', $payload);
         $response1->assertStatus(200);
         
         $payload2 = $this->generateQrPayload($this->schedule);
         
         $response2 = $this->actingAs($this->student)
+             ->withHeader('X-Idempotency-Key', (string) Str::uuid())
              ->postJson('/api/v1/attendance/scan', $payload2);
              
         $response2->assertStatus(400) 
@@ -123,6 +125,7 @@ class AttendanceSecurityTest extends TestCase
         $payload = $this->generateQrPayload($otherSchedule);
         
         $response = $this->actingAs($this->student)
+             ->withHeader('X-Idempotency-Key', (string) Str::uuid())
              ->postJson('/api/v1/attendance/scan', $payload);
              
         $response->assertStatus(404);
@@ -134,6 +137,7 @@ class AttendanceSecurityTest extends TestCase
         $payload['qr_payload']['signature'] = 'invalid_hash_value';
         
         $response = $this->actingAs($this->student)
+             ->withHeader('X-Idempotency-Key', (string) Str::uuid())
              ->postJson('/api/v1/attendance/scan', $payload);
              
         $response->assertStatus(403);
@@ -144,6 +148,7 @@ class AttendanceSecurityTest extends TestCase
         $payload = $this->generateQrPayload($this->schedule, now()->subMinutes(5));
         
         $response = $this->actingAs($this->student)
+             ->withHeader('X-Idempotency-Key', (string) Str::uuid())
              ->postJson('/api/v1/attendance/scan', $payload);
              
         $response->assertStatus(410);
@@ -154,10 +159,12 @@ class AttendanceSecurityTest extends TestCase
         $payload = $this->generateQrPayload($this->schedule);
         
         $this->actingAs($this->student)
+             ->withHeader('X-Idempotency-Key', (string) Str::uuid())
              ->postJson('/api/v1/attendance/scan', $payload)
              ->assertStatus(200);
 
         $response = $this->actingAs($this->student)
+             ->withHeader('X-Idempotency-Key', (string) Str::uuid())
              ->postJson('/api/v1/attendance/scan', $payload);
              
         $response->assertStatus(400); 
@@ -169,16 +176,27 @@ class AttendanceSecurityTest extends TestCase
         $idemKey = Str::uuid()->toString();
         
         $response1 = $this->actingAs($this->student)
-             ->withHeader('Idempotency-Key', $idemKey)
+             ->withHeader('X-Idempotency-Key', $idemKey)
              ->postJson('/api/v1/attendance/scan', $payload);
         $response1->assertStatus(200);
         
         $response2 = $this->actingAs($this->student)
-             ->withHeader('Idempotency-Key', $idemKey)
+             ->withHeader('X-Idempotency-Key', $idemKey)
              ->postJson('/api/v1/attendance/scan', $payload);
              
         $response2->assertStatus(200)
                   ->assertJson($response1->json());
+    }
+
+    public function test_missing_idempotency_key_rejected()
+    {
+        $payload = $this->generateQrPayload($this->schedule);
+
+        $response = $this->actingAs($this->student)
+             ->postJson('/api/v1/attendance/scan', $payload);
+
+        $response->assertStatus(400)
+                 ->assertJsonFragment(['code' => 'MISSING_IDEMPOTENCY_KEY']);
     }
 
     public function test_archive_working()

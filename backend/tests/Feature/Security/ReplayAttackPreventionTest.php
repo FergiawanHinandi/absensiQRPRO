@@ -247,17 +247,16 @@ class ReplayAttackPreventionTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function it_allows_request_without_idempotency_key()
+    public function it_rejects_request_without_idempotency_key()
     {
-        // Request without idempotency key should still be processed
-        // (but will log a warning)
+        // SEC-5: Idempotency key is now ENFORCED — missing key returns 400
         $response = $this->withHeaders([
             'Authorization' => "Bearer {$this->token}",
         ])->postJson('/api/v1/attendance/scan', [
             'qr_payload' => 'test_payload',
         ]);
 
-        // Should not reject the request
-        $this->assertNotEquals(400, $response->status());
+        $response->assertStatus(400);
+        $response->assertJsonFragment(['code' => 'MISSING_IDEMPOTENCY_KEY']);
     }
 }

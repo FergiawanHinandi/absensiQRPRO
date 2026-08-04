@@ -145,13 +145,15 @@ class AttendanceSecurityMiddleware
         $idempotencyKey = $request->header('X-Idempotency-Key') ?? $request->input('request_id');
 
         if (empty($idempotencyKey)) {
-            // No idempotency key - allow but warn
-            Log::warning('Attendance request without idempotency key', [
-                'request_id' => $requestId,
-                'ip' => $request->ip(),
-                'user_id' => $request->user()?->id,
-            ]);
-            return null;
+            $this->logSecurityViolation('MISSING_IDEMPOTENCY_KEY', $request);
+
+            return $this->errorResponse(
+                'MISSING_IDEMPOTENCY_KEY',
+                'Header X-Idempotency-Key wajib untuk mencegah duplikasi.',
+                400,
+                ['retry_allowed' => true],
+                $requestId
+            );
         }
 
         $cacheKey = $this->getIdempotencyCacheKey($idempotencyKey, $request);
