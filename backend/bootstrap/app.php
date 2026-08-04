@@ -93,10 +93,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
 
+        $trustedProxies = array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('TRUSTED_PROXIES', '10.0.0.0/8,172.16.0.0/12,192.168.0.0/16'))
+        )));
+
         $middleware->trustProxies(
-            at: [
-                '*',
-            ],
+            at: $trustedProxies,
             headers: \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
                 \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST |
                 \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT |
@@ -136,7 +139,15 @@ return Application::configure(basePath: dirname(__DIR__))
                 ];
 
                 // Handle specific exceptions
-                if ($e instanceof \Illuminate\Validation\ValidationException) {
+                if ($e instanceof \Illuminate\Http\Exceptions\HttpResponseException) {
+                    // Laravel throws HttpResponseException for throttled requests (429)
+                    // and other short-circuit responses. Return the response as-is,
+                    // otherwise every rate-limit hit would be rendered as a 500.
+                    $throttleResponse = $e->getResponse();
+                    $throttleResponse->headers->set('X-Request-ID', $requestId);
+
+                    return $throttleResponse;
+                } elseif ($e instanceof \Illuminate\Validation\ValidationException) {
                     $statusCode = 422;
                     $response['code'] = 422;
                     $response['message'] = 'Validation Error';
