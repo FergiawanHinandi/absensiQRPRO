@@ -11,7 +11,7 @@ return [
     | Can be rotated without invalidating old tokens (grace period)
     |
     */
-    'secret' => env('QR_SECRET_KEY', 'change-this-in-production-must-be-32-chars-minimum'),
+    'secret' => env('QR_SECRET_KEY'),
 
     /*
     |--------------------------------------------------------------------------

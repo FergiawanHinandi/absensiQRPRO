@@ -231,10 +231,19 @@ class AppServiceProvider extends ServiceProvider
      *
      * In production: Fails fast with exception if critical vars missing
      * In other envs: Logs warnings for missing/invalid vars
+     *
+     * @param  string|null  $env  Environment to evaluate against (defaults to app env)
      */
-    private function validateCriticalEnvVars(): void
+    private function validateCriticalEnvVars(?string $env = null): void
     {
-        $isProduction = $this->app->environment('production');
+        $env ??= (string) $this->app->environment();
+        $isStrict = ! in_array($env, ['local', 'testing'], true);
+
+        // Known insecure default/placeholder values that must never be used
+        $forbiddenSecrets = [
+            'change-this-in-production-must-be-32-chars-minimum',
+            'generate_with_command_above_32_chars_minimum',
+        ];
 
         // CRITICAL: These variables MUST exist in production
         $criticalVars = [
@@ -245,8 +254,14 @@ class AppServiceProvider extends ServiceProvider
             ],
             'QR_SECRET_KEY' => [
                 'required' => true,
-                'validate' => fn ($v) => ! empty($v) && strlen($v) >= 32,
-                'message' => 'QR_SECRET_KEY must be at least 32 characters (HMAC security)',
+                'validate' => function ($v) use ($forbiddenSecrets) {
+                    if (empty($v)) {
+                        return false;
+                    }
+
+                    return strlen($v) >= 32 && ! in_array($v, $forbiddenSecrets, true);
+                },
+                'message' => 'QR_SECRET_KEY must be at least 32 characters, unique, and not the known default (HMAC security)',
             ],
             'DB_CONNECTION' => [
                 'required' => true,
@@ -282,7 +297,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Validate production-only vars
-        if ($isProduction) {
+        if ($env === 'production') {
             foreach ($productionVars as $var => $config) {
                 $value = env($var);
 
@@ -292,8 +307,8 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
-        // In production, fail fast if critical errors
-        if ($isProduction && ! empty($errors)) {
+        // In non-local environments, fail fast if critical errors
+        if ($isStrict && ! empty($errors)) {
             $errorList = implode("\n- ", $errors);
             throw new \RuntimeException(
                 "CRITICAL: Application cannot start due to environment errors:\n- {$errorList}\n\n".
