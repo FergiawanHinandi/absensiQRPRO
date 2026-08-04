@@ -30,6 +30,7 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'username' => fake()->unique()->userName(),
+            'school_id' => \App\Models\School::factory(),
             'role_type' => 'student',
             'is_active' => true,
         ];
