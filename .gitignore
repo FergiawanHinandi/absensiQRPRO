@@ -26,6 +26,9 @@ nul
 tmpclaude-*
 claude_output*
 
+# ---- Graphify knowledge-graph cache (regenerable, may embed file paths) ----
+graphify-out/
+
 # ---- AI-generated analysis docs (archived) ----
 docs/_archive/
 

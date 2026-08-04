@@ -65,6 +65,14 @@ if %ERRORLEVEL% EQU 0 (
     set SECRETS_FOUND=1
 )
 
+REM Pattern 7: GitHub PATs (ghp_)
+git diff --cached | findstr /R "^\+.*ghp_[A-Za-z0-9][A-Za-z0-9]*" > nul
+if %ERRORLEVEL% EQU 0 (
+    echo [91m? BLOCKED: GitHub PAT (ghp_) detected![0m
+    echo [93m   Never commit GitHub tokens[0m
+    set SECRETS_FOUND=1
+)
+
 REM Clean up temp file
 del %TEMP%\staged_files.txt
 

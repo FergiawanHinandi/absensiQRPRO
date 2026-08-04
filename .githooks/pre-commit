@@ -64,6 +64,15 @@ if git diff --cached | grep -E "^\+.*(SANCTUM_TOKEN|API_TOKEN|BEARER_TOKEN)=[^'\
     SECRETS_FOUND=1
 fi
 
+# Pattern 4b: GitHub Personal Access Tokens (ghp_)
+if git diff --cached | grep -E "^\+.*ghp_[A-Za-z0-9]{36}" > /dev/null; then
+    echo -e "${RED}? BLOCKED: GitHub PAT (ghp_) detected!${NC}"
+    echo -e "${YELLOW}   Never commit GitHub tokens${NC}"
+    echo -e "   Files:"
+    git diff --cached --name-only | grep -E "ghp_"
+    SECRETS_FOUND=1
+fi
+
 # Pattern 5: Private keys
 if git diff --cached | grep -E "^\+.*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----" > /dev/null; then
     echo -e "${RED}? BLOCKED: Private key detected!${NC}"
