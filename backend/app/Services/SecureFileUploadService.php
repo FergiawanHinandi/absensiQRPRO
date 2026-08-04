@@ -3,159 +3,214 @@
 namespace App\Services;
 
 use App\Http\Requests\SecureFileUploadRequest;
+use App\Models\SecureFile;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class SecureFileUploadService
 {
     /**
-     * Upload file securely
+     * Upload file securely and record ownership.
+     *
+     * @param  array{user_id: int, school_id: int}  $owner
      */
-    public function uploadFile(SecureFileUploadRequest $request): array
+    public function uploadFile(SecureFileUploadRequest $request, array $owner): array
     {
+        $file = $request->file('file');
+        $secureFilename = $request->getSecureFilename();
+        $storagePath = $request->getStoragePath();
+        $fullPath = $request->getFullFilePath();
+
+        // Store file securely outside public root
+        $storedPath = $file->storeAs($storagePath, $secureFilename, 'secure_uploads');
+
+        if (! $storedPath) {
+            throw new \RuntimeException('Failed to store file securely.');
+        }
+
         try {
-            $file = $request->file('file');
-            $secureFilename = $request->getSecureFilename();
-            $storagePath = $request->getStoragePath();
-            $fullPath = $request->getFullFilePath();
-
-            // Store file securely outside public root
-            $storedPath = $file->storeAs($storagePath, $secureFilename, 'secure_uploads');
-
-            if (!$storedPath) {
-                throw new \Exception('Failed to store file securely.');
-            }
-
-            // Get file metadata
-            $metadata = $this->getFileMetadata($file, $fullPath);
-
-            // Log successful upload
-            Log::channel('security')->info('Secure file upload', [
-                'user_id' => auth()->id(),
-                'school_id' => auth()->user()->school_id,
-                'original_name' => $file->getClientOriginalName(),
-                'secure_name' => $secureFilename,
-                'size' => $file->getSize(),
-                'mime_type' => $file->getMimeType(),
+            $record = SecureFile::create([
+                'user_id' => $owner['user_id'],
+                'school_id' => $owner['school_id'],
                 'storage_path' => $storedPath,
-                'category' => $request->input('category'),
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-
-            return [
-                'success' => true,
-                'file_path' => $storedPath,
                 'original_name' => $file->getClientOriginalName(),
-                'secure_name' => $secureFilename,
-                'size' => $file->getSize(),
                 'mime_type' => $file->getMimeType(),
-                'category' => $request->input('category'),
+                'size' => $file->getSize(),
+                'category' => $request->input('category', 'general'),
                 'description' => $request->input('description'),
-                'metadata' => $metadata,
-            ];
-
-        } catch (\Exception $e) {
-            Log::channel('security')->error('Secure file upload failed', [
-                'user_id' => auth()->id(),
-                'school_id' => auth()->user()->school_id,
-                'error' => $e->getMessage(),
-                'ip_address' => request()->ip(),
             ]);
+        } catch (\Throwable $e) {
+            // Never leave an orphan file without an ownership record.
+            Storage::disk('secure_uploads')->delete($storedPath);
 
-            throw new \Exception('File upload failed: ' . $e->getMessage());
+            throw $e;
         }
+
+        $metadata = $this->getFileMetadata($file, $fullPath);
+
+        Log::channel('security')->info('Secure file upload', [
+            'user_id' => $owner['user_id'],
+            'school_id' => $owner['school_id'],
+            'secure_file_id' => $record->id,
+            'original_name' => $file->getClientOriginalName(),
+            'secure_name' => $secureFilename,
+            'size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
+            'storage_path' => $storedPath,
+            'category' => $request->input('category'),
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        return [
+            'success' => true,
+            'file_id' => $record->id,
+            'file_path' => $storedPath,
+            'original_name' => $file->getClientOriginalName(),
+            'secure_name' => $secureFilename,
+            'size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
+            'category' => $request->input('category'),
+            'description' => $request->input('description'),
+            'metadata' => $metadata,
+        ];
     }
 
     /**
-     * Serve file securely (with authorization check)
+     * Serve file metadata only if the caller owns it.
+     *
+     * @param  array{user_id: int, school_id: int}  $owner
      */
-    public function serveFile(string $filePath): array
+    public function serveFile(string $filePath, array $owner): array
     {
-        try {
-            // Validate file path to prevent directory traversal
-            if ($this->isPathTraversal($filePath)) {
-                throw new \Exception('Invalid file path.');
-            }
+        $record = $this->findOwnedFile($filePath, $owner);
 
-            // Check if file exists in secure storage
-            if (!Storage::disk('secure_uploads')->exists($filePath)) {
-                throw new \Exception('File not found.');
-            }
+        Log::channel('security')->info('Secure file access', [
+            'user_id' => $owner['user_id'],
+            'school_id' => $owner['school_id'],
+            'file_id' => $record->id,
+            'file_path' => $filePath,
+            'ip_address' => request()->ip(),
+        ]);
 
-            // Get file metadata
-            $metadata = $this->getStoredFileMetadata($filePath);
-
-            // Log file access
-            Log::channel('security')->info('Secure file access', [
-                'user_id' => auth()->id(),
-                'school_id' => auth()->user()->school_id,
-                'file_path' => $filePath,
-                'ip_address' => request()->ip(),
-            ]);
-
-            return [
-                'success' => true,
-                'file_path' => $filePath,
-                'metadata' => $metadata,
-            ];
-
-        } catch (\Exception $e) {
-            Log::channel('security')->error('Secure file access failed', [
-                'user_id' => auth()->id(),
-                'school_id' => auth()->user()->school_id,
-                'file_path' => $filePath,
-                'error' => $e->getMessage(),
-                'ip_address' => request()->ip(),
-            ]);
-
-            throw new \Exception('File access failed: ' . $e->getMessage());
-        }
+        return [
+            'success' => true,
+            'file_id' => $record->id,
+            'file_path' => $filePath,
+            'metadata' => $this->getStoredFileMetadata($filePath),
+            'download_url' => $this->generateSecureUrl($filePath),
+        ];
     }
 
     /**
-     * Delete file securely
+     * Delete file securely, only if the caller owns it.
+     *
+     * @param  array{user_id: int, school_id: int}  $owner
      */
-    public function deleteFile(string $filePath): bool
+    public function deleteFile(string $filePath, array $owner): bool
     {
-        try {
-            // Validate file path
-            if ($this->isPathTraversal($filePath)) {
-                throw new \Exception('Invalid file path.');
-            }
+        $record = $this->findOwnedFile($filePath, $owner);
 
-            // Check if file exists
-            if (!Storage::disk('secure_uploads')->exists($filePath)) {
+        $deleted = Storage::disk('secure_uploads')->delete($filePath);
+
+        if ($deleted) {
+            $record->delete();
+
+            Log::channel('security')->info('Secure file deletion', [
+                'user_id' => $owner['user_id'],
+                'school_id' => $owner['school_id'],
+                'file_id' => $record->id,
+                'file_path' => $filePath,
+                'ip_address' => request()->ip(),
+            ]);
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Validate file integrity, only for files owned by the caller.
+     *
+     * @param  array{user_id: int, school_id: int}  $owner
+     */
+    public function validateFileIntegrity(string $filePath, string $expectedHash, array $owner): bool
+    {
+        $record = $this->findOwnedFile($filePath, $owner);
+
+        try {
+            $fullPath = Storage::disk('secure_uploads')->path($filePath);
+
+            if (! file_exists($fullPath)) {
                 return false;
             }
 
-            // Delete file
-            $deleted = Storage::disk('secure_uploads')->delete($filePath);
-
-            if ($deleted) {
-                Log::channel('security')->info('Secure file deletion', [
-                    'user_id' => auth()->id(),
-                    'school_id' => auth()->user()->school_id,
-                    'file_path' => $filePath,
-                    'ip_address' => request()->ip(),
-                ]);
-            }
-
-            return $deleted;
-
+            return hash_equals($expectedHash, hash_file('sha256', $fullPath));
         } catch (\Exception $e) {
-            Log::channel('security')->error('Secure file deletion failed', [
-                'user_id' => auth()->id(),
-                'school_id' => auth()->user()->school_id,
+            Log::channel('security')->error('File integrity validation failed', [
+                'file_id' => $record->id,
                 'file_path' => $filePath,
                 'error' => $e->getMessage(),
-                'ip_address' => request()->ip(),
             ]);
 
             return false;
         }
+    }
+
+    /**
+     * List files owned by the given user within their school.
+     *
+     * @param  array{user_id: int, school_id: int}  $owner
+     */
+    public function getUserFiles(array $owner, ?string $category = null): array
+    {
+        $query = SecureFile::query()
+            ->where('user_id', $owner['user_id'])
+            ->where('school_id', $owner['school_id']);
+
+        if ($category) {
+            $query->where('category', $category);
+        }
+
+        return $query->orderByDesc('created_at')->get()
+            ->map(fn (SecureFile $file) => [
+                'file_id' => $file->id,
+                'path' => $file->storage_path,
+                'original_name' => $file->original_name,
+                'category' => $file->category,
+                'size' => $file->size,
+                'mime_type' => $file->mime_type,
+                'uploaded_at' => $file->created_at?->toISOString(),
+                'metadata' => $this->getStoredFileMetadata($file->storage_path),
+                'download_url' => $this->generateSecureUrl($file->storage_path),
+            ])
+            ->all();
+    }
+
+    /**
+     * Find an owned file record, or 404 if it does not exist / is not owned.
+     *
+     * @param  array{user_id: int, school_id: int}  $owner
+     */
+    private function findOwnedFile(string $filePath, array $owner): SecureFile
+    {
+        $record = SecureFile::query()
+            ->where('storage_path', $filePath)
+            ->where('user_id', $owner['user_id'])
+            ->where('school_id', $owner['school_id'])
+            ->first();
+
+        // 404 (not 403) to avoid disclosing that another user's file exists.
+        if (! $record) {
+            throw new NotFoundHttpException('File not found.');
+        }
+
+        if (! Storage::disk('secure_uploads')->exists($filePath)) {
+            throw new NotFoundHttpException('File not found.');
+        }
+
+        return $record;
     }
 
     /**
@@ -193,59 +248,17 @@ class SecureFileUploadService
     private function getStoredFileMetadata(string $filePath): array
     {
         $fullPath = Storage::disk('secure_uploads')->path($filePath);
-        
-        if (!file_exists($fullPath)) {
-            throw new \Exception('File not found on disk.');
+
+        if (! file_exists($fullPath)) {
+            throw new NotFoundHttpException('File not found.');
         }
 
-        $metadata = [
+        return [
             'size' => filesize($fullPath),
             'modified_at' => date('Y-m-d H:i:s', filemtime($fullPath)),
             'mime_type' => mime_content_type($fullPath),
+            'hash' => hash_file('sha256', $fullPath),
         ];
-
-        // Calculate file hash
-        $metadata['hash'] = hash_file('sha256', $fullPath);
-
-        return $metadata;
-    }
-
-    /**
-     * Check for path traversal attempts
-     */
-    private function isPathTraversal(string $path): bool
-    {
-        // Check for common path traversal patterns
-        $traversalPatterns = [
-            '../',
-            '..\\',
-            '%2e%2e%2f',
-            '%2e%2e%5c',
-            '..%2f',
-            '..%5c',
-            '%2e%2e/',
-            '%2e%2e\\',
-            '....//',
-            '....\\\\',
-        ];
-
-        foreach ($traversalPatterns as $pattern) {
-            if (str_contains(strtolower($path), $pattern)) {
-                return true;
-            }
-        }
-
-        // Check for absolute paths
-        if (str_starts_with($path, '/') || str_starts_with($path, '\\')) {
-            return true;
-        }
-
-        // Check for drive letters (Windows)
-        if (preg_match('/^[a-zA-Z]:/', $path)) {
-            return true;
-        }
-
-        return false;
     }
 
     /**
@@ -253,75 +266,18 @@ class SecureFileUploadService
      */
     public function generateSecureUrl(string $filePath, int $expiresInMinutes = 60): string
     {
-        // Generate temporary signed URL for secure access
         $expiresAt = now()->addMinutes($expiresInMinutes);
-        
-        return Storage::disk('secure_uploads')
-            ->temporaryUrl($filePath, $expiresAt);
-    }
 
-    /**
-     * Validate file integrity
-     */
-    public function validateFileIntegrity(string $filePath, string $expectedHash): bool
-    {
         try {
-            $fullPath = Storage::disk('secure_uploads')->path($filePath);
-            
-            if (!file_exists($fullPath)) {
-                return false;
-            }
-
-            $actualHash = hash_file('sha256', $fullPath);
-            
-            return hash_equals($expectedHash, $actualHash);
-
-        } catch (\Exception $e) {
-            Log::channel('security')->error('File integrity validation failed', [
-                'file_path' => $filePath,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
+            return Storage::disk('secure_uploads')->temporaryUrl($filePath, $expiresAt);
+        } catch (\RuntimeException $e) {
+            // Local disks do not provide temporary URLs natively; fall back to
+            // a signed route that still enforces ownership on access.
+            return \Illuminate\Support\Facades\URL::temporarySignedRoute(
+                'files.serve',
+                $expiresAt,
+                ['filePath' => $filePath]
+            );
         }
-    }
-
-    /**
-     * Get user's uploaded files
-     */
-    public function getUserFiles(int $userId = null, string $category = null): array
-    {
-        $userId = $userId ?? auth()->id();
-        $schoolId = auth()->user()->school_id;
-
-        $basePath = "secure_uploads/{$schoolId}";
-        
-        if ($category) {
-            $basePath .= "/{$category}";
-        }
-
-        $files = [];
-        
-        try {
-            $allFiles = Storage::disk('secure_uploads')->allFiles($basePath);
-            
-            foreach ($allFiles as $file) {
-                $metadata = $this->getStoredFileMetadata($file);
-                $files[] = [
-                    'path' => $file,
-                    'metadata' => $metadata,
-                    'download_url' => $this->generateSecureUrl($file),
-                ];
-            }
-
-        } catch (\Exception $e) {
-            Log::channel('security')->error('Failed to list user files', [
-                'user_id' => $userId,
-                'school_id' => $schoolId,
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return $files;
     }
 }

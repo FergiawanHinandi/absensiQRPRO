@@ -7,7 +7,7 @@ use App\Http\Requests\SecureFileUploadRequest;
 use App\Services\SecureFileUploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class SecureFileUploadController extends Controller
 {
@@ -24,18 +24,22 @@ class SecureFileUploadController extends Controller
     public function upload(SecureFileUploadRequest $request): JsonResponse
     {
         try {
-            $result = $this->fileUploadService->uploadFile($request);
+            $result = $this->fileUploadService->uploadFile($request, $this->owner($request));
 
             return response()->json([
                 'success' => true,
                 'message' => 'File uploaded successfully',
                 'data' => $result,
             ]);
+        } catch (\Throwable $e) {
+            Log::error('Secure file upload failed', [
+                'user_id' => $request->user()?->id,
+                'error' => $e->getMessage(),
+            ]);
 
-        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'File upload failed: ' . $e->getMessage(),
+                'message' => 'File upload gagal. Silakan coba lagi.',
             ], 500);
         }
     }
@@ -46,32 +50,30 @@ class SecureFileUploadController extends Controller
     public function download(Request $request, string $filePath): JsonResponse
     {
         try {
-            // Validate file path
-            if ($this->isPathTraversal($filePath)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid file path',
-                ], 400);
-            }
-
-            $result = $this->fileUploadService->serveFile($filePath);
-
-            // Generate secure download URL
-            $downloadUrl = $this->fileUploadService->generateSecureUrl($filePath);
+            $result = $this->fileUploadService->serveFile($filePath, $this->owner($request));
 
             return response()->json([
                 'success' => true,
                 'message' => 'Download URL generated',
                 'data' => array_merge($result, [
-                    'download_url' => $downloadUrl,
                     'expires_in_minutes' => 60,
                 ]),
             ]);
-
-        } catch (\Exception $e) {
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to generate download URL: ' . $e->getMessage(),
+                'message' => 'File tidak ditemukan.',
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('Secure file download failed', [
+                'user_id' => $request->user()?->id,
+                'file_path' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat URL download.',
             ], 500);
         }
     }
@@ -82,32 +84,34 @@ class SecureFileUploadController extends Controller
     public function destroy(Request $request, string $filePath): JsonResponse
     {
         try {
-            // Validate file path
-            if ($this->isPathTraversal($filePath)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid file path',
-                ], 400);
-            }
-
-            $deleted = $this->fileUploadService->deleteFile($filePath);
+            $deleted = $this->fileUploadService->deleteFile($filePath, $this->owner($request));
 
             if ($deleted) {
                 return response()->json([
                     'success' => true,
                     'message' => 'File deleted successfully',
                 ]);
-            } else {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'File not found or could not be deleted',
-                ], 404);
             }
 
-        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'File deletion failed: ' . $e->getMessage(),
+                'message' => 'File tidak ditemukan atau gagal dihapus.',
+            ], 404);
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File tidak ditemukan.',
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('Secure file deletion failed', [
+                'user_id' => $request->user()?->id,
+                'file_path' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus file.',
             ], 500);
         }
     }
@@ -119,7 +123,7 @@ class SecureFileUploadController extends Controller
     {
         try {
             $category = $request->input('category');
-            $files = $this->fileUploadService->getUserFiles(null, $category);
+            $files = $this->fileUploadService->getUserFiles($this->owner($request), $category);
 
             return response()->json([
                 'success' => true,
@@ -128,11 +132,15 @@ class SecureFileUploadController extends Controller
                     'total' => count($files),
                 ],
             ]);
+        } catch (\Throwable $e) {
+            Log::error('Secure file listing failed', [
+                'user_id' => $request->user()?->id,
+                'error' => $e->getMessage(),
+            ]);
 
-        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve files: ' . $e->getMessage(),
+                'message' => 'Gagal mengambil daftar file.',
             ], 500);
         }
     }
@@ -143,25 +151,27 @@ class SecureFileUploadController extends Controller
     public function show(Request $request, string $filePath): JsonResponse
     {
         try {
-            // Validate file path
-            if ($this->isPathTraversal($filePath)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid file path',
-                ], 400);
-            }
-
-            $result = $this->fileUploadService->serveFile($filePath);
+            $result = $this->fileUploadService->serveFile($filePath, $this->owner($request));
 
             return response()->json([
                 'success' => true,
                 'data' => $result,
             ]);
-
-        } catch (\Exception $e) {
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve file metadata: ' . $e->getMessage(),
+                'message' => 'File tidak ditemukan.',
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('Secure file metadata failed', [
+                'user_id' => $request->user()?->id,
+                'file_path' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil metadata file.',
             ], 500);
         }
     }
@@ -173,23 +183,19 @@ class SecureFileUploadController extends Controller
     {
         try {
             $expectedHash = $request->input('hash');
-            
-            if (!$expectedHash) {
+
+            if (! $expectedHash) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Hash is required for validation',
                 ], 400);
             }
 
-            // Validate file path
-            if ($this->isPathTraversal($filePath)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid file path',
-                ], 400);
-            }
-
-            $isValid = $this->fileUploadService->validateFileIntegrity($filePath, $expectedHash);
+            $isValid = $this->fileUploadService->validateFileIntegrity(
+                $filePath,
+                $expectedHash,
+                $this->owner($request)
+            );
 
             return response()->json([
                 'success' => true,
@@ -199,47 +205,65 @@ class SecureFileUploadController extends Controller
                     'validated_at' => now()->toISOString(),
                 ],
             ]);
-
-        } catch (\Exception $e) {
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'File validation failed: ' . $e->getMessage(),
+                'message' => 'File tidak ditemukan.',
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('Secure file validation failed', [
+                'user_id' => $request->user()?->id,
+                'file_path' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memvalidasi file.',
             ], 500);
         }
     }
 
     /**
-     * Check for path traversal attempts
+     * Stream an owned file's content (signed URL target).
      */
-    private function isPathTraversal(string $path): bool
+    public function serve(Request $request, string $filePath): \Symfony\Component\HttpFoundation\StreamedResponse|JsonResponse
     {
-        $traversalPatterns = [
-            '../',
-            '..\\',
-            '%2e%2e%2f',
-            '%2e%2e%5c',
-            '..%2f',
-            '..%5c',
-            '%2e%2e/',
-            '%2e%2e\\',
-            '....//',
-            '....\\\\',
+        try {
+            $this->fileUploadService->serveFile($filePath, $this->owner($request));
+
+            return \Illuminate\Support\Facades\Storage::disk('secure_uploads')->download($filePath);
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File tidak ditemukan.',
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('Secure file serve failed', [
+                'user_id' => $request->user()?->id,
+                'file_path' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengunduh file.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Resolve the authenticated owner (user_id + school_id) for scoping.
+     *
+     * @return array{user_id: int, school_id: int|null}
+     */
+    private function owner(Request $request): array
+    {
+        $user = $request->user();
+
+        return [
+            'user_id' => $user->id,
+            'school_id' => $user->school_id,
         ];
-
-        foreach ($traversalPatterns as $pattern) {
-            if (str_contains(strtolower($path), $pattern)) {
-                return true;
-            }
-        }
-
-        if (str_starts_with($path, '/') || str_starts_with($path, '\\')) {
-            return true;
-        }
-
-        if (preg_match('/^[a-zA-Z]:/', $path)) {
-            return true;
-        }
-
-        return false;
     }
 }

@@ -46,7 +46,10 @@ class SecureFileUploadRequest extends FormRequest
                 'required',
                 'file',
                 'max:' . (self::MAX_FILE_SIZE / 1024), // in KB
-                'mimes:' . implode(',', array_keys(self::ALLOWED_MIME_TYPES)),
+                // NOTE: mimes rule compares guessExtension() against its
+                // parameters, so extension names are required here; the
+                // closure below does the authoritative MIME-type check.
+                'mimes:' . implode(',', self::ALLOWED_EXTENSIONS),
                 function ($attribute, $value, $fail) {
                     if (!$value instanceof UploadedFile) {
                         $fail('The :attribute must be a file.');
