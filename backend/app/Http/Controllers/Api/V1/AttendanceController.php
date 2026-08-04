@@ -8,7 +8,10 @@ use App\Http\Controllers\Traits\IDORProtection;
 use App\Http\Requests\Attendance\DailyReportRequest;
 use App\Http\Requests\Attendance\ManualAttendanceRequest;
 use App\Http\Requests\Attendance\ScanAttendanceRequest;
+use App\Http\Requests\Api\TeacherScanRequest;
+use App\Http\Requests\Api\SecureAttendanceScanRequest;
 use App\Services\AttendanceService;
+use App\Services\QRSignatureService;
 use App\Traits\UsesCacheTags;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -34,7 +37,8 @@ class AttendanceController extends Controller
 
     public function __construct(
         private AttendanceService $attendanceService,
-        private \App\Services\AttendanceCheckInService $checkInService
+        private \App\Services\AttendanceCheckInService $checkInService,
+        private QRSignatureService $signatureService
     ) {}
 
     /**
@@ -208,6 +212,237 @@ class AttendanceController extends Controller
     }
 
     /**
+     * Teacher scans student QR card (token-based)
+     *
+     * Merged from TeacherScanController
+     */
+    public function teacherScan(TeacherScanRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validatedWithDefaults();
+
+            $result = $this->checkInService->teacherCheckIn(
+                teacher: $request->user(),
+                qrToken: $data['qr_token'],
+                data: [
+                    'lat' => $data['lat'] ?? null,
+                    'lng' => $data['lng'] ?? null,
+                    'device_id' => $data['device_id'] ?? null,
+                    'request_id' => $data['request_id'],
+                ],
+                request: $request
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => $result->message,
+                'data' => [
+                    'attendance' => $result->attendance,
+                    'status' => $result->status,
+                    'is_retry' => $result->isIdempotentRetry,
+                ],
+            ], $result->isIdempotentRetry ? 200 : 201);
+
+        } catch (AttendanceException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => $this->getErrorCode($e),
+                'data' => null,
+            ], 400);
+
+        } catch (\Exception $e) {
+            Log::error('TeacherScan unexpected error', [
+                'teacher_id' => $request->user()->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat memproses absensi.',
+                'code' => 'INTERNAL_ERROR',
+                'data' => null,
+            ], 500);
+        }
+    }
+
+    /**
+     * Secure teacher scan (HMAC signature verification)
+     *
+     * Merged from SecureAttendanceScanController
+     */
+    public function secureScan(SecureAttendanceScanRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validatedWithDefaults();
+            $qrPayload = $data['qr_payload'];
+
+            $verificationResult = $this->signatureService->verifyPayload($qrPayload);
+            $qrToken = $this->buildSecureQrToken($verificationResult, $request->user()->school_id);
+
+            $result = $this->checkInService->teacherCheckIn(
+                teacher: $request->user(),
+                qrToken: $qrToken,
+                data: [
+                    'lat' => $data['lat'] ?? null,
+                    'lng' => $data['lng'] ?? null,
+                    'device_id' => $data['device_id'] ?? null,
+                    'request_id' => $data['request_id'],
+                ],
+                request: $request
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => $result->message,
+                'data' => [
+                    'attendance' => $result->attendance,
+                    'status' => $result->status,
+                    'is_retry' => $result->isIdempotentRetry,
+                ],
+            ], $result->isIdempotentRetry ? 200 : 201);
+
+        } catch (AttendanceException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => $this->getErrorCode($e),
+            ], 400);
+
+        } catch (\Exception $e) {
+            Log::channel('attendance_security')->error('Secure attendance error', [
+                'teacher_id' => $request->user()?->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => app()->isProduction() ? 'Terjadi kesalahan saat memproses absensi.' : $e->getMessage(),
+                'code' => 'INTERNAL_ERROR',
+            ], 500);
+        }
+    }
+
+    /**
+     * Scan using encoded QR string (base64 JSON)
+     *
+     * Merged from SecureAttendanceScanController
+     */
+    public function scanEncoded(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'qr_encoded' => 'required|string',
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lng' => 'nullable|numeric|between:-180,180',
+            'device_id' => 'nullable|string|max:255',
+            'request_id' => 'nullable|uuid',
+        ]);
+
+        $teacher = $request->user();
+
+        if (!in_array($teacher->role_type, ['teacher', 'homeroom_teacher'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Hanya guru yang dapat melakukan scan.',
+                'code' => 'UNAUTHORIZED',
+            ], 403);
+        }
+
+        try {
+            $verificationResult = $this->signatureService->verifyEncodedPayload($validated['qr_encoded']);
+            $qrToken = $this->buildSecureQrToken($verificationResult, $teacher->school_id);
+
+            $result = $this->checkInService->teacherCheckIn(
+                teacher: $teacher,
+                qrToken: $qrToken,
+                data: [
+                    'lat' => $validated['lat'] ?? null,
+                    'lng' => $validated['lng'] ?? null,
+                    'device_id' => $validated['device_id'] ?? null,
+                    'request_id' => $validated['request_id'] ?? (string) \Illuminate\Support\Str::uuid(),
+                ],
+                request: $request
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => $result->message,
+                'data' => [
+                    'attendance' => $result->attendance,
+                    'status' => $result->status,
+                    'is_retry' => $result->isIdempotentRetry,
+                ],
+            ], $result->isIdempotentRetry ? 200 : 201);
+
+        } catch (\Exception $e) {
+            Log::channel('attendance_security')->warning('Encoded QR verification failed', [
+                'teacher_id' => $teacher->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => 'QR_VERIFICATION_FAILED',
+            ], 400);
+        }
+    }
+
+    /**
+     * Generate a new signed QR for a student
+     *
+     * Merged from SecureAttendanceScanController
+     */
+    public function generateQR(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'student_id' => 'required|integer|exists:users,id',
+        ]);
+
+        $user = $request->user();
+
+        if (!in_array($user->role_type, ['teacher', 'homeroom_teacher', 'admin', 'school_admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized.',
+                'code' => 'UNAUTHORIZED',
+            ], 403);
+        }
+
+        $student = \App\Models\User::where('id', $validated['student_id'])
+            ->where('role_type', 'student')
+            ->where('school_id', $user->school_id)
+            ->first();
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Siswa tidak ditemukan.',
+                'code' => 'STUDENT_NOT_FOUND',
+            ], 404);
+        }
+
+        $qrData = $this->signatureService->createForStudent($student);
+
+        Log::channel('attendance_security')->info('QR Generated', [
+            'generator_id' => $user->id,
+            'student_id' => $student->id,
+            'expires_at' => $qrData['expires_at'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'QR Code berhasil dibuat.',
+            'data' => [
+                'qr_payload' => $qrData['payload'],
+                'qr_encoded' => $qrData['encoded'],
+                'expires_at' => $qrData['expires_at'],
+                'valid_for_seconds' => $qrData['valid_for_seconds'],
+            ],
+        ]);
+    }
+
+    /**
      * Get student attendance history
      */
     public function history(Request $request)
@@ -352,5 +587,46 @@ class AttendanceController extends Controller
         });
 
         return response()->success($data);
+    }
+
+    /**
+     * Build QR token from secure verification result
+     */
+    private function buildSecureQrToken(array $result, int $schoolId): string
+    {
+        $payload = [
+            'sid' => $result['student_id'],
+            'sch' => $schoolId,
+            'iat' => is_numeric($result['generated_at'])
+                ? $result['generated_at']
+                : \Carbon\Carbon::parse($result['generated_at'])->timestamp,
+            'typ' => 'secure_scan',
+            'n' => \Illuminate\Support\Str::random(16),
+            'v' => 1,
+        ];
+
+        $encoded = base64_encode(json_encode($payload));
+        $signature = hash_hmac('sha256', $encoded, config('qr.secret'));
+
+        return $encoded . '.' . $signature;
+    }
+
+    /**
+     * Map AttendanceException to error code
+     */
+    private function getErrorCode(AttendanceException $e): string
+    {
+        $message = $e->getMessage();
+
+        return match (true) {
+            str_contains($message, 'sudah dicatat') => 'ALREADY_CHECKED_IN',
+            str_contains($message, 'tidak valid') => 'INVALID_QR',
+            str_contains($message, 'kadaluarsa') => 'QR_EXPIRED',
+            str_contains($message, 'jadwal') => 'NO_ACTIVE_SCHEDULE',
+            str_contains($message, 'radius') => 'OUTSIDE_GEOFENCE',
+            str_contains($message, 'waktu') => 'OUTSIDE_TIME_WINDOW',
+            str_contains($message, 'kelas') => 'STUDENT_NOT_IN_CLASS',
+            default => 'ATTENDANCE_ERROR',
+        };
     }
 }

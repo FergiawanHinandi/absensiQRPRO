@@ -56,9 +56,11 @@ Route::prefix('v1')
             // Attendance (Scan/Manual)
             require __DIR__ . '/api/v1/attendance.php';
             
-            // ✅ SECURE ATTENDANCE (QR with HMAC signature)
-            require __DIR__ . '/api/v1/secure-attendance.php';
-            
+            // Mobile Security Events
+            Route::post('/security/mobile-event', [\App\Http\Controllers\Api\V1\MobileSecurityController::class, 'reportEvent']);
+            Route::post('/security/mobile-events/batch', [\App\Http\Controllers\Api\V1\MobileSecurityController::class, 'reportBatch']);
+            Route::post('/security/device-integrity', [\App\Http\Controllers\Api\V1\MobileSecurityController::class, 'reportDeviceIntegrity']);
+
             // Student
             require __DIR__ . '/api/v1/student.php';
 
