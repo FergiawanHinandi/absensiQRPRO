@@ -51,9 +51,41 @@ class TimezoneHelper
      *
      * @param string|null $timezone Timezone identifier. Uses app.timezone if null.
      */
-    public static function today(?string $timezone = null): Carbon
+    public static function today(School|string|null $timezoneOrSchool = null): Carbon|string
     {
-        return self::now($timezone)->startOfDay();
+        if ($timezoneOrSchool instanceof School) {
+            return self::schoolNow($timezoneOrSchool)->toDateString();
+        }
+
+        return self::now($timezoneOrSchool)->startOfDay();
+    }
+
+    /**
+     * Create a Carbon instance from a time string using the school's timezone.
+     *
+     * @param string      $timeString Time in H:i:s format (e.g. "08:00:00")
+     * @param School|null $school     School model with timezone attribute
+     * @param string|null $date       Date in Y-m-d format (defaults to today)
+     */
+    public static function timeFromString(string $timeString, ?School $school = null, ?string $date = null): Carbon
+    {
+        $timezone = $school?->timezone ?? config('app.timezone');
+
+        $date ??= self::now($timezone)->toDateString();
+
+        return Carbon::createFromFormat('Y-m-d H:i:s', "{$date} {$timeString}", $timezone);
+    }
+
+    /**
+     * Check if a time is between start and end times (inclusive).
+     *
+     * @param Carbon $current Time to check
+     * @param Carbon $start   Start time
+     * @param Carbon $end     End time
+     */
+    public static function isBetween(Carbon $current, Carbon $start, Carbon $end): bool
+    {
+        return $current->between($start, $end);
     }
 
     /**

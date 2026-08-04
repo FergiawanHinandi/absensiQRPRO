@@ -12,9 +12,9 @@ class AttendanceFactory extends Factory
     public function definition(): array
     {
         return [
-            'school_id' => 1,
-            'student_id' => 1,
-            'schedule_id' => 1,
+            'school_id' => \App\Models\School::factory(),
+            'student_id' => \App\Models\User::factory()->state(['role_type' => 'student']),
+            'schedule_id' => \App\Models\Schedule::factory(),
             'attendance_date' => now()->toDateString(),
             // 'status' removed - use state machine methods instead
             'check_in_time' => now(),

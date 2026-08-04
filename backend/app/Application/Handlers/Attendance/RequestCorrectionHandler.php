@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Handlers\Attendance;
 
 use App\Application\Commands\Attendance\RequestCorrectionCommand;
-use App\Domain\Attendance\AttendanceAggregateRoot;
+use App\Domain\Attendance\Aggregates\AttendanceAggregate;
 use App\Infrastructure\Persistence\AttendanceRepository;
 use App\Models\Attendance;
 
@@ -18,7 +18,7 @@ class RequestCorrectionHandler
     public function handle(RequestCorrectionCommand $command): Attendance
     {
         $model = Attendance::findOrFail($command->attendanceId);
-        $aggregate = AttendanceAggregateRoot::fromModel($model);
+        $aggregate = AttendanceAggregate::fromModel($model);
 
         $aggregate->requestCorrection(
             reason: $command->reason,

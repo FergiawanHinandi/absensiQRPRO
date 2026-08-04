@@ -25,7 +25,7 @@ class SecurityMonitoringService
             'ip_address' => $data['ip_address'] ?? request()->ip(),
             'device_id' => $data['device_id'] ?? null,
             'user_agent' => $data['user_agent'] ?? request()->userAgent(),
-            'details' => $data['details'] ?? null,
+            'context' => $data['context'] ?? ($data['details'] ?? null),
         ]);
 
         // Auto-flag if thresholds exceeded
@@ -216,7 +216,7 @@ class SecurityMonitoringService
                 ->count(),
 
             'unreviewed_events_count' => SecurityEvent::where('school_id', $schoolId)
-                ->where('reviewed', false)
+                ->where('is_resolved', false)
                 ->whereIn('severity', ['high', 'critical'])
                 ->count(),
         ];
@@ -301,7 +301,7 @@ class SecurityMonitoringService
                     'user_id' => $event->user_id,
                     'ip_address' => $event->ip_address,
                     'device_id' => $event->device_id,
-                    'details' => $event->details,
+                    'context' => $event->context,
                     'created_at' => $event->created_at->toIso8601String(),
                     'user_name' => $event->user->name ?? 'Unknown',
                     'student_name' => $event->student->name ?? null,

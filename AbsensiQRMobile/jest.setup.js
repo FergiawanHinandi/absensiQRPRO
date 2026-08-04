@@ -21,6 +21,42 @@ jest.mock('react-native-config', () => ({
   ENV: 'test',
 }));
 
+// App-level modules used by the render smoke test
+jest.mock('./src/contexts/AuthContext', () => ({
+  __esModule: true,
+  AuthProvider: ({children}) => children,
+  useAuth: jest.fn(() => ({
+    isAuthenticated: false,
+    isLoading: false,
+    user: null,
+  })),
+}));
+
+jest.mock('./src/navigation/RootNavigator', () => ({
+  __esModule: true,
+  RootNavigator: () => null,
+}));
+
+jest.mock('./src/services/NotificationService', () => ({
+  __esModule: true,
+  NotificationService: {
+    registerDevice: jest.fn(() => Promise.resolve(null)),
+    setupListeners: jest.fn(() => jest.fn()),
+  },
+}));
+
+jest.mock('./src/services/OfflineSyncService', () => ({
+  __esModule: true,
+  offlineSyncService: {
+    init: jest.fn(),
+    destroy: jest.fn(),
+  },
+  default: {
+    init: jest.fn(),
+    destroy: jest.fn(),
+  },
+}));
+
 // react-native-device-info
 jest.mock('react-native-device-info', () => ({
   getUniqueId: jest.fn(() => Promise.resolve('test-device-id')),
@@ -65,12 +101,77 @@ jest.mock('@react-native-community/geolocation', () => ({
   setRNConfiguration: jest.fn(),
 }));
 
+// react-native-geolocation-service
+jest.mock('react-native-geolocation-service', () => ({
+  __esModule: true,
+  default: {
+    getCurrentPosition: jest.fn(),
+    watchPosition: jest.fn(),
+    clearWatch: jest.fn(),
+  },
+}));
+
 // react-native-vision-camera
 jest.mock('react-native-vision-camera', () => ({
   Camera: 'Camera',
   useCameraDevices: jest.fn(() => ({back: {id: 'back'}, front: {id: 'front'}})),
   useCodeScanner: jest.fn(),
 }));
+
+// react-native-qrcode-svg
+jest.mock('react-native-qrcode-svg', () => 'QRCode');
+
+// @react-native-async-storage/async-storage
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  __esModule: true,
+  default: {
+    getItem: jest.fn(() => Promise.resolve(null)),
+    setItem: jest.fn(() => Promise.resolve()),
+    removeItem: jest.fn(() => Promise.resolve()),
+    clear: jest.fn(() => Promise.resolve()),
+  },
+}));
+
+// @react-native-community/netinfo
+jest.mock('@react-native-community/netinfo', () => ({
+  __esModule: true,
+  default: {
+    addEventListener: jest.fn(() => jest.fn()),
+    fetch: jest.fn(() => Promise.resolve({isConnected: false, isInternetReachable: false})),
+  },
+}));
+
+// react-native-background-fetch
+jest.mock('react-native-background-fetch', () => ({
+  __esModule: true,
+  default: {
+    configure: jest.fn(() => Promise.resolve()),
+    finish: jest.fn(),
+  },
+}));
+
+// @react-native-firebase/messaging
+jest.mock('@react-native-firebase/messaging', () => {
+  const messagingFn = jest.fn(() => ({
+    requestPermission: jest.fn(() => Promise.resolve(1)),
+    getToken: jest.fn(() => Promise.resolve('test-fcm-token')),
+    onMessage: jest.fn(() => jest.fn()),
+    onNotificationOpenedApp: jest.fn(),
+    getInitialNotification: jest.fn(() => Promise.resolve(null)),
+    onTokenRefresh: jest.fn(() => jest.fn()),
+  }));
+
+  messagingFn.AuthorizationStatus = {
+    AUTHORIZED: 1,
+    PROVISIONAL: 2,
+  };
+
+  return {
+    __esModule: true,
+    default: messagingFn,
+    AuthorizationStatus: messagingFn.AuthorizationStatus,
+  };
+});
 
 // vision-camera-code-scanner
 jest.mock('vision-camera-code-scanner', () => ({
@@ -108,6 +209,6 @@ jest.spyOn(console, 'warn').mockImplementation((...args) => {
   const msg = typeof args[0] === 'string' ? args[0] : '';
   if (msg.includes('Animated') || msg.includes('useNativeDriver')) {
     return;
-
-  console.warn.apply(console, args);
+  }
+  return;
 });

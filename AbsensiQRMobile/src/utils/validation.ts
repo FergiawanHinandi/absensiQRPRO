@@ -49,7 +49,7 @@ export const patterns = {
   time: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/,
 
   // QR Token format
-  qrToken: /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
+  qrToken: /^[A-Za-z0-9+/=_-]+\.[A-Za-z0-9+/=_-]+$/,
 
   // Device ID format (alphanumeric with hyphens)
   deviceId: /^[A-Za-z0-9-]+$/,

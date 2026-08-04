@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Persistence;
 
-use App\Domain\Attendance\AttendanceAggregateRoot;
+use App\Domain\Attendance\Aggregates\AttendanceAggregate;
 use App\Domain\Shared\DomainEvent;
 use App\Models\Attendance;
 
@@ -18,7 +18,7 @@ class AttendanceRepository
     /**
      * Save an aggregate, persisting the model and dispatching events.
      */
-    public function save(AttendanceAggregateRoot $aggregate): Attendance
+    public function save(AttendanceAggregate $aggregate): Attendance
     {
         $model = $aggregate->getModel();
         $model->save();
@@ -36,24 +36,24 @@ class AttendanceRepository
     /**
      * Find an attendance record and wrap in aggregate.
      */
-    public function findOrFail(int $id): AttendanceAggregateRoot
+    public function findOrFail(int $id): AttendanceAggregate
     {
         $model = Attendance::findOrFail($id);
 
-        return AttendanceAggregateRoot::fromModel($model);
+        return AttendanceAggregate::fromModel($model);
     }
 
     /**
      * Find today's record for student/schedule, or return null.
      */
-    public function findTodayForStudent(int $studentId, int $scheduleId): ?AttendanceAggregateRoot
+    public function findTodayForStudent(int $studentId, int $scheduleId): ?AttendanceAggregate
     {
         $model = Attendance::where('student_id', $studentId)
             ->where('schedule_id', $scheduleId)
             ->whereDate('attendance_date', today())
             ->first();
 
-        return $model ? AttendanceAggregateRoot::fromModel($model) : null;
+        return $model ? AttendanceAggregate::fromModel($model) : null;
     }
 
     private function enrichAndDispatch(DomainEvent $event, Attendance $model): void

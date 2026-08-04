@@ -275,7 +275,7 @@ export const ParentPermissionPage: React.FC = () => {
                     <EmptyState
                         preset="no-data"
                         title="Belum Ada Permohonan Izin"
-                        description="Klik \"Ajukan Izin Baru\" untuk membuat permohonan izin/sakit anak Anda."
+                        description={'Klik "Ajukan Izin Baru" untuk membuat permohonan izin/sakit anak Anda.'}
                         size="md"
                     />
                 ) : (

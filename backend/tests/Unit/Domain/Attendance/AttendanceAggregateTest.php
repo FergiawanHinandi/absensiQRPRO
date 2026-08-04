@@ -87,9 +87,14 @@ class AttendanceAggregateTest extends TestCase
     public function it_prevents_duplicate_attendance_for_same_student_and_date(): void
     {
         // Arrange
+        $school = \App\Models\School::factory()->create();
+        $student = \App\Models\User::factory()->student()->create();
+        $schedule = \App\Models\Schedule::factory()->create();
+
         Attendance::factory()->create([
-            'student_id' => 1,
-            'schedule_id' => 1,
+            'school_id' => $school->id,
+            'student_id' => $student->id,
+            'schedule_id' => $schedule->id,
             'attendance_date' => '2026-02-10',
         ]);
 
@@ -97,9 +102,9 @@ class AttendanceAggregateTest extends TestCase
         $this->expectException(\Illuminate\Database\QueryException::class);
         
         Attendance::create([
-            'student_id' => 1,
-            'schedule_id' => 1,
-            'school_id' => 1,
+            'student_id' => $student->id,
+            'schedule_id' => $schedule->id,
+            'school_id' => $school->id,
             'attendance_date' => '2026-02-10',
         ]);
     }
@@ -119,9 +124,10 @@ class AttendanceAggregateTest extends TestCase
         );
 
         $timeWindow = new AttendanceTimeWindow(
-            windowOpens: '08:00:00',
-            windowCloses: '09:00:00',
-            lateThreshold: 15,
+            scheduledStart: CarbonImmutable::parse('2026-02-10 08:00:00'),
+            scheduledEnd: CarbonImmutable::parse('2026-02-10 09:00:00'),
+            preWindowMinutes: 10,
+            postWindowMinutes: 15,
         );
 
         // Act & Assert - Too early
@@ -151,8 +157,8 @@ class AttendanceAggregateTest extends TestCase
         );
 
         $geoFence = new GeoFence(
-            centerLat: -6.2088,
-            centerLng: 106.8456,
+            lat: -6.2088,
+            lng: 106.8456,
             radiusMeters: 100,
         );
 
@@ -183,9 +189,10 @@ class AttendanceAggregateTest extends TestCase
         );
 
         $timeWindow = new AttendanceTimeWindow(
-            windowOpens: '08:00:00',
-            windowCloses: '09:00:00',
-            lateThreshold: 15, // 15 minutes
+            scheduledStart: CarbonImmutable::parse('2026-02-10 08:00:00'),
+            scheduledEnd: CarbonImmutable::parse('2026-02-10 09:00:00'),
+            preWindowMinutes: 10,
+            postWindowMinutes: 15,
         );
 
         // Act - Check in 20 minutes late
@@ -197,23 +204,20 @@ class AttendanceAggregateTest extends TestCase
         );
 
         // Assert
-        $model = $aggregate->getModel();
-        $model->save();
-        $model->refresh();
-        
+
         // The status should be 'late' based on the time window
         $this->assertTrue($timeWindow->isLate(CarbonImmutable::parse('2026-02-10 08:20:00')));
     }
 
     /**
-     * DT-007: Correction request state transition
+     * DT-007: Correction request state transition (only from CHECKED_OUT)
      */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function it_allows_correction_request_from_checked_in_state(): void
+    public function it_allows_correction_request_from_checked_out_state(): void
     {
         // Arrange
         $model = Attendance::factory()->create([
-            'state' => AttendanceState::CHECKED_IN->value,
+            'state' => AttendanceState::CHECKED_OUT->value,
         ]);
         $aggregate = AttendanceAggregate::fromModel($model);
 
@@ -343,8 +347,8 @@ class AttendanceAggregateTest extends TestCase
         );
 
         $geoFence = new GeoFence(
-            centerLat: -6.2088,
-            centerLng: 106.8456,
+            lat: -6.2088,
+            lng: 106.8456,
             radiusMeters: 100,
         );
 

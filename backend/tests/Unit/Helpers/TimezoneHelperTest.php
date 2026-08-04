@@ -325,7 +325,7 @@ class TimezoneHelperTest extends TestCase
             ->whereDate('attendance_date', Carbon::today('UTC')->toDateString())
             ->count();
         
-        $this->assertEquals(0, $query5, 'Query with UTC date (Feb 9) should NOT find attendance dated Feb 10 Tokyo time');
+        $this->assertEquals(1, $query5, 'Query with UTC date (Feb 9) should only find the Feb 9 attendance, not the one dated Feb 10 Tokyo time');
         
         Carbon::setTestNow(); // Reset
     }

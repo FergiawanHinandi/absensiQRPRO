@@ -65,7 +65,7 @@ class SecurityAuditService
         $request = $request ?? request();
 
         $event = SecurityEvent::create([
-            'school_id' => $user?->school_id,
+            'school_id' => $user?->school_id ?? ($context['school_id'] ?? null),
             'user_id' => $user?->id,
             'user_type' => $user?->role_type,
             'event_type' => $eventType,
@@ -128,7 +128,8 @@ class SecurityAuditService
             $longitude
         );
 
-        $timeDiff = Carbon::now()->diffInHours($lastEvent->created_at);
+        // Carbon 3 (Laravel 12) returns a signed difference — normalize it.
+        $timeDiff = abs((float) Carbon::now()->diffInHours($lastEvent->created_at));
 
         if ($timeDiff > 0) {
             $speed = $distance / $timeDiff;

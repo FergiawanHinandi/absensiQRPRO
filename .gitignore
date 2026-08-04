@@ -79,6 +79,14 @@ coverage/
 *.lcov
 .phpunit.result.cache
 .phpunit.cache/
+backend/storage/debugbar/
+backend/junit.xml
+queue.err.log
+queue.out.log
+serve.err.log
+serve.out.log
+test-output.log
+seed.log
 
 # ---- Frontend legacy artifacts (never commit) ----
 frontend-web/login_page.html

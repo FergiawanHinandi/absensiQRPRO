@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Attendance\Services;
 
-use App\Domain\Attendance\AttendanceAggregateRoot;
+use App\Domain\Attendance\Aggregates\AttendanceAggregate;
 use App\Domain\Attendance\Rules\NoDuplicateAttendanceRule;
 use App\Domain\Attendance\ValueObjects\AttendanceTimeWindow;
 use App\Domain\Attendance\ValueObjects\GeoFence;
@@ -37,7 +37,7 @@ class AttendanceCheckInDomainService
         ?string $deviceId = null,
         ?string $source = null,
         ?string $requestId = null,
-    ): AttendanceAggregateRoot {
+    ): AttendanceAggregate {
         $attendanceDate = $time->format('Y-m-d');
 
         // Enforce no duplicate
@@ -50,7 +50,7 @@ class AttendanceCheckInDomainService
         $geoFence = $this->buildGeoFence($schedule);
 
         // Create aggregate and check-in
-        $aggregate = AttendanceAggregateRoot::create(
+        $aggregate = AttendanceAggregate::create(
             studentId: $studentId,
             scheduleId: $schedule->id,
             schoolId: $schoolId,

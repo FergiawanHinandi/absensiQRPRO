@@ -28,6 +28,16 @@ abstract class AggregateRoot
     }
 
     /**
+     * Get all pending domain events without releasing them.
+     *
+     * @return DomainEvent[]
+     */
+    public function getRecordedEvents(): array
+    {
+        return $this->pendingEvents;
+    }
+
+    /**
      * Check if there are pending domain events.
      */
     public function hasPendingEvents(): bool

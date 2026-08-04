@@ -168,7 +168,7 @@ const LiveAttendanceCounter: React.FC<LiveAttendanceCounterProps> = ({
             </div>
             <div>
               <p className="text-xs font-medium text-amber-700">Terlambat</p>
-              {!compact && <p className="text-[10px] text-amber-500">> Toleransi waktu</p>}
+              {!compact && <p className="text-[10px] text-amber-500">&gt; Toleransi waktu</p>}
             </div>
           </div>
           <p className={`font-bold text-amber-700 ${compact ? 'text-lg' : 'text-2xl'}`}>

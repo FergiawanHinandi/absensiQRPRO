@@ -65,7 +65,7 @@ return new class extends Migration
         if (Schema::hasTable('security_events')) {
             Schema::table('security_events', function (Blueprint $table) {
                 $table->index('user_id', 'idx_security_events_user_id');
-                $table->index('reviewed_by', 'idx_security_events_reviewed_by');
+                $table->index('resolved_by', 'idx_security_events_resolved_by');
             });
         }
         
@@ -353,7 +353,7 @@ return new class extends Migration
         if (Schema::hasTable('security_events')) {
             Schema::table('security_events', function (Blueprint $table) {
                 $table->dropIndex('idx_security_events_user_id');
-                $table->dropIndex('idx_security_events_reviewed_by');
+                $table->dropIndex('idx_security_events_resolved_by');
             });
         }
         

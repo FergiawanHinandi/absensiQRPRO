@@ -65,6 +65,7 @@ class SecurityEvent extends Model
         'resolved_by',
         'resolved_at',
         'resolution_notes',
+        'created_at',
     ];
 
     protected $casts = [

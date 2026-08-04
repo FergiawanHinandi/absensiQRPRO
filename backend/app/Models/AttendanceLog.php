@@ -49,6 +49,7 @@ class AttendanceLog extends Model
         'location_accuracy' => 'float',
         'students_scanned' => 'integer',
         'device_info' => 'array',
+        'changes' => 'array',
         'created_at' => 'datetime',
     ];
 

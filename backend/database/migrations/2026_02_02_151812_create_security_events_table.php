@@ -30,12 +30,12 @@ return new class extends Migration
                 $table->decimal('latitude', 10, 7)->nullable();
                 $table->decimal('longitude', 10, 7)->nullable();
                 $table->text('message')->nullable();
-                $table->json('details')->nullable();
+                $table->json('context')->nullable();
 
-                $table->boolean('reviewed')->default(false);
-                $table->foreignId('reviewed_by')->nullable()->constrained('users')->onDelete('set null');
-                $table->timestamp('reviewed_at')->nullable();
-                $table->text('review_notes')->nullable();
+                $table->boolean('is_resolved')->default(false);
+                $table->foreignId('resolved_by')->nullable()->constrained('users')->onDelete('set null');
+                $table->timestamp('resolved_at')->nullable();
+                $table->text('resolution_notes')->nullable();
 
                 $table->timestamps();
 

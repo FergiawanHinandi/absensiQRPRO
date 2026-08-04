@@ -5,6 +5,12 @@
 .env.production
 .phpactor.json
 .phpunit.result.cache
+.phpunit.cache/
+/storage/debugbar/
+/storage/logs/
+/junit.xml
+/test-output.log
+/test-log.txt
 /.fleet
 /.idea
 /.nova

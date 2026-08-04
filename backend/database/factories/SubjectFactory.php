@@ -12,7 +12,7 @@ class SubjectFactory extends Factory
     public function definition(): array
     {
         return [
-            'school_id' => 1,
+            'school_id' => \App\Models\School::factory(),
             'name' => $this->faker->word.' '.$this->faker->word,
             'code' => strtoupper($this->faker->bothify('???###')),
             'school_level' => $this->faker->randomElement(['SD', 'SMP', 'SMA', 'SMK']),

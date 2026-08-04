@@ -32,8 +32,9 @@ class Attendance extends Model
     use BelongsToSchool, HasAttendanceStateMachine, HasFactory, SoftDeletes, LogsActivity;
 
     /**
-     * SECURITY: 'status' and 'state' are EXCLUDED from $fillable
-     * All state changes MUST go through state machine methods.
+     * SECURITY: 'status' and 'state' are fillable so the mutators below
+     * can enforce state machine rules (creation is allowed, direct
+     * modification of existing records is blocked).
      * @see HasAttendanceStateMachine
      */
     protected $fillable = [
@@ -44,8 +45,10 @@ class Attendance extends Model
         'attendance_date',
         'attendance_type',
         'session_type',
-        // 'state' - REMOVED: Use state machine methods only
-        // 'status' - REMOVED: Legacy field, use state machine
+        // 'state' - fillable so the mutator guards it (allowed on create, blocked on update)
+        // 'status' - legacy field, synced from state via syncLegacyStatus()
+        'state',
+        'status',
         'check_in_time',
         'check_out_time',
         'scanned_at',
@@ -78,13 +81,11 @@ class Attendance extends Model
     /**
      * SEC-02: Guard for fields that must NEVER be mass-assignable.
      * 'id' — auto-increment, tidak boleh diisi manual.
-     * 'status' dan 'state' — hanya boleh diubah via state machine methods:
-     *   checkIn(), checkOut(), approve(), reject().
-     *
-     * $fillable sudah didefinisikan di atas sebagai whitelist.
-     * $guarded di sini sebagai lapisan keamanan tambahan (defense-in-depth).
+     * 'status' dan 'state' — protection is enforced by the mutators:
+     *   allowed on create, blocked on update of existing records
+     *   (only state machine methods may change them).
      */
-    protected $guarded = ['id', 'status', 'state'];
+    protected $guarded = ['id'];
 
     protected $casts = [
         'attendance_date' => 'date',
@@ -233,7 +234,7 @@ class Attendance extends Model
     // ─────────────────────────────────────────────────────────────────────
 
     /**
-     * Block direct status modification ALWAYS (except when unguarded for testing)
+     * Block direct status modification of EXISTING records
      * 
      * Status is automatically synced from state via syncLegacyStatus()
      * 
@@ -242,7 +243,8 @@ class Attendance extends Model
     public function setStatusAttribute($value): void
     {
         // Allow direct assignment when model is unguarded (for testing purposes)
-        if (static::isUnguarded()) {
+        // or while the record is still being created (initial values).
+        if (static::isUnguarded() || ! $this->exists) {
             $this->attributes['status'] = $value;
             return;
         }
@@ -255,7 +257,7 @@ class Attendance extends Model
     }
 
     /**
-     * Block direct state modification via mass assignment
+     * Block direct state modification of EXISTING records
      * State can ONLY be changed via transitionTo() in HasAttendanceStateMachine
      * 
      * @throws \App\Exceptions\StateViolationException
@@ -263,7 +265,8 @@ class Attendance extends Model
     public function setStateAttribute($value): void
     {
         // Allow direct assignment when model is unguarded (for testing purposes)
-        if (static::isUnguarded()) {
+        // or while the record is still being created (initial values).
+        if (static::isUnguarded() || ! $this->exists) {
             $this->attributes['state'] = $value instanceof \App\Enums\AttendanceState 
                 ? $value->value 
                 : $value;

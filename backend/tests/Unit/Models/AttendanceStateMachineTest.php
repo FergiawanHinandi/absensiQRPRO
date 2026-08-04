@@ -519,20 +519,20 @@ class AttendanceStateMachineTest extends TestCase
     // ─────────────────────────────────────────────────────────────────────
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function status_and_state_are_not_in_fillable()
+    public function status_and_state_are_mutator_guarded()
     {
-        $fillable = (new Attendance())->getFillable();
+        $model = new Attendance();
 
-        $this->assertNotContains('status', $fillable);
-        $this->assertNotContains('state', $fillable);
-    }
+        $this->assertContains('status', $model->getFillable());
+        $this->assertContains('state', $model->getFillable());
 
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function status_and_state_are_in_guarded()
-    {
-        $guarded = (new Attendance())->getGuarded();
+        $attendance = Attendance::factory()->create([
+            'state' => AttendanceState::INIT,
+            'student_id' => $this->student->id,
+        ]);
 
-        $this->assertContains('status', $guarded);
-        $this->assertContains('state', $guarded);
+        $this->expectException(StateViolationException::class);
+
+        $attendance->state = AttendanceState::CHECKED_IN;
     }
 }
