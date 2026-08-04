@@ -289,59 +289,22 @@ final class AttendanceCheckInService
              throw AttendanceException::invalidRole();
         }
 
-        // 2. Validate QR & Extract Payload
-        $payload = $this->validateQrToken($qrToken, $request);
-        $studentId = $payload['id'] ?? $payload['sid'] ?? null;
-        $schoolId = $payload['sch'] ?? $payload['school_id'] ?? null;
-        $nonce = $payload['n'] ?? null;
-
-        if ($schoolId != $teacher->school_id) {
-             throw new AttendanceException('QR Code tidak valid untuk sekolah ini.');
-        }
-
-        // 3. Find & Validate Student
-        $student = User::where('id', $studentId)
-            ->where('school_id', $teacher->school_id)
-            ->where('role_type', 'student')
-            ->first();
-
-        if (! $student || ! $student->is_active) {
-            throw AttendanceException::studentNotFound();
-        }
-
-        // 4. Find Schedule (Must be owned by teacher)
-        $schedule = $this->findTeacherSchedule($teacher, $request);
-
-        // 5. Verify Student in Class
-        $this->validateStudentInClass($student, $schedule);
-
-        // 6. Validate Teacher Location (Geofence)
-        $this->geofenceService->validate($teacher->school, $data['lat'] ?? null, $data['lng'] ?? null, $request);
-
-        // 7. Validate Time Window
-        $attendanceStatus = $this->timeWindowService->validate($schedule, $teacher->school);
-
-        // 8. Atomic Check-In
-        $requestId = $data['request_id'] ?? (string) Str::uuid();
-
-        $attendance = $this->atomicCheckIn(
-            $student,
-            $schedule,
-            $attendanceStatus,
-            $data,
-            $requestId,
-            $nonce,
-            $request,
-            'teacher_scan',
-            $teacher->id
+        // 2. Delegate to the canonical teacher-scan flow (single source of truth)
+        $result = $this->recordByTeacherScan(
+            teacher: $teacher,
+            qrToken: $qrToken,
+            lat: $data['lat'] ?? null,
+            lng: $data['lng'] ?? null,
+            deviceId: $data['device_id'] ?? null,
+            requestId: $data['request_id'] ?? ($request ? $request->header('X-Request-ID') : null),
         );
 
         return new AttendanceResult(
             success: true,
-            attendance: $attendance,
+            attendance: $result['attendance'],
             message: 'Absensi berhasil dicatat oleh guru.',
-            status: $attendanceStatus,
-            isIdempotentRetry: false
+            status: $result['attendance']->status,
+            isIdempotentRetry: $result['is_retry'] ?? false
         );
     }
 
@@ -928,11 +891,11 @@ final class AttendanceCheckInService
         ?string $requestId = null,
     ): array {
         // 1. Verify Teacher Role
-        if ($teacher->role_type !== 'teacher') {
+        if (! in_array($teacher->role_type, ['teacher', 'homeroom_teacher'])) {
             $this->logSecurityAnomaly('invalid_role_scan_attempt', [
                 'user_id' => $teacher->id,
                 'role' => $teacher->role_type,
-                'expected' => 'teacher',
+                'expected' => 'teacher,homeroom_teacher',
             ]);
             throw AttendanceException::invalidRole();
         }
@@ -1038,8 +1001,8 @@ final class AttendanceCheckInService
             $student->id,
             $schedule->id,
             $now->format('Y-m-d'),
-            function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken) {
-                return DB::transaction(function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken) {
+            function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken, $now) {
+                return DB::transaction(function () use ($teacher, $student, $schedule, $schoolId, $nonce, $lat, $lng, $deviceId, $requestId, $qrToken, $now) {
                     // Nonce Check
                     if ($nonce && $this->replayPreventionService) {
                          if ($this->replayPreventionService->checkNonceReplay($nonce, $schoolId)) {
@@ -1051,7 +1014,20 @@ final class AttendanceCheckInService
 
                 // Check Existing
                 $existingAttendance = $this->findExistingAttendanceWithLock($student->id, $schedule->id, $now->toDateString());
-                
+
+                // Idempotency by request_id takes precedence: a retry of the
+                // SAME logical request (same request_id) must return the
+                // existing record instead of a duplicate-submission error.
+                $reqId = $requestId ?: request()->header('X-Request-ID');
+                if ($existingAttendance && $reqId && $existingAttendance->request_id === $reqId) {
+                    return [
+                        'attendance' => $existingAttendance,
+                        'student' => $student,
+                        'schedule' => $schedule,
+                        'is_retry' => true,
+                    ];
+                }
+
                 if ($existingAttendance) {
                      if ($this->replayPreventionService) {
                         $this->replayPreventionService->markStudentScanned($student->id, $schedule->id, $schoolId, $existingAttendance->id);
@@ -1060,14 +1036,14 @@ final class AttendanceCheckInService
                 }
 
                 // Idempotency
-                $reqId = $requestId ?: request()->header('X-Request-ID');
                 if ($reqId) {
                     $existing = Attendance::where('request_id', $reqId)->lockForUpdate()->first();
                     if ($existing) {
                          return [
                             'attendance' => $existing,
                             'student' => $student,
-                            'schedule' => $schedule
+                            'schedule' => $schedule,
+                            'is_retry' => true,
                         ];
                     }
                 }
@@ -1094,7 +1070,6 @@ final class AttendanceCheckInService
                         'is_manual' => false,
                         'recorded_by' => $teacher->id,
                         'request_id' => $reqId,
-                        'nonce' => $nonce,
                     ]
                 );
 

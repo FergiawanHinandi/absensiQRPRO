@@ -41,6 +41,7 @@ class Attendance extends Model
         'school_id',
         'schedule_id',
         'class_id',
+        'subject_id',
         'student_id',
         'attendance_date',
         'attendance_type',
